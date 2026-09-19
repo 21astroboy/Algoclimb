@@ -1,0 +1,17 @@
+{
+  "name": "algoclimb",
+  "version": "0.1.0",
+  "description": "Интерактивное приложение для лекций: лобби, интерактивные графы, гора прогресса, посещаемость",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

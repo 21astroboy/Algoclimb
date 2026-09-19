@@ -1,0 +1,16 @@
+services:
+  algoclimb:
+    build: .
+    container_name: algoclimb
+    ports:
+      - "3000:3000"
+    environment:
+      # Адрес ноутбука в сети вуза — попадёт в QR-код для студентов.
+      # Узнать: macOS — System Settings → Wi-Fi → Details; или `ipconfig getifaddr en0`.
+      # Если не задать, QR покажет внутренний IP контейнера и телефоны не подключатся.
+      - HOST_IP=${HOST_IP:-}
+      - PORT=3000
+    volumes:
+      # База и журналы переживают перезапуск контейнера.
+      - ./data:/app/data
+    restart: unless-stopped

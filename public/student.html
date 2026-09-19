@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>AlgoClimb</title>
+<style>
+  :root{--bg:#08111f;--bg2:#0c1d36;--panel:#102544;--panel2:#0c1c34;--line:#1d3a63;
+    --accent:#ffd23f;--accent2:#f5b400;--blue:#5aa9ff;--text:#e8eef7;--muted:#8195b4;--green:#3ddc84;--red:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:radial-gradient(900px 600px at 50% -10%,#14385f,#0c1d36 50%,#08111f);color:var(--text);min-height:100vh}
+  .katex{font-size:1.05em}
+  .wrap{max-width:560px;margin:0 auto;padding:20px}
+  .logo{font-weight:800;font-size:22px;text-align:center;margin:8px 0 18px}
+  .logo b{color:var(--accent)}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:20px}
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+  input{width:100%;padding:13px;border-radius:11px;border:1px solid var(--line);background:#0a1b33;color:var(--text);font-size:16px}
+  .icons{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .ic{font-size:24px;width:46px;height:46px;border-radius:11px;border:1px solid var(--line);background:#0a1b33;display:grid;place-items:center;cursor:pointer}
+  .ic.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .btn{width:100%;margin-top:18px;padding:14px;border:none;border-radius:12px;font-weight:800;font-size:16px;cursor:pointer;
+    background:linear-gradient(180deg,var(--accent),var(--accent2));color:#10243f}
+  .err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+  .center{text-align:center}
+  .big{font-size:20px;font-weight:800;margin:10px 0;white-space:pre-wrap}
+  .hidden{display:none}
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .timer{margin-left:auto;font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--accent);font-size:18px}
+  .timer.low{color:var(--red)}
+  .tbar{height:6px;border-radius:99px;background:#0a1b33;overflow:hidden;margin:4px 0 12px}
+  .tbar i{display:block;height:100%;background:var(--accent);width:100%;transition:width .25s linear}
+  .tbar i.low{background:var(--red)}
+  .dots{display:flex;gap:6px}.dots i{width:9px;height:9px;border-radius:99px;background:var(--line)}
+  .dots i.done{background:var(--green)}.dots i.cur{background:var(--accent)}
+  .score{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--green)}
+  .opt{display:block;width:100%;text-align:left;margin-top:10px;padding:14px;border-radius:12px;border:1px solid var(--line);
+    background:#0a1b33;color:var(--text);font-size:15px;cursor:pointer;transition:.15s}
+  .opt:hover{border-color:var(--blue)}
+  .opt:disabled{cursor:default;opacity:.85}
+  .opt.right{border-color:var(--green);background:#0f2e22;box-shadow:0 0 0 1px var(--green) inset}
+  .opt.wrong{border-color:var(--red);background:#341820;box-shadow:0 0 0 1px var(--red) inset}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .gbtn{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);font-weight:700;cursor:pointer}
+  .gbtn.on{border-color:var(--accent);color:var(--accent)}
+  .gbtn:disabled{opacity:.4;cursor:default}
+  #graph{width:100%;height:300px;background:#0a1c34;border:1px solid var(--line);border-radius:12px;touch-action:none;display:block}
+  .sortrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0}
+  .stile{min-width:52px;padding:16px 14px;border-radius:12px;border:2px solid var(--line);background:#0f2a4d;
+    color:#e8eef7;font-weight:800;font-size:20px;cursor:pointer;text-align:center;user-select:none;transition:transform .08s}
+  .stile.sel{border-color:var(--accent);color:var(--accent);transform:translateY(-4px)}
+  .stile:disabled{opacity:.5;cursor:default}
+  .blankwrap{font-size:17px;line-height:2.1;white-space:pre-wrap;margin:8px 0}
+  .blankin{display:inline-block;min-width:90px;padding:6px 8px;border-radius:8px;border:1px solid var(--accent);
+    background:#0a1c34;color:#e8eef7;font-weight:700;font-size:15px;vertical-align:middle}
+  .blankin:disabled{opacity:.6}
+  .feedback{margin-top:12px;font-weight:800;min-height:24px;font-size:16px}
+  .ok{color:var(--green)}.no{color:var(--red)}.wait{color:var(--muted)}
+  .medal{font-size:54px}
+  /* разбор после игры */
+  .review{margin-top:18px;text-align:left}
+  .review h3{font-size:15px;margin:0 0 10px;color:var(--muted);font-weight:700;text-align:center}
+  .rq{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#0a1c34}
+  .rq .rhead{display:flex;gap:8px;align-items:flex-start;font-weight:700;font-size:14px}
+  .rq .badge{flex:none;font-size:16px}
+  .rq.ok-q{border-color:rgba(61,220,132,.5)}
+  .rq.no-q{border-color:rgba(255,90,90,.45)}
+  .rq .rline{font-size:13px;margin-top:6px;color:var(--text)}
+  .rq .rline .lbl{color:var(--muted)}
+  .rq .yours.wrongtxt{color:var(--red)}
+  .rq .corr{color:var(--green)}
+  .rq .explain{font-size:13px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:#cfe0ff}
+  .bonus{font-size:13px;font-weight:700;margin-top:4px}
+  .bonus .spd{color:#ffd23f}.bonus .stk{color:#ff8c42}
+</style>
+<link rel="stylesheet" href="/vendor/katex/katex.min.css">
+<script src="/vendor/katex/katex.min.js"></script>
+<script src="/vendor/katex/auto-render.min.js"></script>
+</head>
+<body>
+<style>
+  /* антискрин: запрет выделения/копирования (поля ввода исключены) */
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  input,textarea{-webkit-user-select:text;user-select:text}
+  /* водяной знак с ником — не мешает игре (pointer-events:none) */
+  #wm{position:fixed;inset:0;z-index:9999;pointer-events:none;background-repeat:repeat;display:none}
+</style>
+<div id="wm"></div>
+<div class="wrap">
+  <div class="logo">Algo<b>Climb</b></div>
+
+  <!-- JOIN -->
+  <div class="card" id="join">
+    <div class="big center">Вход в сессию</div>
+    <label>Твой ник (выдан преподавателем)</label>
+    <input id="nick" placeholder="например, neo" autocomplete="off">
+    <div id="tokWrap" class="hidden">
+      <label>Код с экрана (QR)</label>
+      <input id="tok" placeholder="6 символов" autocomplete="off" maxlength="7">
+    </div>
+    <label>Иконка</label>
+    <div class="icons" id="icons"></div>
+    <button class="btn" id="joinBtn">Войти в лобби</button>
+    <div class="err" id="joinErr"></div>
+  </div>
+
+  <!-- LOBBY -->
+  <div class="card center hidden" id="lobby">
+    <div class="medal">⛺</div>
+    <div class="big">Ты в лобби, <span id="meNick"></span> <span id="meIcon"></span></div>
+    <div style="color:var(--muted)">Ждём, пока преподаватель начнёт восхождение…</div>
+  </div>
+
+  <!-- TASK -->
+  <div class="card hidden" id="task">
+    <div class="head">
+      <div class="dots" id="dots"></div>
+      <span class="score" id="myScore"></span>
+      <div class="timer" id="timer">00:00</div>
+    </div>
+    <div class="tbar"><i id="tfill"></i></div>
+    <div class="big" id="prompt"></div>
+    <div id="body"></div>
+    <div class="feedback" id="fb"></div>
+  </div>
+
+  <!-- FINISHED -->
+  <div class="card center hidden" id="done">
+    <div class="medal" id="medal">🏔️</div>
+    <div class="big" id="doneMsg">Готово!</div>
+    <div style="color:var(--muted)" id="doneSub"></div>
+    <div id="review" class="review hidden"></div>
+  </div>
+</div>
+
+<script>
+const ICONS=['👾','🐺','🦊','🦉','🐉','🤖','👻','🦅','🐙','🦂','🦇','🐍','💀','🎭','⚡','🔥'];
+let icon='👾', me=null, curTask=null, answered=false, locked=false;
+let limitMs=0, deadline=0, clockOffset=0, timerInt=null, myScore=0;
+const $=id=>document.getElementById(id);
+function show(id){['join','lobby','task','done'].forEach(s=>$(s).classList.toggle('hidden',s!==id));}
+
+ICONS.forEach((c,i)=>{const d=document.createElement('div');d.className='ic'+(i===0?' sel':'');d.textContent=c;
+  d.onclick=()=>{document.querySelectorAll('.ic').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');icon=c;};
+  $('icons').appendChild(d);});
+
+/* антискрин: водяной знак с ником + запрет копирования/ПКМ */
+function applyWatermark(text){
+  const safe=String(text).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="520" height="340">'+
+    '<text x="0" y="185" transform="rotate(-28 260 175)" fill="rgba(255,255,255,0.06)" '+
+    'font-size="20" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700">'+safe+'</text></svg>';
+  const wm=document.getElementById('wm');
+  wm.style.backgroundImage='url("data:image/svg+xml;utf8,'+encodeURIComponent(svg)+'")';
+  wm.style.display='block';
+}
+['contextmenu','copy','cut','dragstart'].forEach(ev=>
+  document.addEventListener(ev,e=>{ if(!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault(); }));
+
+const proto=location.protocol==='https:'?'wss':'ws';
+const ws=new WebSocket(`${proto}://${location.host}/?role=student`);
+ws.onmessage=e=>handle(JSON.parse(e.data));
+ws.onclose=()=>{ if(me&&(!me.done)) $('fb').innerHTML='<span class="no">Соединение потеряно. Обнови страницу.</span>'; };
+
+// Код входа из QR (?t=КОД): подставляем сам, ручной ввод не нужен.
+const urlTok=(new URLSearchParams(location.search).get('t')||'').trim().toUpperCase();
+if(urlTok) $('tok').value=urlTok;
+// Одноразовый код входа — берём свежий при загрузке и после каждого отказа.
+let joinNonce=null;
+async function fetchNonce(){ try{ const r=await fetch('/api/nonce',{cache:'no-store'}); joinNonce=(await r.json()).nonce; }catch(e){} }
+fetchNonce();
+
+$('joinBtn').onclick=async ()=>{
+  const nick=$('nick').value.trim();
+  if(!nick){$('joinErr').textContent='Введи ник';return;}
+  if(!joinNonce) await fetchNonce();
+  const token=(urlTok||$('tok').value.trim().toUpperCase());
+  ws.send(JSON.stringify({type:'join',nick,icon,token,nonce:joinNonce}));
+};
+
+function handle(m){
+  if(m.type==='rejected'){
+    // Код входа берётся из QR автоматически — вручную вводить не нужно.
+    // Если код невалиден/протух — просим отсканировать QR заново, а не печатать.
+    if(/код/i.test(m.reason)) $('joinErr').textContent='Отсканируйте QR-код с экрана заново и снова нажмите «Войти».';
+    else $('joinErr').textContent=m.reason;
+    fetchNonce();   // выдать свежий одноразовый код для повторной попытки
+    return; }
+  if(m.type==='joined'){ me=m; $('meNick').textContent=m.nick; $('meIcon').textContent=m.icon;
+    applyWatermark(m.nick+' '+(m.icon||''));
+    show(m.status==='running'?'task':'lobby'); return; }
+  if(m.type==='task'){ renderTask(m); return; }
+  if(m.type==='paused'){ onPaused(); return; }
+  if(m.type==='resumed'){ onResumed(m); return; }
+  if(m.type==='addtime'){ onAddTime(m); return; }
+  if(m.type==='answered'){ showAnswered(m); return; }
+  if(m.type==='roundover'){ roundOver(m); return; }
+  if(m.type==='finished'){ finished(m.place,m.score); return; }
+  if(m.type==='sessionend'){ finished(m.place,m.score,m.correct,m.total,m.review,m.bestStreak); return; }
+  if(m.type==='kicked'){ kicked(); return; }
+}
+
+function fmt(ms){const s=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
+function startTimer(){
+  clearInterval(timerInt);
+  const tick=()=>{
+    const now=Date.now()+clockOffset;
+    const left=deadline-now;
+    $('timer').textContent=fmt(left);
+    const frac=Math.max(0,Math.min(1,left/limitMs));
+    $('tfill').style.width=(frac*100)+'%';
+    const low=left<=3000;
+    $('timer').classList.toggle('low',low); $('tfill').classList.toggle('low',low);
+    if(left<=0){ clearInterval(timerInt); if(!answered){ lockInputs(); $('fb').innerHTML='<span class="no">Время вышло</span>'; } }
+  };
+  tick(); timerInt=setInterval(tick,250);
+}
+
+/* ---- пауза/продолжение/+время от преподавателя ---- */
+function onPaused(){
+  clearInterval(timerInt);
+  if(answered||locked) return;
+  $('timer').textContent='⏸';
+  $('fb').innerHTML='<span class="wait">⏸ Пауза — преподаватель приостановил вопрос</span>';
+}
+function onResumed(m){
+  if(answered||locked) return;
+  if(typeof m.limit==='number') limitMs=m.limit;
+  deadline=m.deadline; clockOffset=(m.serverTime||Date.now())-Date.now();
+  $('fb').textContent='';
+  startTimer();
+}
+function onAddTime(m){
+  deadline=m.deadline; clockOffset=(m.serverTime||Date.now())-Date.now();
+  if(!answered&&!locked){
+    startTimer();
+    $('fb').innerHTML='<span class="wait">⏱ Преподаватель добавил время</span>';
+    setTimeout(()=>{ if(!answered&&!locked&&/добавил время/.test($('fb').textContent)) $('fb').textContent=''; },1500);
+  }
+}
+
+function renderTask(m){
+  show('task'); curTask=m.task; answered=false; locked=false;
+  $('fb').textContent=''; $('myScore').textContent=myScore?('очки: '+myScore):'';
+  limitMs=m.limit; deadline=m.deadline; clockOffset=(m.serverTime||Date.now())-Date.now();
+  $('dots').innerHTML=Array.from({length:m.total},(_,i)=>
+    `<i class="${i<m.index?'done':i===m.index?'cur':''}"></i>`).join('');
+  $('prompt').textContent=m.task.prompt; mathify($('prompt'));
+  startTimer();
+  if(m.task.type==='choice') renderChoice(m.task);
+  else if(m.task.type==='graph') renderGraph(m.task);
+  else if(m.task.type==='order') renderOrder(m.task);
+  else if(m.task.type==='sort') renderSort(m.task);
+  else if(m.task.type==='blank') renderBlank(m.task);
+}
+
+function lockInputs(){
+  locked=true;
+  document.querySelectorAll('.opt').forEach(b=>b.disabled=true);
+  document.querySelectorAll('.gbtn').forEach(b=>b.disabled=true);
+  document.querySelectorAll('.stile,.blankin').forEach(b=>b.disabled=true);
+}
+
+function renderChoice(t){
+  $('body').innerHTML=t.options.map((o,i)=>`<button class="opt" data-i="${i}">${esc(o)}</button>`).join('');
+  mathify($('body'));
+  document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    if(answered||locked) return;
+    answered=true; lockInputs();
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{choice:+b.dataset.i}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>';
+  });
+}
+
+function showAnswered(m){
+  answered=true; lockInputs();
+  $('myScore').textContent=myScore!==undefined?('очки: '+(myScore)) : '';
+  if(curTask&&curTask.type==='choice'&&m.picked!=null){
+    const b=document.querySelector(`.opt[data-i="${m.picked}"]`);
+    if(b) b.classList.add(m.correct?'right':'wrong');
+  }
+  if(m.correct){ myScore+=m.points||0; $('myScore').textContent='очки: '+myScore;
+    const parts=[];
+    if(m.speedBonus>0) parts.push(`<span class="spd">⚡ +${m.speedBonus} за скорость</span>`);
+    if(m.streakBonus>0) parts.push(`<span class="stk">🔥 +${m.streakBonus} серия ×${m.streak}</span>`);
+    const bonus=parts.length?`<div class="bonus">${parts.join(' · ')}</div>`:'';
+    $('fb').innerHTML=`<span class="ok">Верно! +${m.points} очк.</span>${bonus}`; }
+  else $('fb').innerHTML='<span class="no">Неверно — 0 очков за вопрос</span>';
+}
+
+function roundOver(m){
+  lockInputs();
+  if(!answered){ $('fb').innerHTML='<span class="no">Время вышло — 0 очков</span>'; }
+  setTimeout(()=>{ if(!$('done').classList.contains('hidden')) return;
+    $('fb').innerHTML='<span class="wait">Следующий вопрос…</span>'; },700);
+}
+
+/* ---- graph builder ---- */
+function renderGraph(t){
+  if(t.weighted) return renderWeightedGraph(t);
+  $('body').innerHTML=`
+    ${t.hint?`<div style="font-size:12px;color:var(--accent);margin-bottom:6px">💡 ${esc(t.hint)}</div>`:''}
+    <div class="toolbar">
+      <button class="gbtn on" data-mode="edge" id="gm-edge">／ Соединить</button>
+      <button class="gbtn" data-mode="del" id="gm-del">✕ Удалить ребро</button>
+      <button class="gbtn" id="gclear">Очистить</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+    </div>
+    <canvas id="graph"></canvas>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Соединить: потяни от вершины к вершине — или тапни по двум вершинам. «Удалить»: клик по ребру.</div>`;
+  const cv=$('graph'),ctx=cv.getContext('2d');
+  // dragFrom / sel — это ИНДЕКСЫ вершин (не объекты), чтобы пересоздание nodes при resize их не ломало.
+  const labels=t.nodes; let nodes=[],edges=[],mode='edge',dragFrom=-1,sel=-1,mouse=null,downPos=null;
+  function resize(){const r=cv.getBoundingClientRect();cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);place();draw();}
+  function place(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio,cx=w/2,cy=h/2,R=Math.min(w,h)/2-40;
+    nodes=labels.map((l,i)=>{const a=-Math.PI/2+i*2*Math.PI/labels.length;return{label:l,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)};});}
+  function pos(e){const r=cv.getBoundingClientRect();
+    const p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
+    return{x:p.clientX-r.left,y:p.clientY-r.top};}
+  function hit(p){for(let i=0;i<nodes.length;i++){const n=nodes[i];if(Math.hypot(n.x-p.x,n.y-p.y)<26)return i;}return -1;}
+  function edgeHit(p){return edges.find(ed=>{const a=nodes[ed.a],b=nodes[ed.b];if(!a||!b)return false;
+    const d=Math.abs((b.y-a.y)*p.x-(b.x-a.x)*p.y+b.x*a.y-b.y*a.x)/Math.hypot(b.x-a.x,b.y-a.y);
+    const within=p.x>=Math.min(a.x,b.x)-8&&p.x<=Math.max(a.x,b.x)+8&&p.y>=Math.min(a.y,b.y)-8&&p.y<=Math.max(a.y,b.y)+8;
+    return d<10&&within;});}
+  function hasEdge(ai,bi){return edges.some(ed=>(ed.a===ai&&ed.b===bi)||(ed.a===bi&&ed.b===ai));}
+  function addEdge(ai,bi){if(ai<0||bi<0||ai===bi)return;if(!hasEdge(ai,bi))edges.push({a:ai,b:bi});}
+  function draw(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio;ctx.clearRect(0,0,w,h);
+    edges.forEach(ed=>{const a=nodes[ed.a],b=nodes[ed.b];if(!a||!b)return;ctx.lineWidth=3;ctx.strokeStyle='#5aa9ff';
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+    if(dragFrom>=0&&mouse&&nodes[dragFrom]){const d=nodes[dragFrom];ctx.setLineDash([5,5]);ctx.strokeStyle='#cfe0ff';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(mouse.x,mouse.y);ctx.stroke();ctx.setLineDash([]);}
+    nodes.forEach((n,i)=>{ctx.beginPath();ctx.arc(n.x,n.y,19,0,7);ctx.fillStyle='#0f2a4d';ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle=(i===sel)?'#3ddc84':'#ffd23f';ctx.stroke();
+      ctx.fillStyle='#e8eef7';ctx.font='700 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);});}
+  function down(e){if(answered||locked)return;e.preventDefault();const p=pos(e);downPos=p;
+    if(mode==='edge'){const n=hit(p);if(n>=0){dragFrom=n;mouse=p;}}
+    else if(mode==='del'){const ed=edgeHit(p);if(ed){edges=edges.filter(x=>x!==ed);draw();}}}
+  function move(e){if(dragFrom>=0){mouse=pos(e);draw();}}
+  function up(e){if(answered||locked){dragFrom=-1;mouse=null;return;}
+    if(mode!=='edge'){dragFrom=-1;mouse=null;return;}
+    const p=pos(e);const n=hit(p);
+    const moved=downPos&&Math.hypot(p.x-downPos.x,p.y-downPos.y)>8;
+    if(dragFrom>=0&&n>=0&&n!==dragFrom){            // протянули от вершины к вершине
+      addEdge(dragFrom,n);sel=-1;
+    }else if(n>=0&&!moved){                          // тап по вершине — режим «выбрать две»
+      if(sel<0)sel=n;                               // выбрали первую
+      else if(sel===n)sel=-1;                        // повторный тап — снять выбор
+      else{addEdge(sel,n);sel=-1;}                   // выбрали вторую — соединили
+    }
+    dragFrom=-1;mouse=null;draw();}
+  cv.addEventListener('mousedown',down);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',e=>{e.preventDefault();move(e);},{passive:false});
+  cv.addEventListener('touchend',e=>{e.preventDefault();up(e);},{passive:false});
+  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{if(answered||locked)return;mode=b.dataset.mode;sel=-1;
+    document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('on',x===b));draw();});
+  $('gclear').onclick=()=>{if(answered||locked)return;edges=[];sel=-1;draw();};
+  $('gsubmit').onclick=()=>{ if(answered||locked) return;
+    answered=true; lockInputs();
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{edges:edges.map(ed=>[nodes[ed.a].label,nodes[ed.b].label])}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>'; };
+  window.addEventListener('resize',resize);resize();
+}
+
+/* ---- взвешенный построитель: выбор рёбер из готового графа (для остова/MST) ---- */
+function renderWeightedGraph(t){
+  $('body').innerHTML=`
+    ${t.hint?`<div style="font-size:12px;color:var(--accent);margin-bottom:6px">💡 ${esc(t.hint)}</div>`:''}
+    <div class="toolbar">
+      <button class="gbtn" id="gclear">Сбросить выбор</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+    </div>
+    <canvas id="graph"></canvas>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Нажимайте на рёбра, чтобы включить/исключить их из остова. Подписаны веса.</div>`;
+  const cv=$('graph'),ctx=cv.getContext('2d');
+  const labels=t.nodes, ref=t.refEdges||[];           // ref: [labelA,labelB,weight]
+  const idx={}; labels.forEach((l,i)=>idx[l]=i);
+  let nodes=[]; const chosen=new Set();                // множество индексов выбранных рёбер
+  function resize(){const r=cv.getBoundingClientRect();cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);place();draw();}
+  function place(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio,cx=w/2,cy=h/2,R=Math.min(w,h)/2-40;
+    nodes=labels.map((l,i)=>{const a=-Math.PI/2+i*2*Math.PI/labels.length;return{label:l,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)};});}
+  function pos(e){const r=cv.getBoundingClientRect();
+    const p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
+    return{x:p.clientX-r.left,y:p.clientY-r.top};}
+  function edgeAt(p){let best=-1,bd=12;
+    ref.forEach((ed,i)=>{const a=nodes[idx[ed[0]]],b=nodes[idx[ed[1]]];if(!a||!b)return;
+      const d=Math.abs((b.y-a.y)*p.x-(b.x-a.x)*p.y+b.x*a.y-b.y*a.x)/Math.hypot(b.x-a.x,b.y-a.y);
+      const within=p.x>=Math.min(a.x,b.x)-8&&p.x<=Math.max(a.x,b.x)+8&&p.y>=Math.min(a.y,b.y)-8&&p.y<=Math.max(a.y,b.y)+8;
+      if(d<bd&&within){bd=d;best=i;}});
+    return best;}
+  function draw(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio;ctx.clearRect(0,0,w,h);
+    // 1) сначала все рёбра
+    ref.forEach((ed,i)=>{const a=nodes[idx[ed[0]]],b=nodes[idx[ed[1]]];if(!a||!b)return;
+      const on=chosen.has(i);
+      ctx.lineWidth=on?5:2;ctx.strokeStyle=on?'#3ddc84':'#3a5575';
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+    // 2) потом подписи весов — поверх всех рёбер, чтобы их не перекрывало
+    ref.forEach((ed,i)=>{const a=nodes[idx[ed[0]]],b=nodes[idx[ed[1]]];if(!a||!b)return;
+      const on=chosen.has(i);const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      ctx.fillStyle='#0a1c34';ctx.beginPath();ctx.arc(mx,my,12,0,7);ctx.fill();
+      ctx.lineWidth=1.5;ctx.strokeStyle=on?'#3ddc84':'#3a5575';ctx.stroke();
+      ctx.fillStyle=on?'#3ddc84':'#ffd23f';ctx.font='700 13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(String(ed[2]),mx,my);});
+    // 3) вершины — поверх всего
+    nodes.forEach(n=>{ctx.beginPath();ctx.arc(n.x,n.y,19,0,7);ctx.fillStyle='#0f2a4d';ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle='#ffd23f';ctx.stroke();
+      ctx.fillStyle='#e8eef7';ctx.font='700 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.label,n.x,n.y);});}
+  function toggle(e){if(answered||locked)return;e.preventDefault();const i=edgeAt(pos(e));
+    if(i>=0){chosen.has(i)?chosen.delete(i):chosen.add(i);draw();}}
+  cv.addEventListener('mouseup',toggle);
+  cv.addEventListener('touchend',e=>{e.preventDefault();toggle(e);},{passive:false});
+  $('gclear').onclick=()=>{if(answered||locked)return;chosen.clear();draw();};
+  $('gsubmit').onclick=()=>{ if(answered||locked) return;
+    answered=true; lockInputs();
+    const edges=[...chosen].map(i=>[ref[i][0],ref[i][1]]);
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{edges}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>'; };
+  window.addEventListener('resize',resize);resize();
+}
+
+/* ---- обход графа: клик по вершинам в порядке посещения (BFS/DFS) ---- */
+function renderOrder(t){
+  const modeName=t.mode==='bfs'?'в ширину (BFS)':'в глубину (DFS)';
+  $('body').innerHTML=`
+    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Обход ${modeName}. Старт: вершина ${esc(t.start)}. Кликайте вершины по порядку посещения.</div>
+    <div class="toolbar">
+      <button class="gbtn" id="gundo">↶ Отменить</button>
+      <button class="gbtn" id="gclear">Сбросить</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+    </div>
+    <canvas id="graph"></canvas>
+    <div id="ordseq" style="font-size:14px;color:#d6f5e2;margin-top:8px;min-height:20px"></div>`;
+  const cv=$('graph'),ctx=cv.getContext('2d');
+  const labels=t.nodes, idx={}; labels.forEach((l,i)=>idx[l]=i);
+  const edges=(t.edges||[]).map(e=>[idx[e[0]],idx[e[1]]]);
+  let nodes=[]; let order=[];                          // order: индексы вершин в порядке кликов
+  function seqText(){ $('ordseq').innerHTML=order.length
+    ? '<b>Порядок:</b> '+order.map(i=>esc(labels[i])).join(' → ')
+    : '<span style="color:var(--muted)">Пока ничего не выбрано</span>'; }
+  function resize(){const r=cv.getBoundingClientRect();cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);place();draw();}
+  function place(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio,cx=w/2,cy=h/2,R=Math.min(w,h)/2-40;
+    nodes=labels.map((l,i)=>{const a=-Math.PI/2+i*2*Math.PI/labels.length;return{label:l,x:cx+R*Math.cos(a),y:cy+R*Math.sin(a)};});}
+  function pos(e){const r=cv.getBoundingClientRect();
+    const p=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e;
+    return{x:p.clientX-r.left,y:p.clientY-r.top};}
+  function hit(p){for(let i=0;i<nodes.length;i++){const n=nodes[i];if(Math.hypot(n.x-p.x,n.y-p.y)<26)return i;}return -1;}
+  function draw(){const w=cv.width/devicePixelRatio,h=cv.height/devicePixelRatio;ctx.clearRect(0,0,w,h);
+    edges.forEach(ed=>{const a=nodes[ed[0]],b=nodes[ed[1]];if(!a||!b)return;ctx.lineWidth=2.5;ctx.strokeStyle='#3a5575';
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+    nodes.forEach((n,i)=>{const ord=order.indexOf(i);const visited=ord>=0;const isStart=labels[i]===t.start;
+      ctx.beginPath();ctx.arc(n.x,n.y,19,0,7);
+      ctx.fillStyle=visited?'#16331f':'#0f2a4d';ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle=visited?'#3ddc84':(isStart?'#ff8fb3':'#ffd23f');ctx.stroke();
+      ctx.fillStyle='#e8eef7';ctx.font='700 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(n.label,n.x,n.y);
+      if(visited){ctx.beginPath();ctx.arc(n.x+15,n.y-15,10,0,7);ctx.fillStyle='#3ddc84';ctx.fill();
+        ctx.fillStyle='#06210f';ctx.font='700 12px sans-serif';ctx.fillText(String(ord+1),n.x+15,n.y-15);}
+      else if(isStart){ctx.fillStyle='#ff8fb3';ctx.font='700 10px sans-serif';ctx.fillText('старт',n.x,n.y+27);}});}
+  function tap(e){if(answered||locked)return;e.preventDefault();const i=hit(pos(e));
+    if(i<0)return; if(order.indexOf(i)>=0)return;      // уже посещена
+    order.push(i);draw();seqText();}
+  cv.addEventListener('mouseup',tap);
+  cv.addEventListener('touchend',e=>{e.preventDefault();tap(e);},{passive:false});
+  $('gundo').onclick=()=>{if(answered||locked)return;order.pop();draw();seqText();};
+  $('gclear').onclick=()=>{if(answered||locked)return;order=[];draw();seqText();};
+  $('gsubmit').onclick=()=>{ if(answered||locked) return;
+    answered=true; lockInputs();
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{order:order.map(i=>labels[i])}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>'; };
+  window.addEventListener('resize',resize);resize();seqText();
+}
+
+/* ---- пошаговая сортировка: тапни две плитки, чтобы поменять местами ---- */
+function renderSort(t){
+  const algoName=t.algo==='bubble'?'пузырьком':t.algo==='insertion'?'вставками':(t.algo||'');
+  let cur=(t.array||[]).slice(); let sel=-1;
+  $('body').innerHTML=`
+    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Сортировка ${esc(algoName)}${t.steps?` · выполни ${t.steps} шаг(ов)`:''}. Тапни две плитки, чтобы поменять их местами.</div>
+    <div class="sortrow" id="srow"></div>
+    <div class="toolbar">
+      <button class="gbtn" id="greset">↺ Сбросить</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+    </div>`;
+  const row=$('srow');
+  function draw(){ row.innerHTML=cur.map((v,i)=>
+    `<button class="stile${i===sel?' sel':''}" data-i="${i}">${esc(v)}</button>`).join('');
+    row.querySelectorAll('.stile').forEach(b=>b.onclick=()=>{
+      if(answered||locked) return;
+      const i=+b.dataset.i;
+      if(sel<0) sel=i;
+      else if(sel===i) sel=-1;
+      else { const tmp=cur[sel]; cur[sel]=cur[i]; cur[i]=tmp; sel=-1; }
+      draw();
+    }); }
+  draw();
+  $('greset').onclick=()=>{ if(answered||locked) return; cur=(t.array||[]).slice(); sel=-1; draw(); };
+  $('gsubmit').onclick=()=>{ if(answered||locked) return;
+    answered=true; lockInputs();
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{array:cur}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>'; };
+}
+
+/* ---- заполнение пропусков: текст с ___ → поля ввода или выпадающие списки ---- */
+function renderBlank(t){
+  const parts=(t.template||'').split('___');
+  const blanks=t.blanks||[];
+  let html='<div class="blankwrap">';
+  parts.forEach((p,i)=>{
+    html+=esc(p);
+    if(i<parts.length-1){
+      const b=blanks[i]||{};
+      if(b.options&&b.options.length){
+        html+=`<select class="blankin" data-i="${i}"><option value=""></option>`+
+          b.options.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')+`</select>`;
+      } else {
+        html+=`<input class="blankin" data-i="${i}" autocomplete="off" spellcheck="false">`;
+      }
+    }
+  });
+  html+='</div>';
+  $('body').innerHTML=html+`
+    <div class="toolbar">
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+    </div>`;
+  mathify($('body'));
+  $('gsubmit').onclick=()=>{ if(answered||locked) return;
+    const vals=[];
+    document.querySelectorAll('.blankin').forEach(el=>{ vals[+el.dataset.i]=el.value; });
+    for(let i=0;i<parts.length-1;i++) if(vals[i]==null) vals[i]='';
+    answered=true; lockInputs();
+    ws.send(JSON.stringify({type:'answer',taskId:t.id,payload:{blanks:vals}}));
+    $('fb').innerHTML='<span class="wait">Ответ принят…</span>'; };
+}
+
+function finished(place,score,correct,total,review,bestStreak){
+  if(me)me.done=true; clearInterval(timerInt); show('done');
+  const medals={1:'🥇',2:'🥈',3:'🥉'};
+  $('medal').textContent=medals[place]||'🏔️';
+  $('doneMsg').textContent=place?`Ты на ${place}-м месте!`:'Восхождение завершено!';
+  let sub=`Итого очков: ${score}`;
+  if(correct!=null&&total!=null) sub+=` · верных ответов: ${correct}/${total}`;
+  if(bestStreak>1) sub+=` · лучшая серия: 🔥${bestStreak}`;
+  $('doneSub').textContent=sub;
+  renderReview(review);
+}
+
+function renderReview(review){
+  const box=$('review');
+  if(!Array.isArray(review)||!review.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  const rows=review.map((r,i)=>{
+    const cls=r.correct?'ok-q':'no-q';
+    const badge=r.correct?'✅':(r.answered?'❌':'⏳');
+    let yours='';
+    if(r.type==='choice'){
+      if(r.answered && !r.correct) yours=`<div class="rline"><span class="lbl">Твой ответ:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
+      else if(!r.answered) yours=`<div class="rline"><span class="lbl">Ты не ответил(а)</span></div>`;
+    } else if(r.type==='sort'||r.type==='blank'){
+      if(r.answered && !r.correct && r.yourAnswer) yours=`<div class="rline"><span class="lbl">Твой ответ:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
+      else if(!r.answered) yours=`<div class="rline"><span class="lbl">Ты не ответил(а)</span></div>`;
+    }
+    const corr=`<div class="rline"><span class="lbl">Правильно:</span> <span class="corr">${esc(r.correctAnswer||'')}</span></div>`;
+    const exp=r.explain?`<div class="explain">💡 ${esc(r.explain)}</div>`:'';
+    return `<div class="rq ${cls}">
+      <div class="rhead"><span class="badge">${badge}</span><span>${i+1}. ${esc(r.title||r.prompt)}</span></div>
+      ${yours}${corr}${exp}
+    </div>`;
+  }).join('');
+  box.innerHTML=`<h3>Разбор вопросов</h3>${rows}`;
+  mathify(box);
+  box.classList.remove('hidden');
+}
+function kicked(){ if(me)me.done=true; clearInterval(timerInt); show('done');
+  $('medal').textContent='🚫'; $('doneMsg').textContent='Вас удалил преподаватель';
+  $('doneSub').textContent='Сессия для вас завершена.'; }
+
+function esc(s){return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
+// Рендер формул LaTeX в элементе: $…$ / $$…$$ / \(…\) / \[…\]
+function mathify(el){ if(el&&window.renderMathInElement){ try{ renderMathInElement(el,{
+  delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},
+    {left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],
+  throwOnError:false}); }catch(e){} } }
+
+/* анти-ИИ: уход со вкладки */
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&me&&!me.done&&!$('task').classList.contains('hidden'))
+  ws.send(JSON.stringify({type:'tableave'})); });
+</script>
+</body>
+</html>
