@@ -2,6 +2,7 @@
 Защита входа: TOTP-код (HMAC по окну времени), одноразовые nonce, IP-allowlist.
 Точный порт логики из server.js — коды входа совместимы (тот же алгоритм и алфавит).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -46,10 +47,7 @@ class Security:
         w = self.token_window()
         grace = self.config["qrRotation"].get("graceWindows")
         grace = 1 if grace is None else grace
-        for d in range(grace + 1):
-            if t == self.totp_for(w - d):
-                return True
-        return False
+        return any(t == self.totp_for(w - d) for d in range(grace + 1))
 
     # ---------- nonce ----------
     def issue_nonce(self):

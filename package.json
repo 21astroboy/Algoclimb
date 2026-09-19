@@ -5,11 +5,22 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "lint:js": "eslint \"public/**/*.html\"",
+    "lint:js:fix": "eslint \"public/**/*.html\" --fix",
+    "format": "prettier --write \"public/**/*.html\"",
+    "format:check": "prettier --check \"public/**/*.html\"",
+    "lint": "npm run lint:js && npm run format:check"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@html-eslint/eslint-plugin": "^0.66.1",
+    "@html-eslint/parser": "^0.66.1",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.8"
   },
   "engines": {
     "node": ">=22"

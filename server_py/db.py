@@ -5,6 +5,7 @@
 бэкендами. История сессий, ответов, результатов и событий сохраняется на диске
 (в примонтированном на VPS томе) и переживает перезапуск приложения.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -85,8 +86,10 @@ def wipe_all():
 
 def create_session(stream):
     date = _now()[:10]
-    cur = _exec("INSERT INTO sessions(date,stream,status,started_at) VALUES(?,?,?,?)",
-                (date, stream, "lobby", None))
+    cur = _exec(
+        "INSERT INTO sessions(date,stream,status,started_at) VALUES(?,?,?,?)",
+        (date, stream, "lobby", None),
+    )
     return cur.lastrowid
 
 
@@ -95,7 +98,8 @@ def set_session_status(sid, status):
     _exec("UPDATE sessions SET status=? WHERE id=?", (status, sid))
     col = "started_at" if status == "running" else "finished_at" if status == "finished" else None
     if col:
-        _exec("UPDATE sessions SET %s=? WHERE id=?" % col, (ts, sid))
+        # col — из фиксированного набора выше (started_at/finished_at), инъекция невозможна.
+        _exec(f"UPDATE sessions SET {col}=? WHERE id=?", (ts, sid))
 
 
 def set_session_stream(sid, stream):
@@ -103,18 +107,24 @@ def set_session_stream(sid, stream):
 
 
 def record_attendance(sid, nick, icon, ip):
-    _exec("INSERT INTO attendance(session_id,nick,icon,ip,joined_at) VALUES(?,?,?,?,?)",
-          (sid, nick, icon, ip, _now()))
+    _exec(
+        "INSERT INTO attendance(session_id,nick,icon,ip,joined_at) VALUES(?,?,?,?,?)",
+        (sid, nick, icon, ip, _now()),
+    )
 
 
 def record_answer(sid, nick, task_id, correct, duration_ms):
-    _exec("INSERT INTO answers(session_id,nick,task_id,correct,duration_ms,submitted_at) VALUES(?,?,?,?,?,?)",
-          (sid, nick, task_id, 1 if correct else 0, duration_ms, _now()))
+    _exec(
+        "INSERT INTO answers(session_id,nick,task_id,correct,duration_ms,submitted_at) VALUES(?,?,?,?,?,?)",
+        (sid, nick, task_id, 1 if correct else 0, duration_ms, _now()),
+    )
 
 
 def record_result(sid, nick, base, mult, total, place):
-    _exec("INSERT INTO results(session_id,nick,base_points,multiplier,total,place) VALUES(?,?,?,?,?,?)",
-          (sid, nick, base, mult, total, place))
+    _exec(
+        "INSERT INTO results(session_id,nick,base_points,multiplier,total,place) VALUES(?,?,?,?,?,?)",
+        (sid, nick, base, mult, total, place),
+    )
 
 
 def record_event(sid, nick, kind):
@@ -146,13 +156,16 @@ def task_stats(stream):
               COALESCE(SUM(a.correct),0) AS correct, AVG(a.duration_ms) AS avgMs
             FROM answers a JOIN sessions s ON s.id=a.session_id
             WHERE s.stream=? GROUP BY a.task_id ORDER BY attempts DESC, taskId ASC
-            """, (stream,))
+            """,
+            (stream,),
+        )
     return _all(
         """
         SELECT task_id AS taskId, COUNT(*) AS attempts,
           COALESCE(SUM(correct),0) AS correct, AVG(duration_ms) AS avgMs
         FROM answers GROUP BY task_id ORDER BY attempts DESC, taskId ASC
-        """)
+        """
+    )
 
 
 def _stream_session_ids(stream):
@@ -162,14 +175,18 @@ def _stream_session_ids(stream):
 
 
 def student_stats(stream):
-    answers = _all("SELECT session_id AS sessionId, nick, task_id AS taskId, correct, duration_ms AS durationMs FROM answers")
+    answers = _all(
+        "SELECT session_id AS sessionId, nick, task_id AS taskId, correct, duration_ms AS durationMs FROM answers"
+    )
     for a in answers:
         a["correct"] = bool(a["correct"])
     results = _all("SELECT session_id AS sessionId, nick, total, place FROM results")
     attendance = _all("SELECT session_id AS sessionId, nick, icon FROM attendance")
     events = _all("SELECT session_id AS sessionId, nick, kind FROM events")
-    sess_meta = {r["id"]: {"date": r["date"], "stream": r["stream"]}
-                 for r in _all("SELECT id, date, stream FROM sessions")}
+    sess_meta = {
+        r["id"]: {"date": r["date"], "stream": r["stream"]}
+        for r in _all("SELECT id, date, stream FROM sessions")
+    }
 
     allowed = _stream_session_ids(stream)
     if allowed is not None:
@@ -186,17 +203,37 @@ def _aggregate_students(answers, results, attendance, events, sess_meta):
     def get(nick):
         c = m.get(nick)
         if not c:
-            c = {"nick": nick, "icon": "", "sessionsSet": set(), "answers": 0, "correct": 0,
-                 "msSum": 0, "msN": 0, "totalSum": 0.0, "totalN": 0, "bestPlace": None,
-                 "tabLeaves": 0, "fastAnswers": 0, "byTask": {}, "bySession": {}}
+            c = {
+                "nick": nick,
+                "icon": "",
+                "sessionsSet": set(),
+                "answers": 0,
+                "correct": 0,
+                "msSum": 0,
+                "msN": 0,
+                "totalSum": 0.0,
+                "totalN": 0,
+                "bestPlace": None,
+                "tabLeaves": 0,
+                "fastAnswers": 0,
+                "byTask": {},
+                "bySession": {},
+            }
             m[nick] = c
         return c
 
     def sk(c, sid):
         s = c["bySession"].get(sid)
         if not s:
-            s = {"sessionId": sid, "answers": 0, "correct": 0, "msSum": 0, "msN": 0,
-                 "score": None, "place": None}
+            s = {
+                "sessionId": sid,
+                "answers": 0,
+                "correct": 0,
+                "msSum": 0,
+                "msN": 0,
+                "score": None,
+                "place": None,
+            }
             c["bySession"][sid] = s
         return s
 
@@ -262,25 +299,37 @@ def _aggregate_students(answers, results, attendance, events, sess_meta):
         session_rows = []
         for s in c["bySession"].values():
             meta = sess_meta.get(s["sessionId"], {})
-            session_rows.append({
-                "sessionId": s["sessionId"], "date": meta.get("date") or "",
-                "stream": meta.get("stream"),
-                "answers": s["answers"], "correct": s["correct"],
-                "accuracy": round(s["correct"] / s["answers"] * 100) if s["answers"] else 0,
-                "avgMs": (s["msSum"] / s["msN"]) if s["msN"] else None,
-                "score": s["score"], "place": s["place"],
-            })
+            session_rows.append(
+                {
+                    "sessionId": s["sessionId"],
+                    "date": meta.get("date") or "",
+                    "stream": meta.get("stream"),
+                    "answers": s["answers"],
+                    "correct": s["correct"],
+                    "accuracy": round(s["correct"] / s["answers"] * 100) if s["answers"] else 0,
+                    "avgMs": (s["msSum"] / s["msN"]) if s["msN"] else None,
+                    "score": s["score"],
+                    "place": s["place"],
+                }
+            )
         session_rows.sort(key=lambda r: r["sessionId"], reverse=True)
-        out.append({
-            "nick": c["nick"], "icon": c["icon"], "sessions": len(c["sessionsSet"]),
-            "answers": c["answers"], "correct": c["correct"],
-            "accuracy": round(c["correct"] / c["answers"] * 100) if c["answers"] else 0,
-            "avgMs": (c["msSum"] / c["msN"]) if c["msN"] else None,
-            "avgScore": (c["totalSum"] / c["totalN"]) if c["totalN"] else None,
-            "bestPlace": c["bestPlace"], "tabLeaves": c["tabLeaves"],
-            "fastAnswers": c["fastAnswers"],
-            "taskRows": list(c["byTask"].values()), "sessionRows": session_rows,
-        })
+        out.append(
+            {
+                "nick": c["nick"],
+                "icon": c["icon"],
+                "sessions": len(c["sessionsSet"]),
+                "answers": c["answers"],
+                "correct": c["correct"],
+                "accuracy": round(c["correct"] / c["answers"] * 100) if c["answers"] else 0,
+                "avgMs": (c["msSum"] / c["msN"]) if c["msN"] else None,
+                "avgScore": (c["totalSum"] / c["totalN"]) if c["totalN"] else None,
+                "bestPlace": c["bestPlace"],
+                "tabLeaves": c["tabLeaves"],
+                "fastAnswers": c["fastAnswers"],
+                "taskRows": list(c["byTask"].values()),
+                "sessionRows": session_rows,
+            }
+        )
     out.sort(key=lambda a: (a["accuracy"], -a["answers"]))
     return out
 

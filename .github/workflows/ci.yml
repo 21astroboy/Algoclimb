@@ -1,0 +1,79 @@
+name: CI
+
+# Прогоняем проверки на пул-реквестах и при пуше в основные ветки.
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+
+# Отменяем устаревшие прогоны при новом пуше в ту же ветку/PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────── Python (FastAPI-бэкенд) ───────────────
+  python:
+    name: Python — Ruff, mypy, smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff==0.16.8 mypy==1.18.2
+
+      - name: Ruff (линтер)
+        run: ruff check .
+
+      - name: Ruff (форматтер)
+        run: ruff format --check .
+
+      - name: mypy (типы)
+        run: mypy
+
+      - name: Smoke test (без приватного банка)
+        working-directory: server_py
+        run: python -m smoke_test
+
+  # ─────────────────────────────── Frontend (public/) ────────────────────
+  frontend:
+    name: Frontend — ESLint, Prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint:js
+
+      - name: Prettier (проверка формата)
+        run: npm run format:check
+
+  # ─────────────────────────────── Docker (сборка образа) ────────────────
+  docker:
+    name: Docker — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: algoclimb:ci

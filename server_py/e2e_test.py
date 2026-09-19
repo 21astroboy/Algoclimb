@@ -1,4 +1,5 @@
 """Сквозной тест игрового цикла FastAPI-бэкенда через реальные WebSocket-соединения."""
+
 import asyncio
 import json
 import sys
@@ -10,8 +11,8 @@ import bank
 BASE = "ws://127.0.0.1:8099"
 KEY = "TESTKEY99"
 
-CHOICE_ID = "asd_bst_search"   # lvl1, answer index 0
-GRAPH_ID = "gb_matrix"         # lvl2, requiredEdges
+CHOICE_ID = "asd_bst_search"  # lvl1, answer index 0
+GRAPH_ID = "gb_matrix"  # lvl2, requiredEdges
 
 results = {"ok": [], "fail": []}
 
@@ -38,7 +39,7 @@ async def drain(ws, seconds=0.4):
         while True:
             raw = await asyncio.wait_for(ws.recv(), seconds)
             out.append(json.loads(raw))
-    except asyncio.TimeoutError:
+    except asyncio.TimeoutError:  # noqa: UP041 — портативно для 3.10 и 3.11+
         return out
 
 
@@ -71,11 +72,13 @@ async def main():
     await drain(teacher, 0.5)
 
     # --- start a real (non-test) session with our 2 known tasks ---
-    await teacher.send(json.dumps({"type": "start", "taskIds": [CHOICE_ID, GRAPH_ID], "test": False}))
+    await teacher.send(
+        json.dumps({"type": "start", "taskIds": [CHOICE_ID, GRAPH_ID], "test": False})
+    )
 
     # both students should get task #0 (choice)
     t1, _ = await recv_until(st1, "task")
-    t2, _ = await recv_until(st2, "task")
+    await recv_until(st2, "task")
     check("round0 is choice task", t1["task"]["type"] == "choice" and t1["task"]["id"] == CHOICE_ID)
     check("round0 total==2", t1["total"] == 2)
 
@@ -88,7 +91,9 @@ async def main():
     check("Alice basePoints=40 (100*1*0.4)", a1["basePoints"] == 40)
     check("Alice streak=1", a1["streak"] == 1)
 
-    await st2.send(json.dumps({"type": "answer", "taskId": CHOICE_ID, "payload": {"choice": wrong}}))
+    await st2.send(
+        json.dumps({"type": "answer", "taskId": CHOICE_ID, "payload": {"choice": wrong}})
+    )
     a2, _ = await recv_until(st2, "answered")
     check("Bob choice wrong", a2["correct"] is False and a2["points"] == 0)
 
@@ -112,7 +117,9 @@ async def main():
     await st2.send(json.dumps({"type": "answer", "taskId": GRAPH_ID, "payload": {"edges": edges}}))
     a2b, _ = await recv_until(st2, "answered")
     check("Bob graph correct", a2b["correct"] is True)
-    check("Bob streak reset then =1 -> no streakBonus", a2b["streak"] == 1 and a2b["streakBonus"] == 0)
+    check(
+        "Bob streak reset then =1 -> no streakBonus", a2b["streak"] == 1 and a2b["streakBonus"] == 0
+    )
 
     # session end
     end1, _ = await recv_until(st1, "sessionend", timeout=6)
@@ -129,7 +136,9 @@ async def main():
     states = [m for m in tfin if m["type"] == "state"]
     check("teacher final state finished", states and states[-1]["session"]["status"] == "finished")
 
-    await st1.close(); await st2.close(); await teacher.close()
+    await st1.close()
+    await st2.close()
+    await teacher.close()
 
 
 asyncio.run(main())

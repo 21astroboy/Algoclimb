@@ -1,0 +1,42 @@
+# Конфигурация инструментов качества кода для Python-бэкенда (server_py/).
+# Ruff — линтер + форматтер (замена flake8/black/isort). mypy — проверка типов.
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["server_py"]
+
+[tool.ruff.lint]
+# Прагматичный, но строгий набор: ошибки, пуле, импорты, апгрейды синтаксиса,
+# багбир, comprehensions, упрощения, специфичные для ruff проверки.
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+# E501 (длина строки) не включаем: длину кода держит форматтер,
+# а длинные строковые литералы (встроенный HTML) переносить не нужно.
+ignore = [
+    "E501",    # line too long — за код отвечает форматтер
+    "UP017",   # datetime.UTC — доступен только с 3.11; timezone.utc портативнее
+    "B008",    # вызовы в аргументах по умолчанию (FastAPI Depends и т.п.)
+    "SIM105",  # contextlib.suppress вместо try/except/pass — здесь читается хуже
+    "RUF001",  # кириллица рядом с латиницей в строках — у нас интерфейс на русском
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Тестовый клиент: допускаем блокирующие конструкции и т.п.
+"server_py/e2e_test.py" = ["E402", "F841"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["server_py"]
+# Прагматичный уровень: ловим явные ошибки, но не требуем полной типизации
+# динамичного, построенного на dict игрового состояния.
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = ["server_py/e2e_test\\.py$"]

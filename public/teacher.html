@@ -1,900 +1,2258 @@
 <!doctype html>
 <html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AlgoClimb — экран преподавателя</title>
-<style>
-  :root{--bg:#08111f;--bg2:#0c1d36;--panel:#102544;--panel2:#0c1c34;--line:#1d3a63;
-    --accent:#ffd23f;--accent2:#f5b400;--blue:#5aa9ff;--blue2:#2f6fb5;--text:#e8eef7;--muted:#8195b4;--green:#3ddc84;--red:#ff6b6b}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    background:radial-gradient(1200px 700px at 70% -10%,#14385f,#0c1d36 45%,#08111f);color:var(--text);min-height:100vh}
-  .wrap{max-width:1180px;margin:0 auto;padding:18px}
-  header{display:flex;align-items:center;gap:14px;margin-bottom:16px}
-  .logo{font-weight:800;font-size:22px}.logo b{color:var(--accent)}
-  .tag{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:4px 9px;border-radius:999px}
-  .btn{cursor:pointer;border:none;border-radius:10px;padding:11px 18px;font-weight:800;font-size:14px}
-  .btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent2));color:#10243f}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  .btn.on{border-color:var(--accent);color:var(--accent)}
-  .btn:disabled{opacity:.4;cursor:default}
-  .btn.danger{background:#3a1620;border:1px solid #6b2b35;color:#ff9a9a}
-  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:18px}
-  h2.s{font-size:14px;margin:0 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
-  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .spread{justify-content:space-between}
-  .muted{color:var(--muted)}
-  .hidden{display:none}
-  .lobby-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
-  @media(max-width:820px){.lobby-grid{grid-template-columns:1fr}}
-  .roster{display:flex;flex-wrap:wrap;gap:10px;max-height:360px;overflow:auto}
-  .pill{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 11px}
-  .ava{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:17px;background:#0a1d36}
-  .counter{font-size:34px;font-weight:800;color:var(--accent)}
-  .streamPick{display:flex;align-items:center;gap:8px;font-size:13px}
-  .seg{display:inline-flex;background:#0e1426;border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
-  .seg-btn{min-width:34px;padding:5px 10px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;transition:background .15s,color .15s}
-  .seg-btn:hover{color:#dbe6ff}
-  .seg-btn.on{background:var(--accent);color:#06122a;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-  .joinbox{text-align:center}
-  .qr{width:190px;height:190px;border-radius:14px;background:#fff;padding:10px;margin:6px auto}
-  .qr svg{width:100%;height:100%;display:block}
-  .url{font-family:ui-monospace,Menlo,monospace;color:var(--accent);font-size:15px;word-break:break-all}
-  .token{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:4px;color:var(--accent);margin-top:8px}
-  /* round bar */
-  .roundbar{display:flex;align-items:center;gap:16px;margin-bottom:14px}
-  .qnum{font-size:15px;font-weight:800}
-  .bigtimer{font-family:ui-monospace,Menlo,monospace;font-size:30px;font-weight:800;color:var(--accent)}
-  .bigtimer.low{color:var(--red)}
-  .answered{font-size:15px;font-weight:700;color:var(--blue)}
-  .anspanel{margin-top:12px;padding:12px 14px;border-radius:12px;background:#16331f;border:1px solid #2c6b3f;
-    color:#d6f5e2;font-size:16px;font-weight:600;white-space:pre-wrap}
-  .anspanel b{color:var(--green)}
-  .tbar{flex:1;height:8px;border-radius:99px;background:#0a1b33;overflow:hidden}
-  .tbar i{display:block;height:100%;background:var(--accent);width:100%}
-  .tbar i.low{background:var(--red)}
-  /* mountain */
-  .mt-grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
-  @media(max-width:820px){.mt-grid{grid-template-columns:1fr}}
-  .mtn{position:relative;min-height:440px;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
-  .lb{display:flex;flex-direction:column;gap:7px;max-height:440px;overflow:auto}
-  .lbrow{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
-  .lbrow.r1{border-color:var(--accent)}
-  .lbrank{width:22px;text-align:center;font-weight:800;color:var(--muted)}
-  .lbrow.r1 .lbrank{color:var(--accent)}.lbrow.r2 .lbrank{color:#cfe0ff}.lbrow.r3 .lbrank{color:#ffb86b}
-  .nick{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pts{font-family:ui-monospace,Menlo,monospace;font-weight:800;color:var(--green)}
-  .off{opacity:.45}
-  .ansdot{width:11px;height:11px;border-radius:99px;display:inline-block;margin-right:3px;border:1px solid #0a1d36}
-  .ansdot.ok{background:var(--green)}.ansdot.no{background:var(--red)}.ansdot.skip{background:#33455f}
-  .leave{font-size:12px;color:#ffb3b3;background:#3a1620;border:1px solid #6b2b35;border-radius:7px;padding:1px 7px;font-weight:700}
-  .pending{font-size:12px;color:var(--blue);font-weight:700}
-  .kick{cursor:pointer;border:1px solid #6b2b35;background:transparent;color:#ff9a9a;border-radius:8px;padding:3px 8px;font-size:12px;font-weight:800}
-  .stage-badge{position:absolute;background:rgba(8,20,38,.8);border:1px solid var(--blue2);border-radius:10px;padding:4px 9px;font-size:12px;font-weight:700}
-  /* results */
-  .res{width:100%;border-collapse:collapse}
-  .res th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-  .res td{padding:9px 10px;border-bottom:1px solid #14294a;font-size:14px}
-  .res tr.top1 td{background:#172a1f}
-  /* per-question breakdown */
-  .qbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-  .qbtn{cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);
-    border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:7px}
-  .qbtn:hover{border-color:var(--accent)}
-  .qbtn .mini{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--green)}
-  .modal{position:fixed;inset:0;background:rgba(4,10,20,.72);display:grid;place-items:center;z-index:50;padding:18px}
-  .modal.hidden{display:none}
-  .modalcard{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
-    border-radius:16px;padding:18px;max-width:780px;width:100%;max-height:88vh;overflow:auto}
-  .modalcard .x{float:right;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);
-    border-radius:8px;padding:4px 10px;font-weight:800}
-  .modalcard .qttl{font-size:18px;font-weight:800;margin:0 0 4px}
-  .modalcard .qpr{color:var(--muted);font-size:14px;white-space:pre-wrap;margin-bottom:10px}
-  .corr{background:#16331f;border:1px solid #2c6b3f;border-radius:10px;padding:9px 12px;margin-bottom:12px;
-    color:#d6f5e2;font-size:14px;white-space:pre-wrap}
-  .corr b{color:var(--green)}
-  .agg{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:var(--muted)}
-  .agg b{color:var(--text)}
-  .dtable{width:100%;border-collapse:collapse}
-  .dtable th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
-  .dtable td{padding:8px 9px;border-bottom:1px solid #14294a;font-size:14px;vertical-align:top}
-  .dtable .ans{max-width:300px;word-break:break-word}
-  .dtable .t-ok{color:var(--green);font-weight:800}
-  .dtable .t-no{color:var(--red);font-weight:800}
-  .dtable .t-skip{color:var(--muted)}
-  /* аналитика */
-  .statscard{max-width:880px}
-  .statstabs{display:flex;gap:8px;align-items:center;margin:10px 0 14px}
-  .statstabs .chip{cursor:pointer;border:1px solid #1d3a63;background:transparent;color:#e8eef7;border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px}
-  .statstabs .chip.on{border-color:var(--accent);color:var(--accent);background:rgba(90,169,255,.12)}
-  .accbar{display:inline-block;height:8px;border-radius:4px;vertical-align:middle;margin-right:6px;min-width:2px}
-  .acc-hi{background:var(--green)}.acc-mid{background:#ffd23f}.acc-lo{background:var(--red)}
-  .stat-empty{color:var(--muted);padding:18px;text-align:center}
-  .dtable tr.rowsel td{background:rgba(90,169,255,.14)}
-  .dtable tr[data-nick]:hover td{background:rgba(90,169,255,.07)}
-  .studDetail{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}
-  .studsum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
-  .studsum b{color:#e8eef7;font-weight:800}
-  .chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .chiptag{font-size:12px;background:#0e1426;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:#cdd9ee}
-  .flags{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:30}
-  .flagmsg{background:#3a1620;border:1px solid #6b2b35;color:#ffb3b3;padding:9px 13px;border-radius:10px;font-size:13px;animation:fade .3s}
-  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
-  .katex{font-size:1.02em}
-  .mkgrid{display:flex;flex-direction:column;gap:10px;margin-top:10px}
-  .mkgrid label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:700}
-  .mkgrid input,.mkgrid textarea,.mkgrid select{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
-    padding:9px 11px;color:var(--text);font-size:14px;font-family:inherit}
-  .mkgrid input:focus,.mkgrid textarea:focus,.mkgrid select:focus{outline:none;border-color:var(--accent)}
-  .mksec{border-top:1px solid var(--line);padding-top:10px}
-  .mkopt{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .mkopt input[type=text]{flex:1}
-  .mkopt input[type=radio]{width:auto;flex:none;padding:0;margin:0;accent-color:var(--accent)}
-  .mkDelOpt{padding:6px 10px!important;flex:none}
-  .mkopt .del{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--red);border-radius:8px;padding:4px 9px;font-weight:800}
-  .bdg.cust{background:#2a1f3a;border-color:#6b4b8a;color:#d9bcff}
-  .catrow .delx{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--red);border-radius:7px;padding:1px 7px;font-weight:800;margin-left:6px}
-</style>
-<link rel="stylesheet" href="/vendor/katex/katex.min.css">
-<script src="/vendor/katex/katex.min.js"></script>
-<script src="/vendor/katex/auto-render.min.js"></script>
-</head>
-<body>
-<style>
-  .loginback{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;
-    background:rgba(5,11,22,.92);backdrop-filter:blur(4px)}
-  .loginback.hidden{display:none}
-  .loginCard{width:min(92vw,380px);background:linear-gradient(180deg,#102544,#0c1c34);
-    border:1px solid #1d3a63;border-radius:16px;padding:24px;text-align:center}
-  .loginCard h2{margin:0 0 6px;font-size:20px}
-  .loginCard p{margin:0 0 14px;color:#8195b4;font-size:13px;line-height:1.45}
-  .loginCard input{width:100%;background:#0c1c34;border:1px solid #1d3a63;border-radius:10px;
-    padding:12px;color:#e8eef7;font-size:18px;letter-spacing:3px;text-align:center;text-transform:uppercase}
-  .loginCard button{width:100%;margin-top:12px;padding:12px;font-size:15px}
-  .loginErr{color:#ff6b6b;font-size:13px;min-height:18px;margin-top:8px}
-  /* конструктор сессии */
-  .builder{margin-top:16px}
-  .builder .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-  .builder input[type=search]{flex:1;min-width:180px;background:#0c1c34;border:1px solid #1d3a63;
-    border-radius:10px;padding:9px 12px;color:#e8eef7;font-size:14px}
-  .builder .chip{cursor:pointer;border:1px solid #1d3a63;background:transparent;color:#e8eef7;
-    border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700}
-  .builder .chip.on{background:#ffd23f;color:#10243f;border-color:#ffd23f}
-  .catlist{max-height:320px;overflow:auto;border:1px solid #1d3a63;border-radius:12px}
-  .catrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #142b4d;cursor:pointer}
-  .catrow:last-child{border-bottom:none}
-  .catrow:hover{background:#0e213c}
-  .catrow input{width:17px;height:17px;accent-color:#ffd23f;flex:none}
-  .catrow .ti{font-weight:700;font-size:14px}
-  .catrow .meta{margin-left:auto;display:flex;gap:6px;flex:none}
-  .bdg{font-size:11px;color:#8195b4;border:1px solid #1d3a63;border-radius:999px;padding:1px 8px;white-space:nowrap}
-  .bdg.g{color:#bfe0ff;border-color:#5aa9ff}
-  .selcount{font-weight:800;color:#ffd23f}
-</style>
-<div class="loginback hidden" id="loginBox">
-  <form class="loginCard" id="keyForm" autocomplete="off">
-    <h2>🔒 Вход преподавателя</h2>
-    <p>Введите ключ доступа. Он показан в терминале при запуске сервера. Студентам он не виден.</p>
-    <input type="password" id="keyInput" inputmode="latin" placeholder="КЛЮЧ" autocomplete="off" autofocus>
-    <div class="loginErr" id="loginErr"></div>
-    <button type="submit" class="btn primary">Войти</button>
-  </form>
-</div>
-<div class="wrap">
-  <header>
-    <div class="logo">Algo<b>Climb</b></div>
-    <span class="tag" id="dot">подключение…</span>
-    <span class="tag" id="streamTag"></span>
-    <span class="tag hidden" id="testTag" style="background:#3a2a16;color:#ffd9a0;border-color:#6b4b2b">🧪 тестовая сессия — без записи</span>
-    <div class="row" style="margin-left:auto" id="controls">
-      <a class="btn ghost" id="keyLink" href="/answers" target="_blank" rel="noopener" title="Приватный ключ ответов в отдельной вкладке">🔑 Ключ ответов</a>
-      <button class="btn ghost" id="statsBtn" title="История сессий и статистика по задачам">📊 Аналитика</button>
-      <button class="btn ghost hidden" id="testBtn" title="Тестовый прогон — результаты НЕ пишутся в базу. Удобно для проверки и репетиции.">🧪 Тест: выкл</button>
-      <button class="btn primary hidden" id="startBtn">▶ Старт</button>
-      <button class="btn danger hidden" id="finishBtn">■ Завершить</button>
-      <button class="btn ghost" id="resetBtn">Сброс</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AlgoClimb — экран преподавателя</title>
+    <style>
+      :root {
+        --bg: #08111f;
+        --bg2: #0c1d36;
+        --panel: #102544;
+        --panel2: #0c1c34;
+        --line: #1d3a63;
+        --accent: #ffd23f;
+        --accent2: #f5b400;
+        --blue: #5aa9ff;
+        --blue2: #2f6fb5;
+        --text: #e8eef7;
+        --muted: #8195b4;
+        --green: #3ddc84;
+        --red: #ff6b6b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        background: radial-gradient(1200px 700px at 70% -10%, #14385f, #0c1d36 45%, #08111f);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 18px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+      .logo {
+        font-weight: 800;
+        font-size: 22px;
+      }
+      .logo b {
+        color: var(--accent);
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 4px 9px;
+        border-radius: 999px;
+      }
+      .btn {
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        padding: 11px 18px;
+        font-weight: 800;
+        font-size: 14px;
+      }
+      .btn.primary {
+        background: linear-gradient(180deg, var(--accent), var(--accent2));
+        color: #10243f;
+      }
+      .btn.ghost {
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--text);
+      }
+      .btn.on {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .btn.danger {
+        background: #3a1620;
+        border: 1px solid #6b2b35;
+        color: #ff9a9a;
+      }
+      .card {
+        background: linear-gradient(180deg, var(--panel), var(--panel2));
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+      }
+      h2.s {
+        font-size: 14px;
+        margin: 0 0 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .spread {
+        justify-content: space-between;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .hidden {
+        display: none;
+      }
+      .lobby-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+      @media (max-width: 820px) {
+        .lobby-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .roster {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        max-height: 360px;
+        overflow: auto;
+      }
+      .pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 8px 11px;
+      }
+      .ava {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+        background: #0a1d36;
+      }
+      .counter {
+        font-size: 34px;
+        font-weight: 800;
+        color: var(--accent);
+      }
+      .streamPick {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .seg {
+        display: inline-flex;
+        background: #0e1426;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 3px;
+        gap: 3px;
+      }
+      .seg-btn {
+        min-width: 34px;
+        padding: 5px 10px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .seg-btn:hover {
+        color: #dbe6ff;
+      }
+      .seg-btn.on {
+        background: var(--accent);
+        color: #06122a;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      }
+      .joinbox {
+        text-align: center;
+      }
+      .qr {
+        width: 190px;
+        height: 190px;
+        border-radius: 14px;
+        background: #fff;
+        padding: 10px;
+        margin: 6px auto;
+      }
+      .qr svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .url {
+        font-family: ui-monospace, Menlo, monospace;
+        color: var(--accent);
+        font-size: 15px;
+        word-break: break-all;
+      }
+      .token {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 22px;
+        letter-spacing: 4px;
+        color: var(--accent);
+        margin-top: 8px;
+      }
+      /* round bar */
+      .roundbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+      .qnum {
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .bigtimer {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 30px;
+        font-weight: 800;
+        color: var(--accent);
+      }
+      .bigtimer.low {
+        color: var(--red);
+      }
+      .answered {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--blue);
+      }
+      .anspanel {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #16331f;
+        border: 1px solid #2c6b3f;
+        color: #d6f5e2;
+        font-size: 16px;
+        font-weight: 600;
+        white-space: pre-wrap;
+      }
+      .anspanel b {
+        color: var(--green);
+      }
+      .tbar {
+        flex: 1;
+        height: 8px;
+        border-radius: 99px;
+        background: #0a1b33;
+        overflow: hidden;
+      }
+      .tbar i {
+        display: block;
+        height: 100%;
+        background: var(--accent);
+        width: 100%;
+      }
+      .tbar i.low {
+        background: var(--red);
+      }
+      /* mountain */
+      .mt-grid {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 18px;
+      }
+      @media (max-width: 820px) {
+        .mt-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .mtn {
+        position: relative;
+        min-height: 440px;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+      .lb {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        max-height: 440px;
+        overflow: auto;
+      }
+      .lbrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 7px 10px;
+      }
+      .lbrow.r1 {
+        border-color: var(--accent);
+      }
+      .lbrank {
+        width: 22px;
+        text-align: center;
+        font-weight: 800;
+        color: var(--muted);
+      }
+      .lbrow.r1 .lbrank {
+        color: var(--accent);
+      }
+      .lbrow.r2 .lbrank {
+        color: #cfe0ff;
+      }
+      .lbrow.r3 .lbrank {
+        color: #ffb86b;
+      }
+      .nick {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pts {
+        font-family: ui-monospace, Menlo, monospace;
+        font-weight: 800;
+        color: var(--green);
+      }
+      .off {
+        opacity: 0.45;
+      }
+      .ansdot {
+        width: 11px;
+        height: 11px;
+        border-radius: 99px;
+        display: inline-block;
+        margin-right: 3px;
+        border: 1px solid #0a1d36;
+      }
+      .ansdot.ok {
+        background: var(--green);
+      }
+      .ansdot.no {
+        background: var(--red);
+      }
+      .ansdot.skip {
+        background: #33455f;
+      }
+      .leave {
+        font-size: 12px;
+        color: #ffb3b3;
+        background: #3a1620;
+        border: 1px solid #6b2b35;
+        border-radius: 7px;
+        padding: 1px 7px;
+        font-weight: 700;
+      }
+      .pending {
+        font-size: 12px;
+        color: var(--blue);
+        font-weight: 700;
+      }
+      .kick {
+        cursor: pointer;
+        border: 1px solid #6b2b35;
+        background: transparent;
+        color: #ff9a9a;
+        border-radius: 8px;
+        padding: 3px 8px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .stage-badge {
+        position: absolute;
+        background: rgba(8, 20, 38, 0.8);
+        border: 1px solid var(--blue2);
+        border-radius: 10px;
+        padding: 4px 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      /* results */
+      .res {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .res th {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .res td {
+        padding: 9px 10px;
+        border-bottom: 1px solid #14294a;
+        font-size: 14px;
+      }
+      .res tr.top1 td {
+        background: #172a1f;
+      }
+      /* per-question breakdown */
+      .qbtns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .qbtn {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--panel2);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-weight: 800;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .qbtn:hover {
+        border-color: var(--accent);
+      }
+      .qbtn .mini {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        color: var(--green);
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(4, 10, 20, 0.72);
+        display: grid;
+        place-items: center;
+        z-index: 50;
+        padding: 18px;
+      }
+      .modal.hidden {
+        display: none;
+      }
+      .modalcard {
+        background: linear-gradient(180deg, var(--panel), var(--panel2));
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px;
+        max-width: 780px;
+        width: 100%;
+        max-height: 88vh;
+        overflow: auto;
+      }
+      .modalcard .x {
+        float: right;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--text);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-weight: 800;
+      }
+      .modalcard .qttl {
+        font-size: 18px;
+        font-weight: 800;
+        margin: 0 0 4px;
+      }
+      .modalcard .qpr {
+        color: var(--muted);
+        font-size: 14px;
+        white-space: pre-wrap;
+        margin-bottom: 10px;
+      }
+      .corr {
+        background: #16331f;
+        border: 1px solid #2c6b3f;
+        border-radius: 10px;
+        padding: 9px 12px;
+        margin-bottom: 12px;
+        color: #d6f5e2;
+        font-size: 14px;
+        white-space: pre-wrap;
+      }
+      .corr b {
+        color: var(--green);
+      }
+      .agg {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .agg b {
+        color: var(--text);
+      }
+      .dtable {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .dtable th {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: left;
+        padding: 7px 9px;
+        border-bottom: 1px solid var(--line);
+      }
+      .dtable td {
+        padding: 8px 9px;
+        border-bottom: 1px solid #14294a;
+        font-size: 14px;
+        vertical-align: top;
+      }
+      .dtable .ans {
+        max-width: 300px;
+        word-break: break-word;
+      }
+      .dtable .t-ok {
+        color: var(--green);
+        font-weight: 800;
+      }
+      .dtable .t-no {
+        color: var(--red);
+        font-weight: 800;
+      }
+      .dtable .t-skip {
+        color: var(--muted);
+      }
+      /* аналитика */
+      .statscard {
+        max-width: 880px;
+      }
+      .statstabs {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 10px 0 14px;
+      }
+      .statstabs .chip {
+        cursor: pointer;
+        border: 1px solid #1d3a63;
+        background: transparent;
+        color: #e8eef7;
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .statstabs .chip.on {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(90, 169, 255, 0.12);
+      }
+      .accbar {
+        display: inline-block;
+        height: 8px;
+        border-radius: 4px;
+        vertical-align: middle;
+        margin-right: 6px;
+        min-width: 2px;
+      }
+      .acc-hi {
+        background: var(--green);
+      }
+      .acc-mid {
+        background: #ffd23f;
+      }
+      .acc-lo {
+        background: var(--red);
+      }
+      .stat-empty {
+        color: var(--muted);
+        padding: 18px;
+        text-align: center;
+      }
+      .dtable tr.rowsel td {
+        background: rgba(90, 169, 255, 0.14);
+      }
+      .dtable tr[data-nick]:hover td {
+        background: rgba(90, 169, 255, 0.07);
+      }
+      .studDetail {
+        margin-top: 14px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel2);
+      }
+      .studsum {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .studsum b {
+        color: #e8eef7;
+        font-weight: 800;
+      }
+      .chiprow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .chiptag {
+        font-size: 12px;
+        background: #0e1426;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 10px;
+        color: #cdd9ee;
+      }
+      .flags {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 30;
+      }
+      .flagmsg {
+        background: #3a1620;
+        border: 1px solid #6b2b35;
+        color: #ffb3b3;
+        padding: 9px 13px;
+        border-radius: 10px;
+        font-size: 13px;
+        animation: fade 0.3s;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .katex {
+        font-size: 1.02em;
+      }
+      .mkgrid {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .mkgrid label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .mkgrid input,
+      .mkgrid textarea,
+      .mkgrid select {
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 11px;
+        color: var(--text);
+        font-size: 14px;
+        font-family: inherit;
+      }
+      .mkgrid input:focus,
+      .mkgrid textarea:focus,
+      .mkgrid select:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .mksec {
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+      .mkopt {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .mkopt input[type='text'] {
+        flex: 1;
+      }
+      .mkopt input[type='radio'] {
+        width: auto;
+        flex: none;
+        padding: 0;
+        margin: 0;
+        accent-color: var(--accent);
+      }
+      .mkDelOpt {
+        padding: 6px 10px !important;
+        flex: none;
+      }
+      .mkopt .del {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--red);
+        border-radius: 8px;
+        padding: 4px 9px;
+        font-weight: 800;
+      }
+      .bdg.cust {
+        background: #2a1f3a;
+        border-color: #6b4b8a;
+        color: #d9bcff;
+      }
+      .catrow .delx {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--red);
+        border-radius: 7px;
+        padding: 1px 7px;
+        font-weight: 800;
+        margin-left: 6px;
+      }
+    </style>
+    <link rel="stylesheet" href="/vendor/katex/katex.min.css" />
+    <script src="/vendor/katex/katex.min.js"></script>
+    <script src="/vendor/katex/auto-render.min.js"></script>
+  </head>
+  <body>
+    <style>
+      .loginback {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background: rgba(5, 11, 22, 0.92);
+        backdrop-filter: blur(4px);
+      }
+      .loginback.hidden {
+        display: none;
+      }
+      .loginCard {
+        width: min(92vw, 380px);
+        background: linear-gradient(180deg, #102544, #0c1c34);
+        border: 1px solid #1d3a63;
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+      }
+      .loginCard h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+      }
+      .loginCard p {
+        margin: 0 0 14px;
+        color: #8195b4;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .loginCard input {
+        width: 100%;
+        background: #0c1c34;
+        border: 1px solid #1d3a63;
+        border-radius: 10px;
+        padding: 12px;
+        color: #e8eef7;
+        font-size: 18px;
+        letter-spacing: 3px;
+        text-align: center;
+        text-transform: uppercase;
+      }
+      .loginCard button {
+        width: 100%;
+        margin-top: 12px;
+        padding: 12px;
+        font-size: 15px;
+      }
+      .loginErr {
+        color: #ff6b6b;
+        font-size: 13px;
+        min-height: 18px;
+        margin-top: 8px;
+      }
+      /* конструктор сессии */
+      .builder {
+        margin-top: 16px;
+      }
+      .builder .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .builder input[type='search'] {
+        flex: 1;
+        min-width: 180px;
+        background: #0c1c34;
+        border: 1px solid #1d3a63;
+        border-radius: 10px;
+        padding: 9px 12px;
+        color: #e8eef7;
+        font-size: 14px;
+      }
+      .builder .chip {
+        cursor: pointer;
+        border: 1px solid #1d3a63;
+        background: transparent;
+        color: #e8eef7;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .builder .chip.on {
+        background: #ffd23f;
+        color: #10243f;
+        border-color: #ffd23f;
+      }
+      .catlist {
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid #1d3a63;
+        border-radius: 12px;
+      }
+      .catrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #142b4d;
+        cursor: pointer;
+      }
+      .catrow:last-child {
+        border-bottom: none;
+      }
+      .catrow:hover {
+        background: #0e213c;
+      }
+      .catrow input {
+        width: 17px;
+        height: 17px;
+        accent-color: #ffd23f;
+        flex: none;
+      }
+      .catrow .ti {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .catrow .meta {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+        flex: none;
+      }
+      .bdg {
+        font-size: 11px;
+        color: #8195b4;
+        border: 1px solid #1d3a63;
+        border-radius: 999px;
+        padding: 1px 8px;
+        white-space: nowrap;
+      }
+      .bdg.g {
+        color: #bfe0ff;
+        border-color: #5aa9ff;
+      }
+      .selcount {
+        font-weight: 800;
+        color: #ffd23f;
+      }
+    </style>
+    <div class="loginback hidden" id="loginBox">
+      <form class="loginCard" id="keyForm" autocomplete="off">
+        <h2>🔒 Вход преподавателя</h2>
+        <p>
+          Введите ключ доступа. Он показан в терминале при запуске сервера. Студентам он не виден.
+        </p>
+        <input
+          type="password"
+          id="keyInput"
+          inputmode="latin"
+          placeholder="КЛЮЧ"
+          autocomplete="off"
+          autofocus />
+        <div class="loginErr" id="loginErr"></div>
+        <button type="submit" class="btn primary">Войти</button>
+      </form>
     </div>
-  </header>
+    <div class="wrap">
+      <header>
+        <div class="logo">
+          Algo
+          <b>Climb</b>
+        </div>
+        <span class="tag" id="dot">подключение…</span>
+        <span class="tag" id="streamTag"></span>
+        <span
+          class="tag hidden"
+          id="testTag"
+          style="background: #3a2a16; color: #ffd9a0; border-color: #6b4b2b">
+          🧪 тестовая сессия — без записи
+        </span>
+        <div class="row" style="margin-left: auto" id="controls">
+          <a
+            class="btn ghost"
+            id="keyLink"
+            href="/answers"
+            target="_blank"
+            rel="noopener"
+            title="Приватный ключ ответов в отдельной вкладке">
+            🔑 Ключ ответов
+          </a>
+          <button class="btn ghost" id="statsBtn" title="История сессий и статистика по задачам">
+            📊 Аналитика
+          </button>
+          <button
+            class="btn ghost hidden"
+            id="testBtn"
+            title="Тестовый прогон — результаты НЕ пишутся в базу. Удобно для проверки и репетиции.">
+            🧪 Тест: выкл
+          </button>
+          <button class="btn primary hidden" id="startBtn">▶ Старт</button>
+          <button class="btn danger hidden" id="finishBtn">■ Завершить</button>
+          <button class="btn ghost" id="resetBtn">Сброс</button>
+        </div>
+      </header>
 
-  <!-- LOBBY -->
-  <section id="lobbyView">
-    <div class="lobby-grid">
-      <div class="card">
-        <div class="row spread"><h2 class="s">Лобби</h2>
-          <div class="row" style="gap:14px">
-            <div class="streamPick" title="Номер потока для этой сессии — попадёт в записи посещаемости">
-              <span class="muted">Поток</span>
-              <div class="seg" id="streamSeg">
-                <button type="button" class="seg-btn" data-stream="1">1</button>
-                <button type="button" class="seg-btn" data-stream="2">2</button>
-                <button type="button" class="seg-btn" data-stream="3">3</button>
+      <!-- LOBBY -->
+      <section id="lobbyView">
+        <div class="lobby-grid">
+          <div class="card">
+            <div class="row spread">
+              <h2 class="s">Лобби</h2>
+              <div class="row" style="gap: 14px">
+                <div
+                  class="streamPick"
+                  title="Номер потока для этой сессии — попадёт в записи посещаемости">
+                  <span class="muted">Поток</span>
+                  <div class="seg" id="streamSeg">
+                    <button type="button" class="seg-btn" data-stream="1">1</button>
+                    <button type="button" class="seg-btn" data-stream="2">2</button>
+                    <button type="button" class="seg-btn" data-stream="3">3</button>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="counter" id="cnt">0</span>
+                  <span class="muted">в лобби</span>
+                </div>
               </div>
             </div>
-            <div class="row"><span class="counter" id="cnt">0</span><span class="muted">в лобби</span></div>
-          </div></div>
-        <div class="roster" id="roster"></div>
-      </div>
-      <div class="card joinbox">
-        <h2 class="s">Вход для студентов</h2>
-        <div class="qr" id="qr"></div>
-        <div class="muted" style="font-size:12px">Открыть на телефоне:</div>
-        <div class="url" id="url">—</div>
-        <div class="token hidden" id="token"></div>
-      </div>
-    </div>
-
-    <div class="card builder">
-      <div class="row spread">
-        <h2 class="s">Конструктор сессии</h2>
-        <span class="muted" style="font-size:13px">Выбрано: <span class="selcount" id="selCount">0</span> · если ничего не выбрать, сессия соберётся по config</span>
-      </div>
-      <div class="bar">
-        <input type="search" id="catSearch" placeholder="Поиск по названию или условию…">
-        <button class="chip on" data-f="topic" data-v="all">Все темы</button>
-        <button class="chip" data-f="topic" data-v="asd">АиСД</button>
-        <button class="chip" data-f="topic" data-v="graphs">Графы</button>
-        <button class="chip on" data-f="type" data-v="all">Все типы</button>
-        <button class="chip" data-f="type" data-v="choice">Выбор</button>
-        <button class="chip" data-f="type" data-v="graph">Построение</button>
-        <button class="chip" data-f="type" data-v="order">Обход</button>
-        <button class="chip" data-f="type" data-v="sort">Сортировка</button>
-        <button class="chip" data-f="type" data-v="blank">Пропуски</button>
-        <button class="chip on" data-f="level" data-v="all">Все ур.</button>
-        <button class="chip" data-f="level" data-v="1">ур.1</button>
-        <button class="chip" data-f="level" data-v="2">ур.2</button>
-        <button class="chip" data-f="level" data-v="3">ур.3</button>
-      </div>
-      <div class="bar">
-        <button class="btn ghost" id="catAll">Выбрать видимые</button>
-        <button class="btn ghost" id="catNone">Снять все</button>
-        <button class="btn ghost" id="catRand">🎲 Случайно 10 из видимых</button>
-        <button class="btn ghost" id="openMaker" style="border-color:var(--accent);color:var(--accent)">➕ Создать задачу</button>
-        <span class="muted" id="catCount" style="font-size:12px;margin-left:auto"></span>
-      </div>
-      <div class="catlist" id="catList"></div>
-    </div>
-  </section>
-
-  <!-- КОНСТРУКТОР ЗАДАЧ -->
-  <div class="modal hidden" id="makerModal">
-    <div class="modalcard" style="max-width:640px">
-      <div class="row spread">
-        <h2 class="s">Создать свою задачу</h2>
-        <button class="x" id="makerClose">✕</button>
-      </div>
-      <div class="bar" style="margin-top:8px">
-        <button class="chip on mk-kind" data-k="choice">Выбор ответа</button>
-        <button class="chip mk-kind" data-k="graph">Построение графа</button>
-        <button class="chip mk-kind" data-k="order">Обход (BFS/DFS)</button>
-        <button class="chip mk-kind" data-k="sort">Сортировка</button>
-        <button class="chip mk-kind" data-k="blank">Пропуски</button>
-      </div>
-      <div class="mkgrid">
-        <label>Название<input id="mkTitle" placeholder="Краткий заголовок"></label>
-        <label>Условие<textarea id="mkPrompt" rows="2" placeholder="Текст вопроса (можно LaTeX: $O(n\\log n)$)"></textarea></label>
-        <div class="row" style="gap:10px">
-          <label style="flex:1">Тема
-            <select id="mkTopic"><option value="graphs">Графы</option><option value="asd">АиСД</option></select></label>
-          <label style="flex:1">Уровень
-            <select id="mkLevel"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
-        </div>
-
-        <!-- CHOICE -->
-        <div id="mkChoice" class="mksec">
-          <div class="muted" style="font-size:12px;margin-bottom:4px">Варианты ответа (отметьте правильный):</div>
-          <div id="mkOpts"></div>
-          <button class="btn ghost" id="mkAddOpt" style="margin-top:6px">+ вариант</button>
-        </div>
-
-        <!-- GRAPH -->
-        <div id="mkGraph" class="mksec hidden">
-          <label>Вершины (через запятую)<input id="mkGNodes" placeholder="A, B, C, D"></label>
-          <label>Шаблон проверки<select id="mkGTemplate"></select></label>
-          <label id="mkGExactWrap" class="hidden">Рёбра точного графа (через запятую, формат A-B)
-            <input id="mkGEdges" placeholder="A-B, B-C, C-D"></label>
-          <label>Подсказка (необязательно, видна только вам)<input id="mkGHint" placeholder=""></label>
-        </div>
-
-        <!-- ORDER -->
-        <div id="mkOrder" class="mksec hidden">
-          <label>Вершины (через запятую)<input id="mkONodes" placeholder="A, B, C, D, E"></label>
-          <label>Рёбра (через запятую, формат A-B)<input id="mkOEdges" placeholder="A-B, A-C, B-D"></label>
-          <div class="row" style="gap:10px">
-            <label style="flex:1">Старт<input id="mkOStart" placeholder="A"></label>
-            <label style="flex:1">Режим
-              <select id="mkOMode"><option value="bfs">Обход в ширину (BFS)</option><option value="dfs">Обход в глубину (DFS)</option></select></label>
+            <div class="roster" id="roster"></div>
+          </div>
+          <div class="card joinbox">
+            <h2 class="s">Вход для студентов</h2>
+            <div class="qr" id="qr"></div>
+            <div class="muted" style="font-size: 12px">Открыть на телефоне:</div>
+            <div class="url" id="url">—</div>
+            <div class="token hidden" id="token"></div>
           </div>
         </div>
 
-        <!-- SORT -->
-        <div id="mkSort" class="mksec hidden">
-          <label>Массив (числа через запятую)<input id="mkSArr" placeholder="5, 2, 8, 1, 9, 3"></label>
-          <div class="row" style="gap:10px">
-            <label style="flex:1">Алгоритм
-              <select id="mkSAlgo"><option value="bubble">Пузырьком</option><option value="insertion">Вставками</option></select></label>
-            <label style="flex:1">Число шагов<input id="mkSSteps" type="number" min="1" max="20" value="1"></label>
+        <div class="card builder">
+          <div class="row spread">
+            <h2 class="s">Конструктор сессии</h2>
+            <span class="muted" style="font-size: 13px">
+              Выбрано:
+              <span class="selcount" id="selCount">0</span>
+              · если ничего не выбрать, сессия соберётся по config
+            </span>
           </div>
-          <div class="muted" style="font-size:12px">Ожидаемый результат вычисляется автоматически: состояние массива после указанного числа шагов выбранного алгоритма.</div>
+          <div class="bar">
+            <input type="search" id="catSearch" placeholder="Поиск по названию или условию…" />
+            <button class="chip on" data-f="topic" data-v="all">Все темы</button>
+            <button class="chip" data-f="topic" data-v="asd">АиСД</button>
+            <button class="chip" data-f="topic" data-v="graphs">Графы</button>
+            <button class="chip on" data-f="type" data-v="all">Все типы</button>
+            <button class="chip" data-f="type" data-v="choice">Выбор</button>
+            <button class="chip" data-f="type" data-v="graph">Построение</button>
+            <button class="chip" data-f="type" data-v="order">Обход</button>
+            <button class="chip" data-f="type" data-v="sort">Сортировка</button>
+            <button class="chip" data-f="type" data-v="blank">Пропуски</button>
+            <button class="chip on" data-f="level" data-v="all">Все ур.</button>
+            <button class="chip" data-f="level" data-v="1">ур.1</button>
+            <button class="chip" data-f="level" data-v="2">ур.2</button>
+            <button class="chip" data-f="level" data-v="3">ур.3</button>
+          </div>
+          <div class="bar">
+            <button class="btn ghost" id="catAll">Выбрать видимые</button>
+            <button class="btn ghost" id="catNone">Снять все</button>
+            <button class="btn ghost" id="catRand">🎲 Случайно 10 из видимых</button>
+            <button
+              class="btn ghost"
+              id="openMaker"
+              style="border-color: var(--accent); color: var(--accent)">
+              ➕ Создать задачу
+            </button>
+            <span class="muted" id="catCount" style="font-size: 12px; margin-left: auto"></span>
+          </div>
+          <div class="catlist" id="catList"></div>
+        </div>
+      </section>
+
+      <!-- КОНСТРУКТОР ЗАДАЧ -->
+      <div class="modal hidden" id="makerModal">
+        <div class="modalcard" style="max-width: 640px">
+          <div class="row spread">
+            <h2 class="s">Создать свою задачу</h2>
+            <button class="x" id="makerClose">✕</button>
+          </div>
+          <div class="bar" style="margin-top: 8px">
+            <button class="chip on mk-kind" data-k="choice">Выбор ответа</button>
+            <button class="chip mk-kind" data-k="graph">Построение графа</button>
+            <button class="chip mk-kind" data-k="order">Обход (BFS/DFS)</button>
+            <button class="chip mk-kind" data-k="sort">Сортировка</button>
+            <button class="chip mk-kind" data-k="blank">Пропуски</button>
+          </div>
+          <div class="mkgrid">
+            <label>
+              Название
+              <input id="mkTitle" placeholder="Краткий заголовок" />
+            </label>
+            <label>
+              Условие
+              <textarea
+                id="mkPrompt"
+                rows="2"
+                placeholder="Текст вопроса (можно LaTeX: $O(n\\log n)$)"></textarea>
+            </label>
+            <div class="row" style="gap: 10px">
+              <label style="flex: 1">
+                Тема
+                <select id="mkTopic">
+                  <option value="graphs">Графы</option>
+                  <option value="asd">АиСД</option>
+                </select>
+              </label>
+              <label style="flex: 1">
+                Уровень
+                <select id="mkLevel">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- CHOICE -->
+            <div id="mkChoice" class="mksec">
+              <div class="muted" style="font-size: 12px; margin-bottom: 4px">
+                Варианты ответа (отметьте правильный):
+              </div>
+              <div id="mkOpts"></div>
+              <button class="btn ghost" id="mkAddOpt" style="margin-top: 6px">+ вариант</button>
+            </div>
+
+            <!-- GRAPH -->
+            <div id="mkGraph" class="mksec hidden">
+              <label>
+                Вершины (через запятую)
+                <input id="mkGNodes" placeholder="A, B, C, D" />
+              </label>
+              <label>
+                Шаблон проверки
+                <select id="mkGTemplate"></select>
+              </label>
+              <label id="mkGExactWrap" class="hidden">
+                Рёбра точного графа (через запятую, формат A-B)
+                <input id="mkGEdges" placeholder="A-B, B-C, C-D" />
+              </label>
+              <label>
+                Подсказка (необязательно, видна только вам)
+                <input id="mkGHint" placeholder="" />
+              </label>
+            </div>
+
+            <!-- ORDER -->
+            <div id="mkOrder" class="mksec hidden">
+              <label>
+                Вершины (через запятую)
+                <input id="mkONodes" placeholder="A, B, C, D, E" />
+              </label>
+              <label>
+                Рёбра (через запятую, формат A-B)
+                <input id="mkOEdges" placeholder="A-B, A-C, B-D" />
+              </label>
+              <div class="row" style="gap: 10px">
+                <label style="flex: 1">
+                  Старт
+                  <input id="mkOStart" placeholder="A" />
+                </label>
+                <label style="flex: 1">
+                  Режим
+                  <select id="mkOMode">
+                    <option value="bfs">Обход в ширину (BFS)</option>
+                    <option value="dfs">Обход в глубину (DFS)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <!-- SORT -->
+            <div id="mkSort" class="mksec hidden">
+              <label>
+                Массив (числа через запятую)
+                <input id="mkSArr" placeholder="5, 2, 8, 1, 9, 3" />
+              </label>
+              <div class="row" style="gap: 10px">
+                <label style="flex: 1">
+                  Алгоритм
+                  <select id="mkSAlgo">
+                    <option value="bubble">Пузырьком</option>
+                    <option value="insertion">Вставками</option>
+                  </select>
+                </label>
+                <label style="flex: 1">
+                  Число шагов
+                  <input id="mkSSteps" type="number" min="1" max="20" value="1" />
+                </label>
+              </div>
+              <div class="muted" style="font-size: 12px">
+                Ожидаемый результат вычисляется автоматически: состояние массива после указанного
+                числа шагов выбранного алгоритма.
+              </div>
+            </div>
+
+            <!-- BLANK -->
+            <div id="mkBlank" class="mksec hidden">
+              <label>
+                Шаблон (отмечайте пропуски тремя подчёркиваниями ___)
+                <textarea
+                  id="mkBTemplate"
+                  rows="3"
+                  placeholder="Бинарный поиск работает за ___ и требует ___ массива."></textarea>
+              </label>
+              <div class="muted" style="font-size: 12px; margin-bottom: 4px">
+                Ответы по порядку — по одному на каждый ___. Через | можно задать синонимы. Для
+                выбора из списка перечислите варианты через ; (правильным считается первый).
+              </div>
+              <div id="mkBlanks"></div>
+              <button class="btn ghost" id="mkAddBlank" style="margin-top: 6px">+ пропуск</button>
+            </div>
+          </div>
+          <div class="row spread" style="margin-top: 12px">
+            <span id="mkMsg" style="font-size: 13px; min-height: 18px"></span>
+            <button class="btn primary" id="mkSubmit">Сохранить задачу</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RUNNING -->
+      <section id="gameView" class="hidden">
+        <div class="card" style="margin-bottom: 16px">
+          <div class="roundbar">
+            <span class="qnum" id="qnum">Вопрос 1/5</span>
+            <span class="tag" id="qtype"></span>
+            <div class="tbar"><i id="tfill"></i></div>
+            <span class="answered" id="answered">0/0 ответили</span>
+            <span class="bigtimer" id="timer">00:00</span>
+            <button class="btn ghost" id="pauseBtn" title="Приостановить/продолжить вопрос">
+              ⏸ Пауза
+            </button>
+            <button class="btn ghost" id="addTimeBtn" title="Добавить 15 секунд к таймеру">
+              +15с
+            </button>
+            <button class="btn ghost" id="skipBtn" title="Пропустить текущий вопрос">
+              ⏭ Пропустить
+            </button>
+            <button
+              class="btn ghost"
+              id="ansToggle"
+              title="Внимание: ответ появится и на проекторе">
+              👁 Показать ответ
+            </button>
+          </div>
+          <div class="anspanel hidden" id="ansPanel"></div>
+        </div>
+        <div class="mt-grid">
+          <div class="card" style="padding: 0"><div class="mtn" id="mountain"></div></div>
+          <div class="card">
+            <h2 class="s">Лидерборд</h2>
+            <div class="lb" id="lb"></div>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 10px">
+              Очки — за скорость и сложность вопроса. Неверный ответ — 0.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESULTS -->
+      <section id="resultsView" class="hidden">
+        <div class="card">
+          <div class="row spread">
+            <h2 class="s">Итоги сессии</h2>
+            <div class="row">
+              <button class="btn ghost" id="expSummary">⬇ Итоги (CSV)</button>
+              <button class="btn ghost" id="expDetail">⬇ Разбор по вопросам (CSV)</button>
+              <span class="muted" id="resMeta"></span>
+            </div>
+          </div>
+          <div style="overflow: auto">
+            <table class="res">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Участник</th>
+                  <th>Очки</th>
+                  <th>Верных</th>
+                  <th>Ответы по вопросам</th>
+                  <th>Уходы</th>
+                </tr>
+              </thead>
+              <tbody id="resBody"></tbody>
+            </table>
+          </div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 10px">
+            Кружки:
+            <span class="ansdot ok"></span>
+            верно ·
+            <span class="ansdot no"></span>
+            неверно ·
+            <span class="ansdot skip"></span>
+            нет ответа
+          </div>
         </div>
 
-        <!-- BLANK -->
-        <div id="mkBlank" class="mksec hidden">
-          <label>Шаблон (отмечайте пропуски тремя подчёркиваниями ___)
-            <textarea id="mkBTemplate" rows="3" placeholder="Бинарный поиск работает за ___ и требует ___ массива."></textarea></label>
-          <div class="muted" style="font-size:12px;margin-bottom:4px">Ответы по порядку — по одному на каждый ___. Через | можно задать синонимы. Для выбора из списка перечислите варианты через ; (правильным считается первый).</div>
-          <div id="mkBlanks"></div>
-          <button class="btn ghost" id="mkAddBlank" style="margin-top:6px">+ пропуск</button>
+        <div class="card" style="margin-top: 16px">
+          <div class="row spread">
+            <h2 class="s">Разбор по вопросам</h2>
+            <span class="muted" style="font-size: 12px">
+              Нажмите на вопрос — увидите правильный ответ и ответы каждого студента
+            </span>
+          </div>
+          <div class="qbtns" id="qbtns"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="detailModal">
+      <div class="modalcard">
+        <button class="x" id="detailClose">✕ Закрыть</button>
+        <div class="qttl" id="dTitle"></div>
+        <div class="qpr" id="dPrompt"></div>
+        <div class="corr" id="dCorr"></div>
+        <div class="agg" id="dAgg"></div>
+        <div style="overflow: auto">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>Участник</th>
+                <th>Ответ</th>
+                <th>Верно</th>
+                <th id="dTimeSort" style="cursor: pointer" title="Сортировать по времени">
+                  Время ▲
+                </th>
+                <th>Очки</th>
+              </tr>
+            </thead>
+            <tbody id="dBody"></tbody>
+          </table>
         </div>
       </div>
-      <div class="row spread" style="margin-top:12px">
-        <span id="mkMsg" style="font-size:13px;min-height:18px"></span>
-        <button class="btn primary" id="mkSubmit">Сохранить задачу</button>
+    </div>
+    <!-- АНАЛИТИКА -->
+    <div class="modal hidden" id="statsModal">
+      <div class="modalcard statscard">
+        <button class="x" id="statsClose">✕ Закрыть</button>
+        <div class="qttl">📊 Аналитика</div>
+        <div class="statstabs">
+          <button class="chip on" id="tabSessions">История сессий</button>
+          <button class="chip" id="tabTasks">Статистика по задачам</button>
+          <button class="chip" id="tabStudents">По логинам</button>
+          <button class="chip" id="tabAttend">Посещаемость</button>
+          <button
+            class="btn ghost"
+            id="statsExcel"
+            title="Скачать всю аналитику в Excel (.xlsx)"
+            style="margin-left: auto; padding: 6px 12px; font-size: 13px">
+            ⬇ Excel
+          </button>
+          <button
+            class="btn ghost"
+            id="statsWipe"
+            title="Удалить ВСЕ сессии, ответы и статистику из базы (безвозвратно)"
+            style="padding: 6px 12px; font-size: 13px; color: #ff6b6b; border-color: #6b2b2b">
+            🗑 Очистить
+          </button>
+        </div>
+        <div class="statstabs" style="margin-top: -6px">
+          <span class="muted" style="font-size: 13px">Поток:</span>
+          <button class="chip on" data-statstream="all">Все</button>
+          <button class="chip" data-statstream="1">1</button>
+          <button class="chip" data-statstream="2">2</button>
+          <button class="chip" data-statstream="3">3</button>
+          <span class="muted" id="statsMeta" style="font-size: 12px; margin-left: auto"></span>
+        </div>
+
+        <div id="statsSessions">
+          <div style="overflow: auto">
+            <table class="dtable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Дата</th>
+                  <th>Поток</th>
+                  <th>Статус</th>
+                  <th>Участ.</th>
+                  <th>Ответов</th>
+                  <th>Точность</th>
+                  <th>Ср. балл</th>
+                </tr>
+              </thead>
+              <tbody id="statsSessBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="statsTasks" class="hidden">
+          <div class="row" style="gap: 8px; margin-bottom: 8px">
+            <input type="search" id="statsTaskSearch" placeholder="Поиск задачи…" style="flex: 1" />
+            <button class="chip on" id="taskSortHard" title="Сначала самые проваленные">
+              Сложные сверху
+            </button>
+            <button class="chip" id="taskSortPop" title="Сначала самые частые">
+              Частые сверху
+            </button>
+          </div>
+          <div style="overflow: auto">
+            <table class="dtable">
+              <thead>
+                <tr>
+                  <th>Задача</th>
+                  <th>Тема</th>
+                  <th>Тип</th>
+                  <th>Попыток</th>
+                  <th>Верных</th>
+                  <th>Точность</th>
+                  <th>Ср. время</th>
+                </tr>
+              </thead>
+              <tbody id="statsTaskBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="statsStudents" class="hidden">
+          <div class="row" style="gap: 8px; margin-bottom: 8px">
+            <input type="search" id="statsStudSearch" placeholder="Поиск логина…" style="flex: 1" />
+            <button class="chip on" id="studSortAcc" title="Сначала слабые по точности">
+              Слабые сверху
+            </button>
+            <button class="chip" id="studSortScore" title="Сначала с большим средним баллом">
+              По баллу
+            </button>
+          </div>
+          <div style="overflow: auto">
+            <table class="dtable">
+              <thead>
+                <tr>
+                  <th>Логин</th>
+                  <th>Сессий</th>
+                  <th>Ответов</th>
+                  <th>Верных</th>
+                  <th>Точность</th>
+                  <th>Ср. балл</th>
+                  <th>Лучш. место</th>
+                  <th
+                    title="Индекс подозрительности: уходы со вкладки + 2×аномально быстрые ответы">
+                    ⚠ риск
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="statsStudBody"></tbody>
+            </table>
+          </div>
+          <div id="studDetail" class="studDetail hidden"></div>
+        </div>
+
+        <div id="statsAttend" class="hidden">
+          <div class="row" style="gap: 8px; margin-bottom: 8px">
+            <span class="muted" id="attMeta" style="font-size: 12px; margin-left: auto"></span>
+          </div>
+          <div style="overflow: auto">
+            <table class="dtable" id="attTable">
+              <thead><tr id="attHead"></tr></thead>
+              <tbody id="attBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+    <div class="flags" id="flags"></div>
 
-  <!-- RUNNING -->
-  <section id="gameView" class="hidden">
-    <div class="card" style="margin-bottom:16px">
-      <div class="roundbar">
-        <span class="qnum" id="qnum">Вопрос 1/5</span>
-        <span class="tag" id="qtype"></span>
-        <div class="tbar"><i id="tfill"></i></div>
-        <span class="answered" id="answered">0/0 ответили</span>
-        <span class="bigtimer" id="timer">00:00</span>
-        <button class="btn ghost" id="pauseBtn" title="Приостановить/продолжить вопрос">⏸ Пауза</button>
-        <button class="btn ghost" id="addTimeBtn" title="Добавить 15 секунд к таймеру">+15с</button>
-        <button class="btn ghost" id="skipBtn" title="Пропустить текущий вопрос">⏭ Пропустить</button>
-        <button class="btn ghost" id="ansToggle" title="Внимание: ответ появится и на проекторе">👁 Показать ответ</button>
-      </div>
-      <div class="anspanel hidden" id="ansPanel"></div>
-    </div>
-    <div class="mt-grid">
-      <div class="card" style="padding:0"><div class="mtn" id="mountain"></div></div>
-      <div class="card">
-        <h2 class="s">Лидерборд</h2>
-        <div class="lb" id="lb"></div>
-        <div style="font-size:12px;color:var(--muted);margin-top:10px">Очки — за скорость и сложность вопроса. Неверный ответ — 0.</div>
-      </div>
-    </div>
-  </section>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let TOTAL = 5,
+        state = null,
+        deadline = 0,
+        clockOffset = 0,
+        limitMs = 0,
+        timerInt = null;
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const KEY_STORE = 'algoclimb_tkey';
+      let ws = null,
+        lastKey = '',
+        wasRejected = false,
+        reconnectTimer = null,
+        reconnectDelay = 1000;
+      function connect(key) {
+        lastKey = key;
+        wasRejected = false;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        try {
+          ws && ws.close();
+        } catch {}
+        ws = new WebSocket(
+          `${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`
+        );
+        ws.onopen = () => {
+          $('dot').textContent = 'в сети';
+          reconnectDelay = 1000;
+        };
+        ws.onclose = () => {
+          if (wasRejected) return; // неверный ключ — не переподключаемся
+          $('dot').textContent = 'переподключение…';
+          // автоматическое восстановление сессии: состояние целиком на сервере,
+          // при возврате связи сервер пришлёт текущий state и мы продолжим с того же места.
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => connect(lastKey), reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 1.6, 8000);
+        };
+        ws.onmessage = (e) => {
+          const m = JSON.parse(e.data);
+          if (m.type === 'rejected') {
+            onReject(m.reason);
+            return;
+          }
+          hideLogin();
+          try {
+            localStorage.setItem(KEY_STORE, key);
+          } catch {}
+          render(m);
+        };
+      }
+      function onReject(reason) {
+        wasRejected = true;
+        clearTimeout(reconnectTimer);
+        try {
+          localStorage.removeItem(KEY_STORE);
+        } catch {}
+        showLogin(reason || 'Доступ запрещён');
+      }
+      function showLogin(err) {
+        $('loginBox').classList.remove('hidden');
+        $('loginErr').textContent = err || '';
+        $('keyInput').value = '';
+        setTimeout(() => $('keyInput').focus(), 50);
+      }
+      function hideLogin() {
+        $('loginBox').classList.add('hidden');
+      }
+      $('keyForm').onsubmit = (e) => {
+        e.preventDefault();
+        const k = $('keyInput').value.trim();
+        if (k) connect(k);
+      };
+      (function init() {
+        let saved = '';
+        try {
+          saved = localStorage.getItem(KEY_STORE) || '';
+        } catch {}
+        if (saved) connect(saved);
+        else showLogin();
+      })();
 
-  <!-- RESULTS -->
-  <section id="resultsView" class="hidden">
-    <div class="card">
-      <div class="row spread"><h2 class="s">Итоги сессии</h2>
-        <div class="row">
-          <button class="btn ghost" id="expSummary">⬇ Итоги (CSV)</button>
-          <button class="btn ghost" id="expDetail">⬇ Разбор по вопросам (CSV)</button>
-          <span class="muted" id="resMeta"></span>
-        </div></div>
-      <div style="overflow:auto">
-        <table class="res">
-          <thead><tr>
-            <th>#</th><th>Участник</th><th>Очки</th><th>Верных</th>
-            <th>Ответы по вопросам</th><th>Уходы</th>
-          </tr></thead>
-          <tbody id="resBody"></tbody>
-        </table>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:10px">
-        Кружки: <span class="ansdot ok"></span> верно · <span class="ansdot no"></span> неверно · <span class="ansdot skip"></span> нет ответа</div>
-    </div>
+      let testMode = false;
+      function updateTestBtn() {
+        const b = $('testBtn');
+        if (!b) return;
+        b.textContent = '🧪 Тест: ' + (testMode ? 'ВКЛ' : 'выкл');
+        b.classList.toggle('primary', testMode);
+        b.classList.toggle('ghost', !testMode);
+      }
+      $('testBtn').onclick = () => {
+        testMode = !testMode;
+        updateTestBtn();
+      };
+      $('startBtn').onclick = () => {
+        const ids = [...SELECTED];
+        if (ids.length) ws.send(JSON.stringify({ type: 'start', taskIds: ids, test: testMode }));
+        else if (confirm('Ни одной задачи не выбрано. Запустить сессию по настройкам config?'))
+          ws.send(JSON.stringify({ type: 'start', test: testMode }));
+      };
+      $('finishBtn').onclick = () => ws.send(JSON.stringify({ type: 'finish' }));
+      $('resetBtn').onclick = () => {
+        if (confirm('Сбросить сессию и лобби?')) ws.send(JSON.stringify({ type: 'reset' }));
+      };
+      // Управление раундом на лету: пауза/продолжение, +время, пропуск.
+      $('pauseBtn').onclick = () => {
+        if (ws && ws.readyState === 1)
+          ws.send(JSON.stringify({ type: state && state.paused ? 'resume' : 'pause' }));
+      };
+      $('addTimeBtn').onclick = () => {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'addTime', ms: 15000 }));
+      };
+      $('skipBtn').onclick = () => {
+        if (ws && ws.readyState === 1 && confirm('Пропустить текущий вопрос?'))
+          ws.send(JSON.stringify({ type: 'skip' }));
+      };
+      function kick(nick) {
+        if (confirm('Выкинуть ' + nick + ' из сессии?'))
+          ws.send(JSON.stringify({ type: 'kick', nick }));
+      }
+      // Смена потока из лобби — сегментированный выбор 1/2/3.
+      $('streamSeg')
+        .querySelectorAll('.seg-btn')
+        .forEach((b) => {
+          b.onclick = () => {
+            const n = parseInt(b.dataset.stream, 10);
+            if (Number.isFinite(n) && ws && ws.readyState === 1)
+              ws.send(JSON.stringify({ type: 'setStream', stream: n }));
+          };
+        });
+      function setStreamUI(n) {
+        $('streamSeg')
+          .querySelectorAll('.seg-btn')
+          .forEach((b) => b.classList.toggle('on', parseInt(b.dataset.stream, 10) === n));
+      }
 
-    <div class="card" style="margin-top:16px">
-      <div class="row spread"><h2 class="s">Разбор по вопросам</h2>
-        <span class="muted" style="font-size:12px">Нажмите на вопрос — увидите правильный ответ и ответы каждого студента</span></div>
-      <div class="qbtns" id="qbtns"></div>
-    </div>
-  </section>
-</div>
+      /* ---------- конструктор сессии ---------- */
+      let CATALOG = [],
+        SELECTED = new Set(),
+        catF = { topic: 'all', type: 'all', level: 'all' },
+        catQ = '';
+      function catMatch(it) {
+        if (catF.topic !== 'all' && it.topic !== catF.topic) return false;
+        if (catF.type !== 'all' && it.type !== catF.type) return false;
+        if (catF.level !== 'all' && String(it.level) !== catF.level) return false;
+        if (catQ) {
+          const h = (it.title + ' ' + it.prompt + ' ' + it.id).toLowerCase();
+          if (!h.includes(catQ)) return false;
+        }
+        return true;
+      }
+      function visibleCat() {
+        return CATALOG.filter(catMatch);
+      }
+      function renderCat() {
+        const list = visibleCat();
+        $('catCount').textContent = 'Показано ' + list.length + ' из ' + CATALOG.length;
+        $('catList').innerHTML =
+          list
+            .map((it) => {
+              const tpMap = {
+                graph: '<span class="bdg g">построение</span>',
+                order: '<span class="bdg g">обход</span>',
+                sort: '<span class="bdg g">сортировка</span>',
+                blank: '<span class="bdg g">пропуски</span>',
+                choice: '<span class="bdg">выбор</span>',
+              };
+              const tp = tpMap[it.type] || tpMap.choice;
+              const to =
+                it.topic === 'asd'
+                  ? '<span class="bdg">АиСД</span>'
+                  : '<span class="bdg">графы</span>';
+              const cust = it.custom ? '<span class="bdg cust">своя</span>' : '';
+              const del = it.custom
+                ? '<button type="button" class="delx" data-del="' +
+                  esc(it.id) +
+                  '" title="Удалить свою задачу">✕</button>'
+                : '';
+              return (
+                '<label class="catrow"><input type="checkbox" data-id="' +
+                it.id +
+                '" ' +
+                (SELECTED.has(it.id) ? 'checked' : '') +
+                '>' +
+                '<span class="ti">' +
+                esc(it.title) +
+                '</span><span class="meta">' +
+                tp +
+                ' ' +
+                to +
+                '<span class="bdg">ур.' +
+                it.level +
+                '</span>' +
+                cust +
+                del +
+                '</span></label>'
+              );
+            })
+            .join('') || '<div class="muted" style="padding:14px">Ничего не найдено.</div>';
+        mathify($('catList'));
+        $('selCount').textContent = SELECTED.size;
+      }
+      $('catList').onchange = (e) => {
+        const cb = e.target.closest('input[type=checkbox]');
+        if (!cb) return;
+        if (cb.checked) SELECTED.add(cb.dataset.id);
+        else SELECTED.delete(cb.dataset.id);
+        $('selCount').textContent = SELECTED.size;
+      };
+      $('catSearch').oninput = () => {
+        catQ = $('catSearch').value.trim().toLowerCase();
+        renderCat();
+      };
+      document.querySelector('.builder').addEventListener('click', (e) => {
+        const c = e.target.closest('.chip');
+        if (!c) return;
+        // повторный клик по активному фильтру (кроме «Все…») снимает его и возвращает весь список
+        let v = c.dataset.v;
+        if (c.classList.contains('on') && v !== 'all') v = 'all';
+        catF[c.dataset.f] = v;
+        document
+          .querySelectorAll('.builder .chip[data-f="' + c.dataset.f + '"]')
+          .forEach((x) => x.classList.toggle('on', x.dataset.v === v));
+        renderCat();
+      });
+      $('catAll').onclick = () => {
+        visibleCat().forEach((it) => SELECTED.add(it.id));
+        renderCat();
+      };
+      $('catNone').onclick = () => {
+        SELECTED.clear();
+        renderCat();
+      };
+      $('catRand').onclick = () => {
+        const pool = visibleCat().map((it) => it.id);
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        SELECTED = new Set(pool.slice(0, 10));
+        renderCat();
+      };
 
-<div class="modal hidden" id="detailModal">
-  <div class="modalcard">
-    <button class="x" id="detailClose">✕ Закрыть</button>
-    <div class="qttl" id="dTitle"></div>
-    <div class="qpr" id="dPrompt"></div>
-    <div class="corr" id="dCorr"></div>
-    <div class="agg" id="dAgg"></div>
-    <div style="overflow:auto">
-      <table class="dtable">
-        <thead><tr>
-          <th>Участник</th><th>Ответ</th><th>Верно</th>
-          <th id="dTimeSort" style="cursor:pointer" title="Сортировать по времени">Время ▲</th><th>Очки</th>
-        </tr></thead>
-        <tbody id="dBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-<!-- АНАЛИТИКА -->
-<div class="modal hidden" id="statsModal">
-  <div class="modalcard statscard">
-    <button class="x" id="statsClose">✕ Закрыть</button>
-    <div class="qttl">📊 Аналитика</div>
-    <div class="statstabs">
-      <button class="chip on" id="tabSessions">История сессий</button>
-      <button class="chip" id="tabTasks">Статистика по задачам</button>
-      <button class="chip" id="tabStudents">По логинам</button>
-      <button class="chip" id="tabAttend">Посещаемость</button>
-      <button class="btn ghost" id="statsExcel" title="Скачать всю аналитику в Excel (.xlsx)" style="margin-left:auto;padding:6px 12px;font-size:13px">⬇ Excel</button>
-      <button class="btn ghost" id="statsWipe" title="Удалить ВСЕ сессии, ответы и статистику из базы (безвозвратно)" style="padding:6px 12px;font-size:13px;color:#ff6b6b;border-color:#6b2b2b">🗑 Очистить</button>
-    </div>
-    <div class="statstabs" style="margin-top:-6px">
-      <span class="muted" style="font-size:13px">Поток:</span>
-      <button class="chip on" data-statstream="all">Все</button>
-      <button class="chip" data-statstream="1">1</button>
-      <button class="chip" data-statstream="2">2</button>
-      <button class="chip" data-statstream="3">3</button>
-      <span class="muted" id="statsMeta" style="font-size:12px;margin-left:auto"></span>
-    </div>
+      /* ---------- удаление своих задач ---------- */
+      $('catList').addEventListener('click', (e) => {
+        const b = e.target.closest('.delx');
+        if (!b) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const id = b.dataset.del;
+        if (confirm('Удалить свою задачу безвозвратно?')) {
+          SELECTED.delete(id);
+          if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'deleteTask', id }));
+        }
+      });
 
-    <div id="statsSessions">
-      <div style="overflow:auto">
-        <table class="dtable">
-          <thead><tr>
-            <th>#</th><th>Дата</th><th>Поток</th><th>Статус</th>
-            <th>Участ.</th><th>Ответов</th><th>Точность</th><th>Ср. балл</th>
-          </tr></thead>
-          <tbody id="statsSessBody"></tbody>
-        </table>
-      </div>
-    </div>
+      /* ---------- конструктор задач ---------- */
+      let GRAPH_TEMPLATES = [],
+        mkKind = 'choice',
+        mkOptN = 0;
+      function openMaker() {
+        resetMaker();
+        $('makerModal').classList.remove('hidden');
+        setTimeout(() => $('mkTitle').focus(), 50);
+      }
+      function closeMaker() {
+        $('makerModal').classList.add('hidden');
+      }
+      $('openMaker').onclick = openMaker;
+      $('makerClose').onclick = closeMaker;
+      $('makerModal').addEventListener('click', (e) => {
+        if (e.target === $('makerModal')) closeMaker();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !$('makerModal').classList.contains('hidden')) closeMaker();
+      });
 
-    <div id="statsTasks" class="hidden">
-      <div class="row" style="gap:8px;margin-bottom:8px">
-        <input type="search" id="statsTaskSearch" placeholder="Поиск задачи…" style="flex:1">
-        <button class="chip on" id="taskSortHard" title="Сначала самые проваленные">Сложные сверху</button>
-        <button class="chip" id="taskSortPop" title="Сначала самые частые">Частые сверху</button>
-      </div>
-      <div style="overflow:auto">
-        <table class="dtable">
-          <thead><tr>
-            <th>Задача</th><th>Тема</th><th>Тип</th><th>Попыток</th><th>Верных</th><th>Точность</th><th>Ср. время</th>
-          </tr></thead>
-          <tbody id="statsTaskBody"></tbody>
-        </table>
-      </div>
-    </div>
+      function setKind(k) {
+        mkKind = k;
+        document
+          .querySelectorAll('.mk-kind')
+          .forEach((c) => c.classList.toggle('on', c.dataset.k === k));
+        $('mkChoice').classList.toggle('hidden', k !== 'choice');
+        $('mkGraph').classList.toggle('hidden', k !== 'graph');
+        $('mkOrder').classList.toggle('hidden', k !== 'order');
+        $('mkSort').classList.toggle('hidden', k !== 'sort');
+        $('mkBlank').classList.toggle('hidden', k !== 'blank');
+      }
+      document.querySelector('#makerModal .bar').addEventListener('click', (e) => {
+        const c = e.target.closest('.mk-kind');
+        if (c) setKind(c.dataset.k);
+      });
 
-    <div id="statsStudents" class="hidden">
-      <div class="row" style="gap:8px;margin-bottom:8px">
-        <input type="search" id="statsStudSearch" placeholder="Поиск логина…" style="flex:1">
-        <button class="chip on" id="studSortAcc" title="Сначала слабые по точности">Слабые сверху</button>
-        <button class="chip" id="studSortScore" title="Сначала с большим средним баллом">По баллу</button>
-      </div>
-      <div style="overflow:auto">
-        <table class="dtable">
-          <thead><tr>
-            <th>Логин</th><th>Сессий</th><th>Ответов</th><th>Верных</th><th>Точность</th>
-            <th>Ср. балл</th><th>Лучш. место</th><th title="Индекс подозрительности: уходы со вкладки + 2×аномально быстрые ответы">⚠ риск</th>
-          </tr></thead>
-          <tbody id="statsStudBody"></tbody>
-        </table>
-      </div>
-      <div id="studDetail" class="studDetail hidden"></div>
-    </div>
+      function addOpt(text) {
+        const i = mkOptN++;
+        const row = document.createElement('div');
+        row.className = 'mkopt';
+        row.innerHTML =
+          '<input type="radio" name="mkCorrect" value="' +
+          i +
+          '"' +
+          (i === 0 ? ' checked' : '') +
+          '>' +
+          '<input type="text" class="mkOptText" placeholder="Вариант ответа" value="' +
+          esc(text || '') +
+          '">' +
+          '<button type="button" class="btn ghost mkDelOpt" title="Удалить">✕</button>';
+        $('mkOpts').appendChild(row);
+      }
+      $('mkAddOpt').onclick = () => addOpt('');
+      $('mkOpts').addEventListener('click', (e) => {
+        const d = e.target.closest('.mkDelOpt');
+        if (!d) return;
+        if ($('mkOpts').children.length <= 2) {
+          mkErr('Нужно минимум 2 варианта');
+          return;
+        }
+        const row = d.closest('.mkopt');
+        const wasChecked = row.querySelector('input[type=radio]').checked;
+        row.remove();
+        if (wasChecked) {
+          const first = $('mkOpts').querySelector('input[type=radio]');
+          if (first) first.checked = true;
+        }
+      });
 
-    <div id="statsAttend" class="hidden">
-      <div class="row" style="gap:8px;margin-bottom:8px">
-        <span class="muted" id="attMeta" style="font-size:12px;margin-left:auto"></span>
-      </div>
-      <div style="overflow:auto">
-        <table class="dtable" id="attTable">
-          <thead><tr id="attHead"></tr></thead>
-          <tbody id="attBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="flags" id="flags"></div>
+      function addBlank(ans) {
+        const n = $('mkBlanks').children.length + 1;
+        const row = document.createElement('div');
+        row.className = 'mkopt';
+        row.innerHTML =
+          '<span class="muted" style="flex:none;width:78px">Пропуск ' +
+          n +
+          '</span>' +
+          '<input type="text" class="mkBlankText" placeholder="ответ (или вар-ты через ;)" value="' +
+          esc(ans || '') +
+          '">' +
+          '<button type="button" class="btn ghost mkDelBlank" title="Удалить">✕</button>';
+        $('mkBlanks').appendChild(row);
+      }
+      function renumberBlanks() {
+        [...$('mkBlanks').children].forEach((r, i) => {
+          const s = r.querySelector('.muted');
+          if (s) s.textContent = 'Пропуск ' + (i + 1);
+        });
+      }
+      $('mkAddBlank').onclick = () => addBlank('');
+      $('mkBlanks').addEventListener('click', (e) => {
+        const d = e.target.closest('.mkDelBlank');
+        if (!d) return;
+        if ($('mkBlanks').children.length <= 1) {
+          mkErr('Нужен хотя бы один пропуск');
+          return;
+        }
+        d.closest('.mkopt').remove();
+        renumberBlanks();
+      });
 
-<script>
-const $=id=>document.getElementById(id);
-let TOTAL=5, state=null, deadline=0, clockOffset=0, limitMs=0, timerInt=null;
-const proto=location.protocol==='https:'?'wss':'ws';
-const KEY_STORE='algoclimb_tkey';
-let ws=null, lastKey='', wasRejected=false, reconnectTimer=null, reconnectDelay=1000;
-function connect(key){
-  lastKey=key; wasRejected=false;
-  clearTimeout(reconnectTimer); reconnectTimer=null;
-  try{ws&&ws.close();}catch{}
-  ws=new WebSocket(`${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`);
-  ws.onopen=()=>{ $('dot').textContent='в сети'; reconnectDelay=1000; };
-  ws.onclose=()=>{
-    if(wasRejected) return;                 // неверный ключ — не переподключаемся
-    $('dot').textContent='переподключение…';
-    // автоматическое восстановление сессии: состояние целиком на сервере,
-    // при возврате связи сервер пришлёт текущий state и мы продолжим с того же места.
-    clearTimeout(reconnectTimer);
-    reconnectTimer=setTimeout(()=>connect(lastKey), reconnectDelay);
-    reconnectDelay=Math.min(reconnectDelay*1.6, 8000);
-  };
-  ws.onmessage=e=>{ const m=JSON.parse(e.data);
-    if(m.type==='rejected'){ onReject(m.reason); return; }
-    hideLogin(); try{localStorage.setItem(KEY_STORE,key);}catch{}
-    render(m); };
-}
-function onReject(reason){ wasRejected=true; clearTimeout(reconnectTimer); try{localStorage.removeItem(KEY_STORE);}catch{} showLogin(reason||'Доступ запрещён'); }
-function showLogin(err){ $('loginBox').classList.remove('hidden'); $('loginErr').textContent=err||''; $('keyInput').value=''; setTimeout(()=>$('keyInput').focus(),50); }
-function hideLogin(){ $('loginBox').classList.add('hidden'); }
-$('keyForm').onsubmit=e=>{ e.preventDefault(); const k=$('keyInput').value.trim(); if(k) connect(k); };
-(function init(){ let saved=''; try{saved=localStorage.getItem(KEY_STORE)||'';}catch{} if(saved) connect(saved); else showLogin(); })();
+      function fillTemplateSelect() {
+        const sel = $('mkGTemplate');
+        if (!sel) return;
+        sel.innerHTML = GRAPH_TEMPLATES.map(
+          (t) => '<option value="' + esc(t.key) + '">' + esc(t.label || t.key) + '</option>'
+        ).join('');
+        toggleExact();
+      }
+      $('mkGTemplate') && ($('mkGTemplate').onchange = toggleExact);
+      function toggleExact() {
+        $('mkGExactWrap').classList.toggle('hidden', $('mkGTemplate').value !== 'exact');
+      }
 
-let testMode=false;
-function updateTestBtn(){ const b=$('testBtn'); if(!b) return;
-  b.textContent='🧪 Тест: '+(testMode?'ВКЛ':'выкл');
-  b.classList.toggle('primary',testMode); b.classList.toggle('ghost',!testMode); }
-$('testBtn').onclick=()=>{ testMode=!testMode; updateTestBtn(); };
-$('startBtn').onclick=()=>{
-  const ids=[...SELECTED];
-  if(ids.length) ws.send(JSON.stringify({type:'start',taskIds:ids,test:testMode}));
-  else if(confirm('Ни одной задачи не выбрано. Запустить сессию по настройкам config?')) ws.send(JSON.stringify({type:'start',test:testMode}));
-};
-$('finishBtn').onclick=()=>ws.send(JSON.stringify({type:'finish'}));
-$('resetBtn').onclick=()=>{ if(confirm('Сбросить сессию и лобби?')) ws.send(JSON.stringify({type:'reset'})); };
-// Управление раундом на лету: пауза/продолжение, +время, пропуск.
-$('pauseBtn').onclick=()=>{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type: state&&state.paused?'resume':'pause'})); };
-$('addTimeBtn').onclick=()=>{ if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'addTime',ms:15000})); };
-$('skipBtn').onclick=()=>{ if(ws&&ws.readyState===1 && confirm('Пропустить текущий вопрос?')) ws.send(JSON.stringify({type:'skip'})); };
-function kick(nick){ if(confirm('Выкинуть '+nick+' из сессии?')) ws.send(JSON.stringify({type:'kick',nick})); }
-// Смена потока из лобби — сегментированный выбор 1/2/3.
-$('streamSeg').querySelectorAll('.seg-btn').forEach(b=>{
-  b.onclick=()=>{
-    const n=parseInt(b.dataset.stream,10);
-    if(Number.isFinite(n)&&ws&&ws.readyState===1) ws.send(JSON.stringify({type:'setStream',stream:n}));
-  };
-});
-function setStreamUI(n){
-  $('streamSeg').querySelectorAll('.seg-btn').forEach(b=>
-    b.classList.toggle('on',parseInt(b.dataset.stream,10)===n));
-}
+      function mkErr(s) {
+        $('mkMsg').style.color = '#ff6b6b';
+        $('mkMsg').textContent = s;
+      }
+      function mkOk(s) {
+        $('mkMsg').style.color = 'var(--green)';
+        $('mkMsg').textContent = s;
+      }
+      function resetMaker() {
+        setKind('choice');
+        $('mkMsg').textContent = '';
+        $('mkTitle').value = '';
+        $('mkPrompt').value = '';
+        $('mkTopic').value = 'graphs';
+        $('mkLevel').value = '1';
+        $('mkOpts').innerHTML = '';
+        mkOptN = 0;
+        addOpt('Правильный вариант');
+        addOpt('');
+        addOpt('');
+        $('mkGNodes').value = '';
+        $('mkGEdges').value = '';
+        $('mkGHint').value = '';
+        if (GRAPH_TEMPLATES.length) fillTemplateSelect();
+        $('mkONodes').value = '';
+        $('mkOEdges').value = '';
+        $('mkOStart').value = '';
+        $('mkOMode').value = 'bfs';
+        $('mkSArr').value = '';
+        $('mkSAlgo').value = 'bubble';
+        $('mkSSteps').value = '1';
+        $('mkBTemplate').value = '';
+        $('mkBlanks').innerHTML = '';
+        addBlank('');
+      }
+      function parseNodes(s) {
+        return s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+      }
+      function parseEdges(s) {
+        return s
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((p) => {
+            const m = p
+              .split(/[-–—]/)
+              .map((y) => y.trim())
+              .filter(Boolean);
+            return m.length === 2 ? [m[0], m[1]] : null;
+          })
+          .filter(Boolean);
+      }
 
-/* ---------- конструктор сессии ---------- */
-let CATALOG=[], SELECTED=new Set(), catF={topic:'all',type:'all',level:'all'}, catQ='';
-function catMatch(it){
-  if(catF.topic!=='all'&&it.topic!==catF.topic) return false;
-  if(catF.type!=='all'&&it.type!==catF.type) return false;
-  if(catF.level!=='all'&&String(it.level)!==catF.level) return false;
-  if(catQ){ const h=(it.title+' '+it.prompt+' '+it.id).toLowerCase(); if(!h.includes(catQ)) return false; }
-  return true;
-}
-function visibleCat(){ return CATALOG.filter(catMatch); }
-function renderCat(){
-  const list=visibleCat();
-  $('catCount').textContent='Показано '+list.length+' из '+CATALOG.length;
-  $('catList').innerHTML=list.map(it=>{
-    const tpMap={graph:'<span class="bdg g">построение</span>',order:'<span class="bdg g">обход</span>',sort:'<span class="bdg g">сортировка</span>',blank:'<span class="bdg g">пропуски</span>',choice:'<span class="bdg">выбор</span>'};
-    const tp=tpMap[it.type]||tpMap.choice;
-    const to=it.topic==='asd'?'<span class="bdg">АиСД</span>':'<span class="bdg">графы</span>';
-    const cust=it.custom?'<span class="bdg cust">своя</span>':'';
-    const del=it.custom?'<button type="button" class="delx" data-del="'+esc(it.id)+'" title="Удалить свою задачу">✕</button>':'';
-    return '<label class="catrow"><input type="checkbox" data-id="'+it.id+'" '+(SELECTED.has(it.id)?'checked':'')+'>'+
-      '<span class="ti">'+esc(it.title)+'</span><span class="meta">'+tp+' '+to+'<span class="bdg">ур.'+it.level+'</span>'+cust+del+'</span></label>';
-  }).join('') || '<div class="muted" style="padding:14px">Ничего не найдено.</div>';
-  mathify($('catList'));
-  $('selCount').textContent=SELECTED.size;
-}
-$('catList').onchange=e=>{ const cb=e.target.closest('input[type=checkbox]'); if(!cb) return;
-  if(cb.checked) SELECTED.add(cb.dataset.id); else SELECTED.delete(cb.dataset.id);
-  $('selCount').textContent=SELECTED.size; };
-$('catSearch').oninput=()=>{ catQ=$('catSearch').value.trim().toLowerCase(); renderCat(); };
-document.querySelector('.builder').addEventListener('click',e=>{
-  const c=e.target.closest('.chip'); if(!c) return;
-  // повторный клик по активному фильтру (кроме «Все…») снимает его и возвращает весь список
-  let v=c.dataset.v;
-  if(c.classList.contains('on') && v!=='all') v='all';
-  catF[c.dataset.f]=v;
-  document.querySelectorAll('.builder .chip[data-f="'+c.dataset.f+'"]').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
-  renderCat();
-});
-$('catAll').onclick=()=>{ visibleCat().forEach(it=>SELECTED.add(it.id)); renderCat(); };
-$('catNone').onclick=()=>{ SELECTED.clear(); renderCat(); };
-$('catRand').onclick=()=>{ const pool=visibleCat().map(it=>it.id);
-  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-  SELECTED=new Set(pool.slice(0,10)); renderCat(); };
+      $('mkSubmit').onclick = () => {
+        const title = $('mkTitle').value.trim(),
+          prompt = $('mkPrompt').value.trim();
+        const topic = $('mkTopic').value,
+          level = +$('mkLevel').value;
+        if (!title) {
+          mkErr('Введите название');
+          return;
+        }
+        if (!prompt) {
+          mkErr('Введите условие');
+          return;
+        }
+        const task = { kind: mkKind, title, prompt, topic, level };
+        if (mkKind === 'choice') {
+          const opts = [...$('mkOpts').querySelectorAll('.mkOptText')].map((i) => i.value.trim());
+          if (opts.some((o) => !o)) {
+            mkErr('Заполните все варианты или удалите пустые');
+            return;
+          }
+          if (opts.length < 2) {
+            mkErr('Нужно минимум 2 варианта');
+            return;
+          }
+          const r = $('mkOpts').querySelector('input[type=radio]:checked');
+          task.options = opts;
+          task.answer = r ? +r.value : 0;
+        } else if (mkKind === 'graph') {
+          const nodes = parseNodes($('mkGNodes').value);
+          if (nodes.length < 2) {
+            mkErr('Укажите минимум 2 вершины');
+            return;
+          }
+          task.nodes = nodes;
+          task.template = $('mkGTemplate').value;
+          task.hint = $('mkGHint').value.trim();
+          if (task.template === 'exact') {
+            const edges = parseEdges($('mkGEdges').value);
+            if (!edges.length) {
+              mkErr('Укажите рёбра точного графа (A-B)');
+              return;
+            }
+            task.requiredEdges = edges;
+          }
+        } else if (mkKind === 'order') {
+          const nodes = parseNodes($('mkONodes').value),
+            edges = parseEdges($('mkOEdges').value);
+          const start = $('mkOStart').value.trim();
+          if (nodes.length < 2) {
+            mkErr('Укажите минимум 2 вершины');
+            return;
+          }
+          if (!edges.length) {
+            mkErr('Укажите рёбра (A-B)');
+            return;
+          }
+          if (!start || !nodes.includes(start)) {
+            mkErr('Старт должен быть одной из вершин');
+            return;
+          }
+          const bad = edges.find((e) => !nodes.includes(e[0]) || !nodes.includes(e[1]));
+          if (bad) {
+            mkErr('Ребро ссылается на несуществующую вершину: ' + bad.join('-'));
+            return;
+          }
+          task.nodes = nodes;
+          task.edges = edges;
+          task.start = start;
+          task.mode = $('mkOMode').value;
+        } else if (mkKind === 'sort') {
+          const arr = $('mkSArr')
+            .value.split(',')
+            .map((x) => x.trim())
+            .filter(Boolean);
+          if (arr.length < 3) {
+            mkErr('Укажите минимум 3 элемента массива');
+            return;
+          }
+          const steps = +$('mkSSteps').value;
+          if (!(steps >= 1 && steps <= 20)) {
+            mkErr('Число шагов — от 1 до 20');
+            return;
+          }
+          task.array = arr;
+          task.algo = $('mkSAlgo').value;
+          task.steps = steps;
+        } else if (mkKind === 'blank') {
+          const template = $('mkBTemplate').value;
+          const marks = (template.match(/___/g) || []).length;
+          if (marks < 1) {
+            mkErr('В шаблоне нет пропусков (используйте ___)');
+            return;
+          }
+          const rows = [...$('mkBlanks').querySelectorAll('.mkBlankText')].map((i) =>
+            i.value.trim()
+          );
+          if (rows.length !== marks) {
+            mkErr('Пропусков в шаблоне: ' + marks + ', а полей ответа: ' + rows.length);
+            return;
+          }
+          if (rows.some((r) => !r)) {
+            mkErr('Заполните ответ для каждого пропуска');
+            return;
+          }
+          const blanks = rows.map((r) => {
+            if (r.includes(';')) {
+              const opts = r
+                .split(';')
+                .map((x) => x.trim())
+                .filter(Boolean);
+              return { answer: opts[0], options: opts };
+            }
+            if (r.includes('|')) {
+              const alts = r
+                .split('|')
+                .map((x) => x.trim())
+                .filter(Boolean);
+              return { answer: alts[0], alts: alts.slice(1) };
+            }
+            return { answer: r };
+          });
+          task.template = template;
+          task.blanks = blanks;
+        }
+        if (ws && ws.readyState === 1) {
+          $('mkSubmit').disabled = true;
+          mkOk('Сохранение…');
+          ws.send(JSON.stringify({ type: 'addTask', task }));
+        } else mkErr('Нет связи с сервером');
+      };
+      function onTaskAdded(m) {
+        $('mkSubmit').disabled = false;
+        if (m.ok) {
+          mkOk('Задача добавлена ✓');
+          setTimeout(closeMaker, 600);
+        } else mkErr(m.error || 'Не удалось добавить задачу');
+      }
 
-/* ---------- удаление своих задач ---------- */
-$('catList').addEventListener('click',e=>{
-  const b=e.target.closest('.delx'); if(!b) return;
-  e.preventDefault(); e.stopPropagation();
-  const id=b.dataset.del;
-  if(confirm('Удалить свою задачу безвозвратно?')){
-    SELECTED.delete(id);
-    if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'deleteTask',id}));
-  }
-});
+      /* ---------- экспорт итогов в CSV (открывается в Excel) ---------- */
+      function csvCell(v) {
+        const s = String(v == null ? '' : v);
+        return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }
+      function downloadCsv(name, rows) {
+        const body = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+        const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(a.href);
+          a.remove();
+        }, 100);
+      }
+      function stamp() {
+        const d = new Date(),
+          p = (n) => String(n).padStart(2, '0');
+        return (
+          d.getFullYear() +
+          p(d.getMonth() + 1) +
+          p(d.getDate()) +
+          '-' +
+          p(d.getHours()) +
+          p(d.getMinutes())
+        );
+      }
+      $('expSummary').onclick = () => {
+        if (!state || !state.leaderboard) return;
+        const tot = state.roundTotal || state.session.total || 0;
+        const rows = [
+          ['Место', 'Участник', 'Очки', 'Верных', 'Всего вопросов', '% верных', 'Уходы со вкладки'],
+        ];
+        state.leaderboard.forEach((r) => {
+          const pct = tot ? Math.round((100 * r.correct) / tot) : 0;
+          rows.push([r.rank, r.nick, r.score, r.correct, tot, pct + '%', r.tabLeaves || 0]);
+        });
+        downloadCsv(
+          'algoclimb-итоги-поток' + (state.session.stream || '') + '-' + stamp() + '.csv',
+          rows
+        );
+      };
+      $('expDetail').onclick = () => {
+        const d = state && state.details;
+        if (!d || !d.length) return;
+        const rows = [
+          [
+            'Вопрос №',
+            'Задача',
+            'Правильный ответ',
+            'Участник',
+            'Ответ студента',
+            'Верно',
+            'Время, с',
+            'Очки',
+          ],
+        ];
+        d.forEach((q) => {
+          (q.responses || []).forEach((r) => {
+            rows.push([
+              q.index + 1,
+              q.title,
+              q.correctAnswer,
+              r.nick,
+              r.answered ? r.answer || '' : '(нет ответа)',
+              r.answered ? (r.correct ? 'да' : 'нет') : '',
+              r.ms != null ? (r.ms / 1000).toFixed(1) : '',
+              r.points || 0,
+            ]);
+          });
+        });
+        downloadCsv(
+          'algoclimb-разбор-поток' + (state.session.stream || '') + '-' + stamp() + '.csv',
+          rows
+        );
+      };
 
-/* ---------- конструктор задач ---------- */
-let GRAPH_TEMPLATES=[], mkKind='choice', mkOptN=0;
-function openMaker(){ resetMaker(); $('makerModal').classList.remove('hidden'); setTimeout(()=>$('mkTitle').focus(),50); }
-function closeMaker(){ $('makerModal').classList.add('hidden'); }
-$('openMaker').onclick=openMaker;
-$('makerClose').onclick=closeMaker;
-$('makerModal').addEventListener('click',e=>{ if(e.target===$('makerModal')) closeMaker(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('makerModal').classList.contains('hidden')) closeMaker(); });
+      let showAnswer = false;
+      $('ansToggle').onclick = () => {
+        showAnswer = !showAnswer;
+        updateAnswerPanel();
+      };
+      function updateAnswerPanel() {
+        const a = state && state.currentAnswer;
+        $('ansToggle').textContent = showAnswer ? '🙈 Скрыть ответ' : '👁 Показать ответ';
+        if (showAnswer && a) {
+          $('ansPanel').classList.remove('hidden');
+          $('ansPanel').innerHTML = '<b>Ответ:</b> ' + esc(a);
+          mathify($('ansPanel'));
+        } else $('ansPanel').classList.add('hidden');
+      }
 
-function setKind(k){ mkKind=k;
-  document.querySelectorAll('.mk-kind').forEach(c=>c.classList.toggle('on',c.dataset.k===k));
-  $('mkChoice').classList.toggle('hidden',k!=='choice');
-  $('mkGraph').classList.toggle('hidden',k!=='graph');
-  $('mkOrder').classList.toggle('hidden',k!=='order');
-  $('mkSort').classList.toggle('hidden',k!=='sort');
-  $('mkBlank').classList.toggle('hidden',k!=='blank');
-}
-document.querySelector('#makerModal .bar').addEventListener('click',e=>{
-  const c=e.target.closest('.mk-kind'); if(c) setKind(c.dataset.k);
-});
+      function render(m) {
+        if (m.type === 'catalog') {
+          CATALOG = m.items || [];
+          renderCat();
+          return;
+        }
+        if (m.type === 'taskTemplates') {
+          GRAPH_TEMPLATES = m.graph || [];
+          fillTemplateSelect();
+          return;
+        }
+        if (m.type === 'taskAdded') {
+          onTaskAdded(m);
+          return;
+        }
+        if (m.type === 'flag') {
+          flag(m.nick, m.count, m.kind);
+          return;
+        }
+        if (m.type === 'stats') {
+          onStats(m);
+          return;
+        }
+        if (m.type === 'wiped') {
+          if (!m.ok) alert('Не удалось очистить: ' + (m.error || ''));
+          return;
+        }
+        if (m.type !== 'state') return;
+        state = m;
+        TOTAL = m.session.total || TOTAL;
+        $('streamTag').textContent = 'Поток ' + m.session.stream;
+        if (m.session.stream != null) setStreamUI(m.session.stream);
+        const st = m.session.status;
+        $('startBtn').classList.toggle('hidden', st !== 'lobby');
+        $('testBtn').classList.toggle('hidden', st !== 'lobby');
+        $('testTag').classList.toggle('hidden', !m.test);
+        updateTestBtn();
+        $('finishBtn').classList.toggle('hidden', st !== 'running');
+        $('lobbyView').classList.toggle('hidden', st !== 'lobby');
+        $('gameView').classList.toggle('hidden', st !== 'running');
+        $('resultsView').classList.toggle('hidden', st !== 'finished');
 
-function addOpt(text){ const i=mkOptN++;
-  const row=document.createElement('div'); row.className='mkopt';
-  row.innerHTML='<input type="radio" name="mkCorrect" value="'+i+'"'+(i===0?' checked':'')+'>'+
-    '<input type="text" class="mkOptText" placeholder="Вариант ответа" value="'+esc(text||'')+'">'+
-    '<button type="button" class="btn ghost mkDelOpt" title="Удалить">✕</button>';
-  $('mkOpts').appendChild(row);
-}
-$('mkAddOpt').onclick=()=>addOpt('');
-$('mkOpts').addEventListener('click',e=>{ const d=e.target.closest('.mkDelOpt'); if(!d) return;
-  if($('mkOpts').children.length<=2){ mkErr('Нужно минимум 2 варианта'); return; }
-  const row=d.closest('.mkopt'); const wasChecked=row.querySelector('input[type=radio]').checked;
-  row.remove();
-  if(wasChecked){ const first=$('mkOpts').querySelector('input[type=radio]'); if(first) first.checked=true; }
-});
+        if (st === 'lobby') renderLobby(m);
+        else if (st === 'running') renderGame(m);
+        else renderResults(m);
+      }
 
-function addBlank(ans){ const n=$('mkBlanks').children.length+1;
-  const row=document.createElement('div'); row.className='mkopt';
-  row.innerHTML='<span class="muted" style="flex:none;width:78px">Пропуск '+n+'</span>'+
-    '<input type="text" class="mkBlankText" placeholder="ответ (или вар-ты через ;)" value="'+esc(ans||'')+'">'+
-    '<button type="button" class="btn ghost mkDelBlank" title="Удалить">✕</button>';
-  $('mkBlanks').appendChild(row);
-}
-function renumberBlanks(){ [...$('mkBlanks').children].forEach((r,i)=>{ const s=r.querySelector('.muted'); if(s) s.textContent='Пропуск '+(i+1); }); }
-$('mkAddBlank').onclick=()=>addBlank('');
-$('mkBlanks').addEventListener('click',e=>{ const d=e.target.closest('.mkDelBlank'); if(!d) return;
-  if($('mkBlanks').children.length<=1){ mkErr('Нужен хотя бы один пропуск'); return; }
-  d.closest('.mkopt').remove(); renumberBlanks();
-});
+      function renderLobby(m) {
+        clearInterval(timerInt);
+        $('cnt').textContent = m.roster.length;
+        $('roster').innerHTML =
+          m.roster
+            .map(
+              (s) =>
+                `<div class="pill"><div class="ava">${s.icon}</div><div>${esc(s.nick)}</div></div>`
+            )
+            .join('') || '<div class="muted">Пока никто не зашёл…</div>';
+        const url = m.joinUrl || `http://${location.host}/`;
+        $('url').textContent = url;
+        if (m.qrSvg) $('qr').innerHTML = m.qrSvg;
+        else drawQR(url);
+        if (m.token) {
+          $('token').classList.remove('hidden');
+          $('token').textContent = 'Код: ' + m.token;
+        } else $('token').classList.add('hidden');
+      }
 
-function fillTemplateSelect(){
-  const sel=$('mkGTemplate'); if(!sel) return;
-  sel.innerHTML=GRAPH_TEMPLATES.map(t=>'<option value="'+esc(t.key)+'">'+esc(t.label||t.key)+'</option>').join('');
-  toggleExact();
-}
-$('mkGTemplate')&&($('mkGTemplate').onchange=toggleExact);
-function toggleExact(){ $('mkGExactWrap').classList.toggle('hidden',$('mkGTemplate').value!=='exact'); }
+      function renderGame(m) {
+        $('qnum').textContent = `Вопрос ${m.round + 1}/${m.roundTotal}`;
+        $('qtype').textContent =
+          { graph: 'построение', order: 'обход', sort: 'сортировка', blank: 'пропуски' }[
+            m.currentType
+          ] || 'выбор';
+        $('answered').textContent = `${m.answeredCount}/${m.activeCount} ответили`;
+        deadline = m.deadline;
+        clockOffset = (m.serverTime || Date.now()) - Date.now();
+        limitMs =
+          typeof m.limit === 'number' && m.limit > 0
+            ? m.limit
+            : (m.currentType === 'choice' || m.currentType === 'blank' ? 10 : 25) * 1000;
+        const paused = !!m.paused;
+        $('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза';
+        $('pauseBtn').classList.toggle('on', paused);
+        $('pauseBtn').disabled = !!m.intermission;
+        $('addTimeBtn').disabled = !!m.intermission;
+        $('skipBtn').disabled = !!m.intermission;
+        startTimer(m.intermission, paused);
+        buildMountain(m.leaderboard);
+        buildLB(m.leaderboard, true);
+        updateAnswerPanel();
+      }
 
-function mkErr(s){ $('mkMsg').style.color='#ff6b6b'; $('mkMsg').textContent=s; }
-function mkOk(s){ $('mkMsg').style.color='var(--green)'; $('mkMsg').textContent=s; }
-function resetMaker(){
-  setKind('choice'); $('mkMsg').textContent='';
-  $('mkTitle').value=''; $('mkPrompt').value=''; $('mkTopic').value='graphs'; $('mkLevel').value='1';
-  $('mkOpts').innerHTML=''; mkOptN=0; addOpt('Правильный вариант'); addOpt(''); addOpt('');
-  $('mkGNodes').value=''; $('mkGEdges').value=''; $('mkGHint').value='';
-  if(GRAPH_TEMPLATES.length) fillTemplateSelect();
-  $('mkONodes').value=''; $('mkOEdges').value=''; $('mkOStart').value=''; $('mkOMode').value='bfs';
-  $('mkSArr').value=''; $('mkSAlgo').value='bubble'; $('mkSSteps').value='1';
-  $('mkBTemplate').value=''; $('mkBlanks').innerHTML=''; addBlank('');
-}
-function parseNodes(s){ return s.split(',').map(x=>x.trim()).filter(Boolean); }
-function parseEdges(s){ return s.split(',').map(x=>x.trim()).filter(Boolean).map(p=>{
-  const m=p.split(/[-–—]/).map(y=>y.trim()).filter(Boolean); return m.length===2?[m[0],m[1]]:null;
-}).filter(Boolean); }
+      function startTimer(intermission, paused) {
+        clearInterval(timerInt);
+        if (paused) {
+          $('timer').textContent = '⏸';
+          $('timer').classList.remove('low');
+          $('tfill').classList.remove('low');
+          return;
+        }
+        if (intermission || !deadline) {
+          $('timer').textContent = '—';
+          $('tfill').style.width = '0%';
+          return;
+        }
+        const tick = () => {
+          const left = deadline - (Date.now() + clockOffset);
+          const s = Math.max(0, Math.ceil(left / 1000));
+          $('timer').textContent = `00:${String(s).padStart(2, '0')}`;
+          const frac = Math.max(0, Math.min(1, left / limitMs));
+          $('tfill').style.width = frac * 100 + '%';
+          const low = left <= 3000;
+          $('timer').classList.toggle('low', low);
+          $('tfill').classList.toggle('low', low);
+          if (left <= 0) clearInterval(timerInt);
+        };
+        tick();
+        timerInt = setInterval(tick, 250);
+      }
 
-$('mkSubmit').onclick=()=>{
-  const title=$('mkTitle').value.trim(), prompt=$('mkPrompt').value.trim();
-  const topic=$('mkTopic').value, level=+$('mkLevel').value;
-  if(!title){ mkErr('Введите название'); return; }
-  if(!prompt){ mkErr('Введите условие'); return; }
-  const task={kind:mkKind,title,prompt,topic,level};
-  if(mkKind==='choice'){
-    const opts=[...$('mkOpts').querySelectorAll('.mkOptText')].map(i=>i.value.trim());
-    if(opts.some(o=>!o)){ mkErr('Заполните все варианты или удалите пустые'); return; }
-    if(opts.length<2){ mkErr('Нужно минимум 2 варианта'); return; }
-    const r=$('mkOpts').querySelector('input[type=radio]:checked');
-    task.options=opts; task.answer=r?+r.value:0;
-  } else if(mkKind==='graph'){
-    const nodes=parseNodes($('mkGNodes').value);
-    if(nodes.length<2){ mkErr('Укажите минимум 2 вершины'); return; }
-    task.nodes=nodes; task.template=$('mkGTemplate').value; task.hint=$('mkGHint').value.trim();
-    if(task.template==='exact'){
-      const edges=parseEdges($('mkGEdges').value);
-      if(!edges.length){ mkErr('Укажите рёбра точного графа (A-B)'); return; }
-      task.requiredEdges=edges;
-    }
-  } else if(mkKind==='order'){
-    const nodes=parseNodes($('mkONodes').value), edges=parseEdges($('mkOEdges').value);
-    const start=$('mkOStart').value.trim();
-    if(nodes.length<2){ mkErr('Укажите минимум 2 вершины'); return; }
-    if(!edges.length){ mkErr('Укажите рёбра (A-B)'); return; }
-    if(!start||!nodes.includes(start)){ mkErr('Старт должен быть одной из вершин'); return; }
-    const bad=edges.find(e=>!nodes.includes(e[0])||!nodes.includes(e[1]));
-    if(bad){ mkErr('Ребро ссылается на несуществующую вершину: '+bad.join('-')); return; }
-    task.nodes=nodes; task.edges=edges; task.start=start; task.mode=$('mkOMode').value;
-  } else if(mkKind==='sort'){
-    const arr=$('mkSArr').value.split(',').map(x=>x.trim()).filter(Boolean);
-    if(arr.length<3){ mkErr('Укажите минимум 3 элемента массива'); return; }
-    const steps=+$('mkSSteps').value;
-    if(!(steps>=1&&steps<=20)){ mkErr('Число шагов — от 1 до 20'); return; }
-    task.array=arr; task.algo=$('mkSAlgo').value; task.steps=steps;
-  } else if(mkKind==='blank'){
-    const template=$('mkBTemplate').value;
-    const marks=(template.match(/___/g)||[]).length;
-    if(marks<1){ mkErr('В шаблоне нет пропусков (используйте ___)'); return; }
-    const rows=[...$('mkBlanks').querySelectorAll('.mkBlankText')].map(i=>i.value.trim());
-    if(rows.length!==marks){ mkErr('Пропусков в шаблоне: '+marks+', а полей ответа: '+rows.length); return; }
-    if(rows.some(r=>!r)){ mkErr('Заполните ответ для каждого пропуска'); return; }
-    const blanks=rows.map(r=>{
-      if(r.includes(';')){ const opts=r.split(';').map(x=>x.trim()).filter(Boolean);
-        return {answer:opts[0], options:opts}; }
-      if(r.includes('|')){ const alts=r.split('|').map(x=>x.trim()).filter(Boolean);
-        return {answer:alts[0], alts:alts.slice(1)}; }
-      return {answer:r};
-    });
-    task.template=template; task.blanks=blanks;
-  }
-  if(ws&&ws.readyState===1){ $('mkSubmit').disabled=true; mkOk('Сохранение…'); ws.send(JSON.stringify({type:'addTask',task})); }
-  else mkErr('Нет связи с сервером');
-};
-function onTaskAdded(m){
-  $('mkSubmit').disabled=false;
-  if(m.ok){ mkOk('Задача добавлена ✓'); setTimeout(closeMaker,600); }
-  else mkErr(m.error||'Не удалось добавить задачу');
-}
-
-/* ---------- экспорт итогов в CSV (открывается в Excel) ---------- */
-function csvCell(v){ const s=String(v==null?'':v); return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
-function downloadCsv(name,rows){
-  const body=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
-  const blob=new Blob(['﻿'+body],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=name; document.body.appendChild(a); a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);
-}
-function stamp(){ const d=new Date(),p=n=>String(n).padStart(2,'0');
-  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes()); }
-$('expSummary').onclick=()=>{
-  if(!state||!state.leaderboard) return;
-  const tot=state.roundTotal||state.session.total||0;
-  const rows=[['Место','Участник','Очки','Верных','Всего вопросов','% верных','Уходы со вкладки']];
-  state.leaderboard.forEach(r=>{
-    const pct=tot?Math.round(100*r.correct/tot):0;
-    rows.push([r.rank, r.nick, r.score, r.correct, tot, pct+'%', r.tabLeaves||0]);
-  });
-  downloadCsv('algoclimb-итоги-поток'+(state.session.stream||'')+'-'+stamp()+'.csv',rows);
-};
-$('expDetail').onclick=()=>{
-  const d=state&&state.details; if(!d||!d.length) return;
-  const rows=[['Вопрос №','Задача','Правильный ответ','Участник','Ответ студента','Верно','Время, с','Очки']];
-  d.forEach(q=>{
-    (q.responses||[]).forEach(r=>{
-      rows.push([q.index+1, q.title, q.correctAnswer,
-        r.nick, r.answered?(r.answer||''):'(нет ответа)',
-        r.answered?(r.correct?'да':'нет'):'', r.ms!=null?(r.ms/1000).toFixed(1):'', r.points||0]);
-    });
-  });
-  downloadCsv('algoclimb-разбор-поток'+(state.session.stream||'')+'-'+stamp()+'.csv',rows);
-};
-
-let showAnswer=false;
-$('ansToggle').onclick=()=>{ showAnswer=!showAnswer; updateAnswerPanel(); };
-function updateAnswerPanel(){
-  const a=state&&state.currentAnswer;
-  $('ansToggle').textContent=showAnswer?'🙈 Скрыть ответ':'👁 Показать ответ';
-  if(showAnswer&&a){ $('ansPanel').classList.remove('hidden');
-    $('ansPanel').innerHTML='<b>Ответ:</b> '+esc(a); mathify($('ansPanel')); }
-  else $('ansPanel').classList.add('hidden');
-}
-
-function render(m){
-  if(m.type==='catalog'){ CATALOG=m.items||[]; renderCat(); return; }
-  if(m.type==='taskTemplates'){ GRAPH_TEMPLATES=m.graph||[]; fillTemplateSelect(); return; }
-  if(m.type==='taskAdded'){ onTaskAdded(m); return; }
-  if(m.type==='flag'){ flag(m.nick,m.count,m.kind); return; }
-  if(m.type==='stats'){ onStats(m); return; }
-  if(m.type==='wiped'){ if(!m.ok) alert('Не удалось очистить: '+(m.error||'')); return; }
-  if(m.type!=='state') return;
-  state=m; TOTAL=m.session.total||TOTAL;
-  $('streamTag').textContent='Поток '+m.session.stream;
-  if(m.session.stream!=null) setStreamUI(m.session.stream);
-  const st=m.session.status;
-  $('startBtn').classList.toggle('hidden',st!=='lobby');
-  $('testBtn').classList.toggle('hidden',st!=='lobby');
-  $('testTag').classList.toggle('hidden',!m.test);
-  updateTestBtn();
-  $('finishBtn').classList.toggle('hidden',st!=='running');
-  $('lobbyView').classList.toggle('hidden',st!=='lobby');
-  $('gameView').classList.toggle('hidden',st!=='running');
-  $('resultsView').classList.toggle('hidden',st!=='finished');
-
-  if(st==='lobby') renderLobby(m);
-  else if(st==='running') renderGame(m);
-  else renderResults(m);
-}
-
-function renderLobby(m){
-  clearInterval(timerInt);
-  $('cnt').textContent=m.roster.length;
-  $('roster').innerHTML=m.roster.map(s=>
-    `<div class="pill"><div class="ava">${s.icon}</div><div>${esc(s.nick)}</div></div>`).join('')
-    || '<div class="muted">Пока никто не зашёл…</div>';
-  const url=m.joinUrl||`http://${location.host}/`;
-  $('url').textContent=url;
-  if(m.qrSvg) $('qr').innerHTML=m.qrSvg; else drawQR(url);
-  if(m.token){ $('token').classList.remove('hidden'); $('token').textContent='Код: '+m.token; }
-  else $('token').classList.add('hidden');
-}
-
-function renderGame(m){
-  $('qnum').textContent=`Вопрос ${m.round+1}/${m.roundTotal}`;
-  $('qtype').textContent=({graph:'построение',order:'обход',sort:'сортировка',blank:'пропуски'}[m.currentType])||'выбор';
-  $('answered').textContent=`${m.answeredCount}/${m.activeCount} ответили`;
-  deadline=m.deadline; clockOffset=(m.serverTime||Date.now())-Date.now();
-  limitMs=(typeof m.limit==='number'&&m.limit>0)?m.limit:((m.currentType==='choice'||m.currentType==='blank')?10:25)*1000;
-  const paused=!!m.paused;
-  $('pauseBtn').textContent=paused?'▶ Продолжить':'⏸ Пауза';
-  $('pauseBtn').classList.toggle('on',paused);
-  $('pauseBtn').disabled=!!m.intermission;
-  $('addTimeBtn').disabled=!!m.intermission;
-  $('skipBtn').disabled=!!m.intermission;
-  startTimer(m.intermission,paused);
-  buildMountain(m.leaderboard);
-  buildLB(m.leaderboard,true);
-  updateAnswerPanel();
-}
-
-function startTimer(intermission,paused){
-  clearInterval(timerInt);
-  if(paused){ $('timer').textContent='⏸'; $('timer').classList.remove('low'); $('tfill').classList.remove('low'); return; }
-  if(intermission||!deadline){ $('timer').textContent='—'; $('tfill').style.width='0%'; return; }
-  const tick=()=>{
-    const left=deadline-(Date.now()+clockOffset);
-    const s=Math.max(0,Math.ceil(left/1000));
-    $('timer').textContent=`00:${String(s).padStart(2,'0')}`;
-    const frac=Math.max(0,Math.min(1,left/limitMs));
-    $('tfill').style.width=(frac*100)+'%';
-    const low=left<=3000;
-    $('timer').classList.toggle('low',low); $('tfill').classList.toggle('low',low);
-    if(left<=0) clearInterval(timerInt);
-  };
-  tick(); timerInt=setInterval(tick,250);
-}
-
-function buildLB(rows,running){
-  $('lb').innerHTML=rows.slice(0,20).map(r=>{
-    const cls=r.rank<=3?`r${r.rank}`:'';
-    const off=r.connected?'':'off';
-    const leave=r.tabLeaves>0?`<span class="leave" title="уходов со вкладки">⚠ ${r.tabLeaves}</span>`:'';
-    const fast=r.fastAnswers>0?`<span class="leave" title="аномально быстрые верные ответы" style="background:#3a2e16;border-color:#6b5a2b;color:#ffd98a">⚡ ${r.fastAnswers}</span>`:'';
-    const pend=running&&r.answeredThisRound?'<span class="ansdot ok" title="ответил"></span>':(running?'<span class="ansdot skip" title="ждём"></span>':'');
-    const kbtn=running?`<button class="kick" onclick="kick('${esc(r.nick)}')">✕</button>`:'';
-    return `<div class="lbrow ${cls} ${off}">
+      function buildLB(rows, running) {
+        $('lb').innerHTML =
+          rows
+            .slice(0, 20)
+            .map((r) => {
+              const cls = r.rank <= 3 ? `r${r.rank}` : '';
+              const off = r.connected ? '' : 'off';
+              const leave =
+                r.tabLeaves > 0
+                  ? `<span class="leave" title="уходов со вкладки">⚠ ${r.tabLeaves}</span>`
+                  : '';
+              const fast =
+                r.fastAnswers > 0
+                  ? `<span class="leave" title="аномально быстрые верные ответы" style="background:#3a2e16;border-color:#6b5a2b;color:#ffd98a">⚡ ${r.fastAnswers}</span>`
+                  : '';
+              const pend =
+                running && r.answeredThisRound
+                  ? '<span class="ansdot ok" title="ответил"></span>'
+                  : running
+                    ? '<span class="ansdot skip" title="ждём"></span>'
+                    : '';
+              const kbtn = running
+                ? `<button class="kick" onclick="kick('${esc(r.nick)}')">✕</button>`
+                : '';
+              return `<div class="lbrow ${cls} ${off}">
       <div class="lbrank">${r.rank}</div>
       <div class="ava">${r.icon}</div>
       <div class="nick">${esc(r.nick)}</div>
       ${pend} ${leave} ${fast}
       <div class="pts">${r.score}</div>
       ${kbtn}</div>`;
-  }).join('') || '<div class="muted">Нет участников</div>';
-}
+            })
+            .join('') || '<div class="muted">Нет участников</div>';
+      }
 
-/* ---------- mountain ---------- */
-function buildMountain(rows){
-  const w=560,h=440;
-  const pts=[];
-  for(let i=0;i<=TOTAL;i++){const t=i/TOTAL;pts.push([60+t*400+(i%2?30:0), 400-t*350]);}
-  let path=`M${pts[0][0]},${pts[0][1]}`;
-  for(let i=1;i<pts.length;i++)path+=` L${pts[i][0]},${pts[i][1]}`;
-  let squares='';
-  pts.forEach(p=>squares+=`<rect x="${p[0]-9}" y="${p[1]-9}" width="18" height="18" rx="3" fill="#0a1c34" stroke="#cfe0ff" stroke-width="2.5"/>`);
-  const byStage={};
-  rows.forEach(s=>{const st=Math.min(s.correct,TOTAL);(byStage[st]=byStage[st]||[]).push(s);});
-  let badges='';
-  Object.keys(byStage).forEach(st=>{const p=pts[st];const arr=byStage[st];
-    const faces=arr.slice(0,3).map(s=>s.icon).join('');
-    badges+=`<div class="stage-badge" style="left:${p[0]/w*100}%;top:${p[1]/h*100}%;transform:translate(-120%,-30%)">${faces} ${arr.length}</div>`;});
-  $('mountain').innerHTML=`
+      /* ---------- mountain ---------- */
+      function buildMountain(rows) {
+        const w = 560,
+          h = 440;
+        const pts = [];
+        for (let i = 0; i <= TOTAL; i++) {
+          const t = i / TOTAL;
+          pts.push([60 + t * 400 + (i % 2 ? 30 : 0), 400 - t * 350]);
+        }
+        let path = `M${pts[0][0]},${pts[0][1]}`;
+        for (let i = 1; i < pts.length; i++) path += ` L${pts[i][0]},${pts[i][1]}`;
+        let squares = '';
+        pts.forEach(
+          (p) =>
+            (squares += `<rect x="${p[0] - 9}" y="${p[1] - 9}" width="18" height="18" rx="3" fill="#0a1c34" stroke="#cfe0ff" stroke-width="2.5"/>`)
+        );
+        const byStage = {};
+        rows.forEach((s) => {
+          const st = Math.min(s.correct, TOTAL);
+          (byStage[st] = byStage[st] || []).push(s);
+        });
+        let badges = '';
+        Object.keys(byStage).forEach((st) => {
+          const p = pts[st];
+          const arr = byStage[st];
+          const faces = arr
+            .slice(0, 3)
+            .map((s) => s.icon)
+            .join('');
+          badges += `<div class="stage-badge" style="left:${(p[0] / w) * 100}%;top:${(p[1] / h) * 100}%;transform:translate(-120%,-30%)">${faces} ${arr.length}</div>`;
+        });
+        $('mountain').innerHTML = `
     <svg viewBox="0 0 ${w} ${h}" style="position:absolute;inset:0;width:100%;height:100%">
       <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#1b4a7a"/><stop offset="1" stop-color="#0a1d36"/></linearGradient></defs>
@@ -902,376 +2260,634 @@ function buildMountain(rows){
       <path d="M0,412 C140,398 260,424 380,406 S560,398 560,410 L560,440 L0,440 Z" fill="none" stroke="#ffd23f" stroke-width="4"/>
       <path d="${path}" fill="none" stroke="#cfe0ff" stroke-width="3" stroke-dasharray="2 6" opacity=".55"/>
       ${squares}
-      <text x="${pts[0][0]}" y="${pts[0][1]+34}" font-family="Arial" font-weight="800" font-size="15" fill="#ffd23f" text-anchor="middle">СТАРТ</text>
-      <line x1="${pts[TOTAL][0]}" y1="${pts[TOTAL][1]-12}" x2="${pts[TOTAL][0]}" y2="${pts[TOTAL][1]-44}" stroke="#fff" stroke-width="2.5"/>
-      <path d="M${pts[TOTAL][0]},${pts[TOTAL][1]-44} L${pts[TOTAL][0]+24},${pts[TOTAL][1]-36} L${pts[TOTAL][0]},${pts[TOTAL][1]-28} Z" fill="#ffd23f"/>
-      <text x="${pts[TOTAL][0]-6}" y="${pts[TOTAL][1]-50}" font-family="Arial" font-weight="800" font-size="14" fill="#fff" text-anchor="end">ФИНИШ</text>
+      <text x="${pts[0][0]}" y="${pts[0][1] + 34}" font-family="Arial" font-weight="800" font-size="15" fill="#ffd23f" text-anchor="middle">СТАРТ</text>
+      <line x1="${pts[TOTAL][0]}" y1="${pts[TOTAL][1] - 12}" x2="${pts[TOTAL][0]}" y2="${pts[TOTAL][1] - 44}" stroke="#fff" stroke-width="2.5"/>
+      <path d="M${pts[TOTAL][0]},${pts[TOTAL][1] - 44} L${pts[TOTAL][0] + 24},${pts[TOTAL][1] - 36} L${pts[TOTAL][0]},${pts[TOTAL][1] - 28} Z" fill="#ffd23f"/>
+      <text x="${pts[TOTAL][0] - 6}" y="${pts[TOTAL][1] - 50}" font-family="Arial" font-weight="800" font-size="14" fill="#fff" text-anchor="end">ФИНИШ</text>
     </svg>${badges}`;
-}
+      }
 
-/* ---------- results ---------- */
-function renderResults(m){
-  clearInterval(timerInt);
-  const rows=m.leaderboard;
-  const totalQ=m.roundTotal||TOTAL;
-  $('resMeta').textContent=`${rows.length} участников · ${totalQ} вопросов`;
-  $('resBody').innerHTML=rows.map(r=>{
-    const circles=Array.from({length:totalQ},(_,i)=>{
-      const a=r.answers[i];
-      const c=!a?'skip':(a.correct?'ok':'no');
-      return `<span class="ansdot ${c}"></span>`;
-    }).join('');
-    const leave=r.tabLeaves>0?`<span class="leave">⚠ ${r.tabLeaves}</span>`:'<span class="muted">0</span>';
-    return `<tr class="${r.rank===1?'top1':''}">
-      <td><b style="color:${r.rank===1?'#ffd23f':'var(--muted)'}">${r.rank}</b></td>
+      /* ---------- results ---------- */
+      function renderResults(m) {
+        clearInterval(timerInt);
+        const rows = m.leaderboard;
+        const totalQ = m.roundTotal || TOTAL;
+        $('resMeta').textContent = `${rows.length} участников · ${totalQ} вопросов`;
+        $('resBody').innerHTML =
+          rows
+            .map((r) => {
+              const circles = Array.from({ length: totalQ }, (_, i) => {
+                const a = r.answers[i];
+                const c = !a ? 'skip' : a.correct ? 'ok' : 'no';
+                return `<span class="ansdot ${c}"></span>`;
+              }).join('');
+              const leave =
+                r.tabLeaves > 0
+                  ? `<span class="leave">⚠ ${r.tabLeaves}</span>`
+                  : '<span class="muted">0</span>';
+              return `<tr class="${r.rank === 1 ? 'top1' : ''}">
+      <td><b style="color:${r.rank === 1 ? '#ffd23f' : 'var(--muted)'}">${r.rank}</b></td>
       <td>${r.icon} ${esc(r.nick)}</td>
       <td class="pts">${r.score}</td>
       <td>${r.correct}/${totalQ}</td>
       <td>${circles}</td>
       <td>${leave}</td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="muted">Нет данных</td></tr>';
-  renderQBtns(m.details||[]);
-}
+            })
+            .join('') || '<tr><td colspan="6" class="muted">Нет данных</td></tr>';
+        renderQBtns(m.details || []);
+      }
 
-/* ---------- per-question breakdown ---------- */
-let DETAILS=[], dSortAsc=true;
-function renderQBtns(details){
-  DETAILS=details;
-  $('qbtns').innerHTML=details.map(d=>{
-    const ans=d.responses.filter(r=>r.answered);
-    const ok=ans.filter(r=>r.correct).length;
-    return `<button class="qbtn" onclick="openDetail(${d.index})">В${d.index+1}
+      /* ---------- per-question breakdown ---------- */
+      let DETAILS = [],
+        dSortAsc = true;
+      function renderQBtns(details) {
+        DETAILS = details;
+        $('qbtns').innerHTML =
+          details
+            .map((d) => {
+              const ans = d.responses.filter((r) => r.answered);
+              const ok = ans.filter((r) => r.correct).length;
+              return `<button class="qbtn" onclick="openDetail(${d.index})">В${d.index + 1}
       <span class="mini">${ok}/${d.responses.length}</span></button>`;
-  }).join('') || '<div class="muted">Нет данных по вопросам</div>';
-}
-function fmtMs(ms){ return ms==null?'—':(ms/1000).toFixed(1)+' с'; }
-function parseEdges(text){
-  if(!text||text==='(пусто)') return [];
-  return text.split(',').map(s=>s.trim()).filter(Boolean).map(s=>{
-    const p=s.split('–'); return p.length>=2?[p[0].trim(),p[1].trim()]:null;
-  }).filter(Boolean);
-}
-function graphSvg(nodes,edges,opts){
-  opts=opts||{}; const size=opts.size||150, cx=size/2, cy=size/2, r=size/2-16;
-  if(!nodes||!nodes.length){ const set=[];
-    edges.forEach(e=>{ if(!set.includes(e[0]))set.push(e[0]); if(!set.includes(e[1]))set.push(e[1]); });
-    nodes=set; }
-  const n=nodes.length||1, pos={};
-  nodes.forEach((v,i)=>{ const a=-Math.PI/2+i*2*Math.PI/n; pos[v]=[cx+r*Math.cos(a),cy+r*Math.sin(a)]; });
-  let lines='', wlabels='';
-  edges.forEach(e=>{ const p=pos[e[0]],q=pos[e[1]]; if(!p||!q) return;
-    lines+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="${opts.color||'#5aa9ff'}" stroke-width="2"/>`;
-    if(opts.weighted&&e[2]!=null){ const mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2; const w=String(e[2]).length*6+10;
-      // подписи весов собираем отдельно и рисуем поверх всех рёбер, чтобы их не перекрывало
-      wlabels+=`<rect x="${mx-w/2}" y="${my-9}" width="${w}" height="15" rx="4" fill="#0a1c34" stroke="${opts.color||'#5aa9ff'}" stroke-width="1"/>`+
-        `<text x="${mx}" y="${my+2}" font-size="11" font-weight="700" fill="#ffd23f" text-anchor="middle">${e[2]}</text>`; }});
-  let dots='';
-  nodes.forEach(v=>{ const p=pos[v]; if(!p) return;
-    dots+=`<circle cx="${p[0]}" cy="${p[1]}" r="11" fill="#0a1c34" stroke="#cfe0ff" stroke-width="2"/>`+
-      `<text x="${p[0]}" y="${p[1]+4}" font-size="11" fill="#e8eef7" text-anchor="middle" font-weight="700">${esc(v)}</text>`; });
-  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block">${lines}${wlabels}${dots}</svg>`;
-}
-function openDetail(i){
-  const d=DETAILS[i]; if(!d) return;
-  $('dTitle').textContent=`Вопрос ${i+1}: ${d.title||''}`; mathify($('dTitle'));
-  $('dPrompt').textContent=d.prompt||''; mathify($('dPrompt'));
-  let corr=`<b>Правильный ответ:</b> ${esc(d.correctAnswer||'')}`;
-  if(d.type==='order'&&d.answerGraph&&d.answerGraph.edges){
-    corr+=`<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes||d.nodes,d.answerGraph.edges,{size:200,color:'#5aa9ff'})}</div>`;
-  }
-  if(d.type==='graph'){
-    if(d.answerGraph&&d.answerGraph.edges){
-      corr+=`<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes||d.nodes,d.answerGraph.edges,{size:200,color:'#3ddc84',weighted:d.answerGraph.weighted})}</div>`;
-    } else if(d.nodes){
-      corr+=`<div style="margin-top:6px;color:#8195b4;font-size:12px">Подходит любой такой граф на вершинах: ${d.nodes.map(esc).join(', ')}</div>`;
-    }
-  }
-  $('dCorr').innerHTML=corr; mathify($('dCorr'));
-  const ans=d.responses.filter(r=>r.answered);
-  const ok=ans.filter(r=>r.correct).length;
-  const times=ans.map(r=>r.ms).filter(x=>x!=null);
-  const avg=times.length?times.reduce((a,b)=>a+b,0)/times.length:null;
-  const fast=times.length?Math.min(...times):null;
-  $('dAgg').innerHTML=
-    `Ответили: <b>${ans.length}/${d.responses.length}</b>`+
-    ` · Верно: <b>${ok}</b> (${ans.length?Math.round(ok/ans.length*100):0}%)`+
-    ` · Среднее время: <b>${fmtMs(avg)}</b>`+
-    ` · Быстрейший: <b>${fmtMs(fast)}</b>`;
-  $('detailModal').dataset.idx=i;
-  renderDBody();
-  $('detailModal').classList.remove('hidden');
-}
-function renderDBody(){
-  const i=+$('detailModal').dataset.idx; const d=DETAILS[i]; if(!d) return;
-  const rows=[...d.responses].sort((a,b)=>{
-    const av=a.answered?a.ms:Infinity, bv=b.answered?b.ms:Infinity;
-    return dSortAsc?av-bv:bv-av;
-  });
-  $('dTimeSort').textContent='Время '+(dSortAsc?'▲':'▼');
-  $('dBody').innerHTML=rows.map(r=>{
-    const verdict=!r.answered?'<span class="t-skip">— нет ответа</span>'
-      :(r.correct?'<span class="t-ok">✓ верно</span>':'<span class="t-no">✕ неверно</span>');
-    let ans;
-    if(!r.answered) ans='<span class="t-skip">—</span>';
-    else if(d.type==='graph'){
-      const edges=parseEdges(r.answer);
-      ans=graphSvg(d.nodes,edges,{size:130,color:r.correct?'#3ddc84':'#ff6b6b'})+
-        `<div style="font-size:11px;color:#8195b4;margin-top:2px">${esc(r.answer||'(пусто)')}</div>`;
-    } else ans=esc(r.answer||'');
-    return `<tr>
-      <td>${r.icon||''} ${esc(r.nick)}</td>
+            })
+            .join('') || '<div class="muted">Нет данных по вопросам</div>';
+      }
+      function fmtMs(ms) {
+        return ms == null ? '—' : (ms / 1000).toFixed(1) + ' с';
+      }
+      function parseEdges(text) {
+        if (!text || text === '(пусто)') return [];
+        return text
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => {
+            const p = s.split('–');
+            return p.length >= 2 ? [p[0].trim(), p[1].trim()] : null;
+          })
+          .filter(Boolean);
+      }
+      function graphSvg(nodes, edges, opts) {
+        opts = opts || {};
+        const size = opts.size || 150,
+          cx = size / 2,
+          cy = size / 2,
+          r = size / 2 - 16;
+        if (!nodes || !nodes.length) {
+          const set = [];
+          edges.forEach((e) => {
+            if (!set.includes(e[0])) set.push(e[0]);
+            if (!set.includes(e[1])) set.push(e[1]);
+          });
+          nodes = set;
+        }
+        const n = nodes.length || 1,
+          pos = {};
+        nodes.forEach((v, i) => {
+          const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+          pos[v] = [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+        });
+        let lines = '',
+          wlabels = '';
+        edges.forEach((e) => {
+          const p = pos[e[0]],
+            q = pos[e[1]];
+          if (!p || !q) return;
+          lines += `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="${opts.color || '#5aa9ff'}" stroke-width="2"/>`;
+          if (opts.weighted && e[2] != null) {
+            const mx = (p[0] + q[0]) / 2,
+              my = (p[1] + q[1]) / 2;
+            const w = String(e[2]).length * 6 + 10;
+            // подписи весов собираем отдельно и рисуем поверх всех рёбер, чтобы их не перекрывало
+            wlabels +=
+              `<rect x="${mx - w / 2}" y="${my - 9}" width="${w}" height="15" rx="4" fill="#0a1c34" stroke="${opts.color || '#5aa9ff'}" stroke-width="1"/>` +
+              `<text x="${mx}" y="${my + 2}" font-size="11" font-weight="700" fill="#ffd23f" text-anchor="middle">${e[2]}</text>`;
+          }
+        });
+        let dots = '';
+        nodes.forEach((v) => {
+          const p = pos[v];
+          if (!p) return;
+          dots +=
+            `<circle cx="${p[0]}" cy="${p[1]}" r="11" fill="#0a1c34" stroke="#cfe0ff" stroke-width="2"/>` +
+            `<text x="${p[0]}" y="${p[1] + 4}" font-size="11" fill="#e8eef7" text-anchor="middle" font-weight="700">${esc(v)}</text>`;
+        });
+        return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block">${lines}${wlabels}${dots}</svg>`;
+      }
+      function openDetail(i) {
+        const d = DETAILS[i];
+        if (!d) return;
+        $('dTitle').textContent = `Вопрос ${i + 1}: ${d.title || ''}`;
+        mathify($('dTitle'));
+        $('dPrompt').textContent = d.prompt || '';
+        mathify($('dPrompt'));
+        let corr = `<b>Правильный ответ:</b> ${esc(d.correctAnswer || '')}`;
+        if (d.type === 'order' && d.answerGraph && d.answerGraph.edges) {
+          corr += `<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes || d.nodes, d.answerGraph.edges, { size: 200, color: '#5aa9ff' })}</div>`;
+        }
+        if (d.type === 'graph') {
+          if (d.answerGraph && d.answerGraph.edges) {
+            corr += `<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes || d.nodes, d.answerGraph.edges, { size: 200, color: '#3ddc84', weighted: d.answerGraph.weighted })}</div>`;
+          } else if (d.nodes) {
+            corr += `<div style="margin-top:6px;color:#8195b4;font-size:12px">Подходит любой такой граф на вершинах: ${d.nodes.map(esc).join(', ')}</div>`;
+          }
+        }
+        $('dCorr').innerHTML = corr;
+        mathify($('dCorr'));
+        const ans = d.responses.filter((r) => r.answered);
+        const ok = ans.filter((r) => r.correct).length;
+        const times = ans.map((r) => r.ms).filter((x) => x != null);
+        const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
+        const fast = times.length ? Math.min(...times) : null;
+        $('dAgg').innerHTML =
+          `Ответили: <b>${ans.length}/${d.responses.length}</b>` +
+          ` · Верно: <b>${ok}</b> (${ans.length ? Math.round((ok / ans.length) * 100) : 0}%)` +
+          ` · Среднее время: <b>${fmtMs(avg)}</b>` +
+          ` · Быстрейший: <b>${fmtMs(fast)}</b>`;
+        $('detailModal').dataset.idx = i;
+        renderDBody();
+        $('detailModal').classList.remove('hidden');
+      }
+      function renderDBody() {
+        const i = +$('detailModal').dataset.idx;
+        const d = DETAILS[i];
+        if (!d) return;
+        const rows = [...d.responses].sort((a, b) => {
+          const av = a.answered ? a.ms : Infinity,
+            bv = b.answered ? b.ms : Infinity;
+          return dSortAsc ? av - bv : bv - av;
+        });
+        $('dTimeSort').textContent = 'Время ' + (dSortAsc ? '▲' : '▼');
+        $('dBody').innerHTML =
+          rows
+            .map((r) => {
+              const verdict = !r.answered
+                ? '<span class="t-skip">— нет ответа</span>'
+                : r.correct
+                  ? '<span class="t-ok">✓ верно</span>'
+                  : '<span class="t-no">✕ неверно</span>';
+              let ans;
+              if (!r.answered) ans = '<span class="t-skip">—</span>';
+              else if (d.type === 'graph') {
+                const edges = parseEdges(r.answer);
+                ans =
+                  graphSvg(d.nodes, edges, {
+                    size: 130,
+                    color: r.correct ? '#3ddc84' : '#ff6b6b',
+                  }) +
+                  `<div style="font-size:11px;color:#8195b4;margin-top:2px">${esc(r.answer || '(пусто)')}</div>`;
+              } else ans = esc(r.answer || '');
+              return `<tr>
+      <td>${r.icon || ''} ${esc(r.nick)}</td>
       <td class="ans">${ans}</td>
       <td>${verdict}</td>
       <td>${fmtMs(r.ms)}</td>
-      <td class="pts">${r.points||0}</td></tr>`;
-  }).join('') || '<tr><td colspan="5" class="muted">Нет участников</td></tr>';
-}
-$('detailClose').onclick=()=>$('detailModal').classList.add('hidden');
-$('detailModal').onclick=e=>{ if(e.target===$('detailModal')) $('detailModal').classList.add('hidden'); };
-$('dTimeSort').onclick=()=>{ dSortAsc=!dSortAsc; renderDBody(); };
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('detailModal').classList.add('hidden'); $('statsModal').classList.add('hidden'); } });
+      <td class="pts">${r.points || 0}</td></tr>`;
+            })
+            .join('') || '<tr><td colspan="5" class="muted">Нет участников</td></tr>';
+      }
+      $('detailClose').onclick = () => $('detailModal').classList.add('hidden');
+      $('detailModal').onclick = (e) => {
+        if (e.target === $('detailModal')) $('detailModal').classList.add('hidden');
+      };
+      $('dTimeSort').onclick = () => {
+        dSortAsc = !dSortAsc;
+        renderDBody();
+      };
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          $('detailModal').classList.add('hidden');
+          $('statsModal').classList.add('hidden');
+        }
+      });
 
-/* ---------- аналитика ---------- */
-let STATS=null, taskSort='hard', taskQuery='', studSort='acc', studQuery='', openStud=null, statStream='all';
-function setStatStreamUI(){
-  document.querySelectorAll('[data-statstream]').forEach(x=>x.classList.toggle('on',x.dataset.statstream===statStream));
-}
-function requestStats(){
-  $('statsMeta').textContent='Загрузка…';
-  const stream=statStream==='all'?null:Number(statStream);
-  if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'getStats',stream}));
-  else $('statsMeta').textContent='Нет связи с сервером';
-}
-function openStats(){
-  $('statsModal').classList.remove('hidden');
-  // по умолчанию — поток текущей/выбранной сессии
-  const cur=state&&state.session&&state.session.stream;
-  statStream=(cur==null)?'all':String(cur);
-  setStatStreamUI();
-  requestStats();
-}
-$('statsBtn').onclick=openStats;
-$('statsClose').onclick=()=>$('statsModal').classList.add('hidden');
-$('statsModal').onclick=e=>{ if(e.target===$('statsModal')) $('statsModal').classList.add('hidden'); };
-$('tabSessions').onclick=()=>switchStatsTab('sessions');
-$('tabTasks').onclick=()=>switchStatsTab('tasks');
-$('tabStudents').onclick=()=>switchStatsTab('students');
-$('tabAttend').onclick=()=>switchStatsTab('attend');
-$('statsExcel').onclick=()=>{
-  if(!lastKey){ alert('Нет ключа доступа'); return; }
-  let u='/export/analytics.xlsx?key='+encodeURIComponent(lastKey);
-  if(statStream!=='all') u+='&stream='+encodeURIComponent(statStream);
-  window.open(u,'_blank');
-};
-$('statsWipe').onclick=()=>{
-  if(!ws||ws.readyState!==1){ alert('Нет связи с сервером'); return; }
-  if(!confirm('Удалить ВСЕ данные о сессиях, ответах, посещаемости и статистике?\n\nЭто безвозвратно. Банк задач не затрагивается.')) return;
-  if(!confirm('Точно очистить базу? Отменить будет нельзя.')) return;
-  ws.send(JSON.stringify({type:'wipeData'}));
-};
-document.querySelectorAll('[data-statstream]').forEach(b=>b.onclick=()=>{
-  statStream=b.dataset.statstream;
-  setStatStreamUI();
-  requestStats();
-});
-$('taskSortHard').onclick=()=>{ taskSort='hard'; $('taskSortHard').classList.add('on'); $('taskSortPop').classList.remove('on'); renderTaskStats(); };
-$('taskSortPop').onclick=()=>{ taskSort='pop'; $('taskSortPop').classList.add('on'); $('taskSortHard').classList.remove('on'); renderTaskStats(); };
-$('statsTaskSearch').oninput=e=>{ taskQuery=e.target.value.trim().toLowerCase(); renderTaskStats(); };
-$('studSortAcc').onclick=()=>{ studSort='acc'; $('studSortAcc').classList.add('on'); $('studSortScore').classList.remove('on'); renderStudentStats(); };
-$('studSortScore').onclick=()=>{ studSort='score'; $('studSortScore').classList.add('on'); $('studSortAcc').classList.remove('on'); renderStudentStats(); };
-$('statsStudSearch').oninput=e=>{ studQuery=e.target.value.trim().toLowerCase(); renderStudentStats(); };
-function switchStatsTab(which){
-  $('tabSessions').classList.toggle('on',which==='sessions');
-  $('tabTasks').classList.toggle('on',which==='tasks');
-  $('tabStudents').classList.toggle('on',which==='students');
-  $('tabAttend').classList.toggle('on',which==='attend');
-  $('statsSessions').classList.toggle('hidden',which!=='sessions');
-  $('statsTasks').classList.toggle('hidden',which!=='tasks');
-  $('statsStudents').classList.toggle('hidden',which!=='students');
-  $('statsAttend').classList.toggle('hidden',which!=='attend');
-}
-function accClass(p){ return p>=70?'acc-hi':p>=45?'acc-mid':'acc-lo'; }
-function accCell(p){ return `<span class="accbar ${accClass(p)}" style="width:${Math.max(2,p*0.6)}px"></span>${p}%`; }
-function fmtMs(ms){ return ms==null?'—':(ms/1000).toFixed(1)+'с'; }
-function onStats(m){
-  STATS=m;
-  const be=m.backend==='sqlite'?'SQLite':'журнал';
-  $('statsMeta').textContent=`Сессий: ${(m.sessions||[]).length} · задач: ${(m.tasks||[]).length} · логинов: ${(m.students||[]).length} · хранилище: ${be}`;
-  renderSessionStats(); renderTaskStats(); renderStudentStats(); renderAttendance();
-}
-function renderAttendance(){
-  const att=(STATS&&STATS.attendance)||[];
-  const sessions=((STATS&&STATS.sessions)||[]).slice();
-  // карта sessionId -> {date, stream}
-  const meta={}; sessions.forEach(s=>{ meta[s.id]={date:s.date||('#'+s.id),stream:s.stream}; });
-  // колонки = сессии (данные уже отфильтрованы по потоку на сервере); сортируем по id
-  let cols=sessions.map(s=>s.id).sort((a,b)=>a-b);
-  if(!att.length || !cols.length){
-    $('attHead').innerHTML='<th>Логин</th>';
-    $('attBody').innerHTML='<tr><td class="stat-empty">Нет данных о посещаемости'+(statStream!=='all'?' для этого потока':'')+'</td></tr>';
-    $('attMeta').textContent='';
-    return;
-  }
-  const colSet=new Set(cols);
-  const head=['<th>Логин</th>'].concat(cols.map(id=>{
-    const mm=meta[id]||{}; const d=(mm.date||('#'+id)).slice(5,16);
-    return `<th title="Сессия ${id}${mm.stream!=null?', поток '+mm.stream:''}">${esc(d||('#'+id))}</th>`;
-  })).concat('<th>Всего</th>');
-  $('attHead').innerHTML=head.join('');
-  // строки = логины, у которых есть посещение в видимых колонках
-  const rows=att.map(a=>{
-    const present=new Set((a.sessionIds||[]).filter(id=>colSet.has(id)));
-    return {nick:a.nick, icon:a.icon, present, count:present.size};
-  }).filter(r=>r.count>0).sort((a,b)=> b.count-a.count || (a.nick<b.nick?-1:1));
-  $('attBody').innerHTML=rows.map(r=>{
-    const cells=cols.map(id=> r.present.has(id)
-      ? '<td style="text-align:center;color:var(--green);font-weight:800">✓</td>'
-      : '<td style="text-align:center;color:#33455f">·</td>').join('');
-    return `<tr><td class="ans">${r.icon||''} ${esc(r.nick)}</td>${cells}<td style="font-weight:800">${r.count}</td></tr>`;
-  }).join('') || '<tr><td class="stat-empty">Нет посещений</td></tr>';
-  $('attMeta').textContent=`Студентов: ${rows.length} · занятий: ${cols.length}`;
-}
-function renderSessionStats(){
-  const rows=(STATS&&STATS.sessions)||[];
-  if(!rows.length){ $('statsSessBody').innerHTML='<tr><td colspan="8" class="stat-empty">Пока нет проведённых сессий</td></tr>'; return; }
-  $('statsSessBody').innerHTML=rows.map(s=>{
-    const st=s.status==='finished'?'завершена':s.status==='running'?'идёт':'лобби';
-    const avg=s.avgScore!=null?s.avgScore:'—';
-    return `<tr>
-      <td>${s.id}</td><td>${esc(s.date||'')}</td><td>${s.stream!=null?esc(String(s.stream)):'—'}</td>
+      /* ---------- аналитика ---------- */
+      let STATS = null,
+        taskSort = 'hard',
+        taskQuery = '',
+        studSort = 'acc',
+        studQuery = '',
+        openStud = null,
+        statStream = 'all';
+      function setStatStreamUI() {
+        document
+          .querySelectorAll('[data-statstream]')
+          .forEach((x) => x.classList.toggle('on', x.dataset.statstream === statStream));
+      }
+      function requestStats() {
+        $('statsMeta').textContent = 'Загрузка…';
+        const stream = statStream === 'all' ? null : Number(statStream);
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'getStats', stream }));
+        else $('statsMeta').textContent = 'Нет связи с сервером';
+      }
+      function openStats() {
+        $('statsModal').classList.remove('hidden');
+        // по умолчанию — поток текущей/выбранной сессии
+        const cur = state && state.session && state.session.stream;
+        statStream = cur == null ? 'all' : String(cur);
+        setStatStreamUI();
+        requestStats();
+      }
+      $('statsBtn').onclick = openStats;
+      $('statsClose').onclick = () => $('statsModal').classList.add('hidden');
+      $('statsModal').onclick = (e) => {
+        if (e.target === $('statsModal')) $('statsModal').classList.add('hidden');
+      };
+      $('tabSessions').onclick = () => switchStatsTab('sessions');
+      $('tabTasks').onclick = () => switchStatsTab('tasks');
+      $('tabStudents').onclick = () => switchStatsTab('students');
+      $('tabAttend').onclick = () => switchStatsTab('attend');
+      $('statsExcel').onclick = () => {
+        if (!lastKey) {
+          alert('Нет ключа доступа');
+          return;
+        }
+        let u = '/export/analytics.xlsx?key=' + encodeURIComponent(lastKey);
+        if (statStream !== 'all') u += '&stream=' + encodeURIComponent(statStream);
+        window.open(u, '_blank');
+      };
+      $('statsWipe').onclick = () => {
+        if (!ws || ws.readyState !== 1) {
+          alert('Нет связи с сервером');
+          return;
+        }
+        if (
+          !confirm(
+            'Удалить ВСЕ данные о сессиях, ответах, посещаемости и статистике?\n\nЭто безвозвратно. Банк задач не затрагивается.'
+          )
+        )
+          return;
+        if (!confirm('Точно очистить базу? Отменить будет нельзя.')) return;
+        ws.send(JSON.stringify({ type: 'wipeData' }));
+      };
+      document.querySelectorAll('[data-statstream]').forEach(
+        (b) =>
+          (b.onclick = () => {
+            statStream = b.dataset.statstream;
+            setStatStreamUI();
+            requestStats();
+          })
+      );
+      $('taskSortHard').onclick = () => {
+        taskSort = 'hard';
+        $('taskSortHard').classList.add('on');
+        $('taskSortPop').classList.remove('on');
+        renderTaskStats();
+      };
+      $('taskSortPop').onclick = () => {
+        taskSort = 'pop';
+        $('taskSortPop').classList.add('on');
+        $('taskSortHard').classList.remove('on');
+        renderTaskStats();
+      };
+      $('statsTaskSearch').oninput = (e) => {
+        taskQuery = e.target.value.trim().toLowerCase();
+        renderTaskStats();
+      };
+      $('studSortAcc').onclick = () => {
+        studSort = 'acc';
+        $('studSortAcc').classList.add('on');
+        $('studSortScore').classList.remove('on');
+        renderStudentStats();
+      };
+      $('studSortScore').onclick = () => {
+        studSort = 'score';
+        $('studSortScore').classList.add('on');
+        $('studSortAcc').classList.remove('on');
+        renderStudentStats();
+      };
+      $('statsStudSearch').oninput = (e) => {
+        studQuery = e.target.value.trim().toLowerCase();
+        renderStudentStats();
+      };
+      function switchStatsTab(which) {
+        $('tabSessions').classList.toggle('on', which === 'sessions');
+        $('tabTasks').classList.toggle('on', which === 'tasks');
+        $('tabStudents').classList.toggle('on', which === 'students');
+        $('tabAttend').classList.toggle('on', which === 'attend');
+        $('statsSessions').classList.toggle('hidden', which !== 'sessions');
+        $('statsTasks').classList.toggle('hidden', which !== 'tasks');
+        $('statsStudents').classList.toggle('hidden', which !== 'students');
+        $('statsAttend').classList.toggle('hidden', which !== 'attend');
+      }
+      function accClass(p) {
+        return p >= 70 ? 'acc-hi' : p >= 45 ? 'acc-mid' : 'acc-lo';
+      }
+      function accCell(p) {
+        return `<span class="accbar ${accClass(p)}" style="width:${Math.max(2, p * 0.6)}px"></span>${p}%`;
+      }
+      function fmtMs(ms) {
+        return ms == null ? '—' : (ms / 1000).toFixed(1) + 'с';
+      }
+      function onStats(m) {
+        STATS = m;
+        const be = m.backend === 'sqlite' ? 'SQLite' : 'журнал';
+        $('statsMeta').textContent =
+          `Сессий: ${(m.sessions || []).length} · задач: ${(m.tasks || []).length} · логинов: ${(m.students || []).length} · хранилище: ${be}`;
+        renderSessionStats();
+        renderTaskStats();
+        renderStudentStats();
+        renderAttendance();
+      }
+      function renderAttendance() {
+        const att = (STATS && STATS.attendance) || [];
+        const sessions = ((STATS && STATS.sessions) || []).slice();
+        // карта sessionId -> {date, stream}
+        const meta = {};
+        sessions.forEach((s) => {
+          meta[s.id] = { date: s.date || '#' + s.id, stream: s.stream };
+        });
+        // колонки = сессии (данные уже отфильтрованы по потоку на сервере); сортируем по id
+        let cols = sessions.map((s) => s.id).sort((a, b) => a - b);
+        if (!att.length || !cols.length) {
+          $('attHead').innerHTML = '<th>Логин</th>';
+          $('attBody').innerHTML =
+            '<tr><td class="stat-empty">Нет данных о посещаемости' +
+            (statStream !== 'all' ? ' для этого потока' : '') +
+            '</td></tr>';
+          $('attMeta').textContent = '';
+          return;
+        }
+        const colSet = new Set(cols);
+        const head = ['<th>Логин</th>']
+          .concat(
+            cols.map((id) => {
+              const mm = meta[id] || {};
+              const d = (mm.date || '#' + id).slice(5, 16);
+              return `<th title="Сессия ${id}${mm.stream != null ? ', поток ' + mm.stream : ''}">${esc(d || '#' + id)}</th>`;
+            })
+          )
+          .concat('<th>Всего</th>');
+        $('attHead').innerHTML = head.join('');
+        // строки = логины, у которых есть посещение в видимых колонках
+        const rows = att
+          .map((a) => {
+            const present = new Set((a.sessionIds || []).filter((id) => colSet.has(id)));
+            return { nick: a.nick, icon: a.icon, present, count: present.size };
+          })
+          .filter((r) => r.count > 0)
+          .sort((a, b) => b.count - a.count || (a.nick < b.nick ? -1 : 1));
+        $('attBody').innerHTML =
+          rows
+            .map((r) => {
+              const cells = cols
+                .map((id) =>
+                  r.present.has(id)
+                    ? '<td style="text-align:center;color:var(--green);font-weight:800">✓</td>'
+                    : '<td style="text-align:center;color:#33455f">·</td>'
+                )
+                .join('');
+              return `<tr><td class="ans">${r.icon || ''} ${esc(r.nick)}</td>${cells}<td style="font-weight:800">${r.count}</td></tr>`;
+            })
+            .join('') || '<tr><td class="stat-empty">Нет посещений</td></tr>';
+        $('attMeta').textContent = `Студентов: ${rows.length} · занятий: ${cols.length}`;
+      }
+      function renderSessionStats() {
+        const rows = (STATS && STATS.sessions) || [];
+        if (!rows.length) {
+          $('statsSessBody').innerHTML =
+            '<tr><td colspan="8" class="stat-empty">Пока нет проведённых сессий</td></tr>';
+          return;
+        }
+        $('statsSessBody').innerHTML = rows
+          .map((s) => {
+            const st =
+              s.status === 'finished' ? 'завершена' : s.status === 'running' ? 'идёт' : 'лобби';
+            const avg = s.avgScore != null ? s.avgScore : '—';
+            return `<tr>
+      <td>${s.id}</td><td>${esc(s.date || '')}</td><td>${s.stream != null ? esc(String(s.stream)) : '—'}</td>
       <td>${st}</td><td>${s.students}</td><td>${s.answers}</td>
-      <td>${s.answers?accCell(s.accuracy):'—'}</td><td>${avg}</td>
+      <td>${s.answers ? accCell(s.accuracy) : '—'}</td><td>${avg}</td>
     </tr>`;
-  }).join('');
-}
-function renderTaskStats(){
-  let rows=((STATS&&STATS.tasks)||[]).slice();
-  if(taskQuery) rows=rows.filter(t=>(t.title+' '+t.prompt+' '+t.id).toLowerCase().includes(taskQuery));
-  rows.sort((a,b)=> taskSort==='pop' ? (b.attempts-a.attempts) : (a.accuracy-b.accuracy)||(b.attempts-a.attempts));
-  if(!rows.length){ $('statsTaskBody').innerHTML='<tr><td colspan="7" class="stat-empty">Нет данных по задачам</td></tr>'; return; }
-  const topic={asd:'АиСД',graphs:'Графы'}, type={choice:'выбор',graph:'построение',order:'обход',sort:'сортировка',blank:'пропуски'};
-  $('statsTaskBody').innerHTML=rows.map(t=>`<tr>
-    <td class="ans">${esc(t.title||t.id)}</td>
-    <td>${topic[t.topic]||esc(t.topic||'')}</td>
-    <td>${type[t.type]||esc(t.type||'')}</td>
+          })
+          .join('');
+      }
+      function renderTaskStats() {
+        let rows = ((STATS && STATS.tasks) || []).slice();
+        if (taskQuery)
+          rows = rows.filter((t) =>
+            (t.title + ' ' + t.prompt + ' ' + t.id).toLowerCase().includes(taskQuery)
+          );
+        rows.sort((a, b) =>
+          taskSort === 'pop'
+            ? b.attempts - a.attempts
+            : a.accuracy - b.accuracy || b.attempts - a.attempts
+        );
+        if (!rows.length) {
+          $('statsTaskBody').innerHTML =
+            '<tr><td colspan="7" class="stat-empty">Нет данных по задачам</td></tr>';
+          return;
+        }
+        const topic = { asd: 'АиСД', graphs: 'Графы' },
+          type = {
+            choice: 'выбор',
+            graph: 'построение',
+            order: 'обход',
+            sort: 'сортировка',
+            blank: 'пропуски',
+          };
+        $('statsTaskBody').innerHTML = rows
+          .map(
+            (t) => `<tr>
+    <td class="ans">${esc(t.title || t.id)}</td>
+    <td>${topic[t.topic] || esc(t.topic || '')}</td>
+    <td>${type[t.type] || esc(t.type || '')}</td>
     <td>${t.attempts}</td><td>${t.correct}</td>
     <td>${accCell(t.accuracy)}</td><td>${fmtMs(t.avgMs)}</td>
-  </tr>`).join('');
-  mathify($('statsTaskBody'));
-}
-function renderStudentStats(){
-  let rows=((STATS&&STATS.students)||[]).slice();
-  if(studQuery) rows=rows.filter(s=>s.nick.toLowerCase().includes(studQuery));
-  rows.sort((a,b)=> studSort==='score'
-    ? ((b.avgScore||0)-(a.avgScore||0))||(b.accuracy-a.accuracy)
-    : (a.accuracy-b.accuracy)||(b.answers-a.answers));
-  if(!rows.length){ $('statsStudBody').innerHTML='<tr><td colspan="8" class="stat-empty">Пока нет данных по логинам</td></tr>'; return; }
-  $('statsStudBody').innerHTML=rows.map(s=>{
-    const sel=openStud===s.nick?' class="rowsel"':'';
-    const susc=s.suspicion!=null?s.suspicion:((s.tabLeaves||0)+2*(s.fastAnswers||0));
-    const tip=`уходов: ${s.tabLeaves||0}, быстрых ответов: ${s.fastAnswers||0}`;
-    const risk=s.suspect
-      ? `<span class="leave" title="${tip}">⚠ риск ${susc}</span>`
-      : (susc?`<span class="muted" title="${tip}">${susc}</span>`:'—');
-    return `<tr data-nick="${esc(s.nick)}"${sel} style="cursor:pointer">
-      <td class="ans">${s.icon||''} ${esc(s.nick)}</td>
+  </tr>`
+          )
+          .join('');
+        mathify($('statsTaskBody'));
+      }
+      function renderStudentStats() {
+        let rows = ((STATS && STATS.students) || []).slice();
+        if (studQuery) rows = rows.filter((s) => s.nick.toLowerCase().includes(studQuery));
+        rows.sort((a, b) =>
+          studSort === 'score'
+            ? (b.avgScore || 0) - (a.avgScore || 0) || b.accuracy - a.accuracy
+            : a.accuracy - b.accuracy || b.answers - a.answers
+        );
+        if (!rows.length) {
+          $('statsStudBody').innerHTML =
+            '<tr><td colspan="8" class="stat-empty">Пока нет данных по логинам</td></tr>';
+          return;
+        }
+        $('statsStudBody').innerHTML = rows
+          .map((s) => {
+            const sel = openStud === s.nick ? ' class="rowsel"' : '';
+            const susc =
+              s.suspicion != null ? s.suspicion : (s.tabLeaves || 0) + 2 * (s.fastAnswers || 0);
+            const tip = `уходов: ${s.tabLeaves || 0}, быстрых ответов: ${s.fastAnswers || 0}`;
+            const risk = s.suspect
+              ? `<span class="leave" title="${tip}">⚠ риск ${susc}</span>`
+              : susc
+                ? `<span class="muted" title="${tip}">${susc}</span>`
+                : '—';
+            return `<tr data-nick="${esc(s.nick)}"${sel} style="cursor:pointer">
+      <td class="ans">${s.icon || ''} ${esc(s.nick)}</td>
       <td>${s.sessions}</td><td>${s.answers}</td><td>${s.correct}</td>
-      <td>${s.answers?accCell(s.accuracy):'—'}</td>
-      <td>${s.avgScore!=null?s.avgScore:'—'}</td>
-      <td>${s.bestPlace!=null?'#'+s.bestPlace:'—'}</td>
+      <td>${s.answers ? accCell(s.accuracy) : '—'}</td>
+      <td>${s.avgScore != null ? s.avgScore : '—'}</td>
+      <td>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</td>
       <td>${risk}</td>
     </tr>`;
-  }).join('');
-  $('statsStudBody').querySelectorAll('tr[data-nick]').forEach(tr=>{
-    tr.onclick=()=>showStudentDetail(tr.dataset.nick);
-  });
-  if(openStud) renderStudentDetail();
-}
-function accSparkline(rows){
-  const pts=(rows||[]).filter(r=>r.answers>0).map(r=>({v:r.accuracy,id:r.sessionId}));
-  if(pts.length<2) return '';
-  const w=Math.max(140,pts.length*46), h=58, pad=10;
-  const X=i=> pad + i*(w-2*pad)/(pts.length-1);
-  const Y=v=> h-pad - (v/100)*(h-2*pad);
-  let line='',dots='';
-  pts.forEach((p,i)=>{ const x=X(i),y=Y(p.v);
-    line+=(i?'L':'M')+x.toFixed(1)+','+y.toFixed(1)+' ';
-    dots+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#ffd23f"/>`+
-      `<text x="${x.toFixed(1)}" y="${(y-6).toFixed(1)}" font-size="9" fill="#cdd9ee" text-anchor="middle">${p.v}</text>`;
-  });
-  return `<div style="margin-top:12px"><div class="muted" style="font-size:12px;margin-bottom:4px">Динамика точности по занятиям</div>`+
-    `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="max-width:100%;height:auto">`+
-    `<line x1="${pad}" y1="${Y(50)}" x2="${w-pad}" y2="${Y(50)}" stroke="#1d3a63" stroke-dasharray="3 4"/>`+
-    `<path d="${line}" fill="none" stroke="#3ddc84" stroke-width="2"/>${dots}</svg></div>`;
-}
-function showStudentDetail(nick){
-  openStud=openStud===nick?null:nick;
-  renderStudentStats();
-  if(!openStud){ $('studDetail').classList.add('hidden'); return; }
-  renderStudentDetail();
-}
-function renderStudentDetail(){
-  const s=((STATS&&STATS.students)||[]).find(x=>x.nick===openStud);
-  if(!s){ $('studDetail').classList.add('hidden'); return; }
-  const box=$('studDetail'); box.classList.remove('hidden');
-  const topic={asd:'АиСД',graphs:'Графы'};
-  const byTopic=(s.topics||[]).map(t=>
-    `<span class="chiptag">${topic[t.topic]||esc(t.topic)}: ${t.correct}/${t.attempts} (${t.attempts?Math.round(t.correct/t.attempts*100):0}%)</span>`).join('');
-  const ordered=(s.sessionRows||[]).slice().sort((a,b)=>a.sessionId-b.sessionId);
-  const susc=s.suspicion!=null?s.suspicion:((s.tabLeaves||0)+2*(s.fastAnswers||0));
-  const sess=(s.sessionRows||[]).map(r=>`<tr>
-    <td>${r.sessionId}</td><td>${esc(r.date||'')}</td><td>${r.stream!=null?esc(String(r.stream)):'—'}</td>
+          })
+          .join('');
+        $('statsStudBody')
+          .querySelectorAll('tr[data-nick]')
+          .forEach((tr) => {
+            tr.onclick = () => showStudentDetail(tr.dataset.nick);
+          });
+        if (openStud) renderStudentDetail();
+      }
+      function accSparkline(rows) {
+        const pts = (rows || [])
+          .filter((r) => r.answers > 0)
+          .map((r) => ({ v: r.accuracy, id: r.sessionId }));
+        if (pts.length < 2) return '';
+        const w = Math.max(140, pts.length * 46),
+          h = 58,
+          pad = 10;
+        const X = (i) => pad + (i * (w - 2 * pad)) / (pts.length - 1);
+        const Y = (v) => h - pad - (v / 100) * (h - 2 * pad);
+        let line = '',
+          dots = '';
+        pts.forEach((p, i) => {
+          const x = X(i),
+            y = Y(p.v);
+          line += (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+          dots +=
+            `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#ffd23f"/>` +
+            `<text x="${x.toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="9" fill="#cdd9ee" text-anchor="middle">${p.v}</text>`;
+        });
+        return (
+          `<div style="margin-top:12px"><div class="muted" style="font-size:12px;margin-bottom:4px">Динамика точности по занятиям</div>` +
+          `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="max-width:100%;height:auto">` +
+          `<line x1="${pad}" y1="${Y(50)}" x2="${w - pad}" y2="${Y(50)}" stroke="#1d3a63" stroke-dasharray="3 4"/>` +
+          `<path d="${line}" fill="none" stroke="#3ddc84" stroke-width="2"/>${dots}</svg></div>`
+        );
+      }
+      function showStudentDetail(nick) {
+        openStud = openStud === nick ? null : nick;
+        renderStudentStats();
+        if (!openStud) {
+          $('studDetail').classList.add('hidden');
+          return;
+        }
+        renderStudentDetail();
+      }
+      function renderStudentDetail() {
+        const s = ((STATS && STATS.students) || []).find((x) => x.nick === openStud);
+        if (!s) {
+          $('studDetail').classList.add('hidden');
+          return;
+        }
+        const box = $('studDetail');
+        box.classList.remove('hidden');
+        const topic = { asd: 'АиСД', graphs: 'Графы' };
+        const byTopic = (s.topics || [])
+          .map(
+            (t) =>
+              `<span class="chiptag">${topic[t.topic] || esc(t.topic)}: ${t.correct}/${t.attempts} (${t.attempts ? Math.round((t.correct / t.attempts) * 100) : 0}%)</span>`
+          )
+          .join('');
+        const ordered = (s.sessionRows || []).slice().sort((a, b) => a.sessionId - b.sessionId);
+        const susc =
+          s.suspicion != null ? s.suspicion : (s.tabLeaves || 0) + 2 * (s.fastAnswers || 0);
+        const sess =
+          (s.sessionRows || [])
+            .map(
+              (r) => `<tr>
+    <td>${r.sessionId}</td><td>${esc(r.date || '')}</td><td>${r.stream != null ? esc(String(r.stream)) : '—'}</td>
     <td>${r.answers}</td><td>${r.correct}</td>
-    <td>${r.answers?accCell(r.accuracy):'—'}</td>
-    <td>${r.score!=null?Math.round(r.score):'—'}</td>
-    <td>${r.place!=null?'#'+r.place:'—'}</td>
-  </tr>`).join('') || '<tr><td colspan="8" class="muted">Нет сессий</td></tr>';
-  box.innerHTML=`
+    <td>${r.answers ? accCell(r.accuracy) : '—'}</td>
+    <td>${r.score != null ? Math.round(r.score) : '—'}</td>
+    <td>${r.place != null ? '#' + r.place : '—'}</td>
+  </tr>`
+            )
+            .join('') || '<tr><td colspan="8" class="muted">Нет сессий</td></tr>';
+        box.innerHTML = `
     <div class="row spread" style="margin-bottom:6px">
-      <div class="qttl" style="font-size:16px">${s.icon||''} ${esc(s.nick)}</div>
+      <div class="qttl" style="font-size:16px">${s.icon || ''} ${esc(s.nick)}</div>
       <button class="chip" id="studDetClose">✕</button>
     </div>
     <div class="studsum">
       <span>Сессий: <b>${s.sessions}</b></span>
       <span>Ответов: <b>${s.answers}</b></span>
-      <span>Точность: <b>${s.answers?s.accuracy+'%':'—'}</b></span>
-      <span>Ср. балл: <b>${s.avgScore!=null?s.avgScore:'—'}</b></span>
+      <span>Точность: <b>${s.answers ? s.accuracy + '%' : '—'}</b></span>
+      <span>Ср. балл: <b>${s.avgScore != null ? s.avgScore : '—'}</b></span>
       <span>Ср. время: <b>${fmtMs(s.avgMs)}</b></span>
-      <span>Лучш. место: <b>${s.bestPlace!=null?'#'+s.bestPlace:'—'}</b></span>
-      <span>⚠ уходов: <b>${s.tabLeaves||0}</b></span>
-      <span>⚡ быстрых: <b>${s.fastAnswers||0}</b></span>
-      <span>Риск: <b style="color:${s.suspect?'var(--red)':'inherit'}">${susc}${s.suspect?' ⚠':''}</b></span>
+      <span>Лучш. место: <b>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</b></span>
+      <span>⚠ уходов: <b>${s.tabLeaves || 0}</b></span>
+      <span>⚡ быстрых: <b>${s.fastAnswers || 0}</b></span>
+      <span>Риск: <b style="color:${s.suspect ? 'var(--red)' : 'inherit'}">${susc}${s.suspect ? ' ⚠' : ''}</b></span>
     </div>
     ${accSparkline(ordered)}
-    ${byTopic?`<div class="chiprow">${byTopic}</div>`:''}
+    ${byTopic ? `<div class="chiprow">${byTopic}</div>` : ''}
     <div style="overflow:auto;margin-top:8px">
       <table class="dtable">
         <thead><tr><th>#</th><th>Дата</th><th>Поток</th><th>Ответов</th><th>Верных</th><th>Точность</th><th>Балл</th><th>Место</th></tr></thead>
         <tbody>${sess}</tbody>
       </table>
     </div>`;
-  $('studDetClose').onclick=()=>{ openStud=null; renderStudentStats(); $('studDetail').classList.add('hidden'); };
-}
+        $('studDetClose').onclick = () => {
+          openStud = null;
+          renderStudentStats();
+          $('studDetail').classList.add('hidden');
+        };
+      }
 
-/* ---------- QR fallback ---------- */
-function drawQR(text){
-  const n=25,cell=170/n;let r='';let seed=0;for(const ch of text)seed=(seed*31+ch.charCodeAt(0))>>>0;
-  function rnd(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;}
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    const finder=(x<7&&y<7)||(x>=n-7&&y<7)||(x<7&&y>=n-7);
-    const on=finder?((x%6===0||y%6===0)||(x>1&&x<5&&y>1&&y<5)):rnd()>0.5;
-    if(on)r+=`<rect x="${10+x*cell}" y="${10+y*cell}" width="${cell+0.4}" height="${cell+0.4}" fill="#08111f"/>`;}
-  $('qr').innerHTML=`<svg viewBox="0 0 190 190">${r}</svg>`;
-}
-function esc(s){return String(s).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));}
-function mathify(el){ if(el&&window.renderMathInElement){ try{ renderMathInElement(el,{
-  delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},
-    {left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],
-  throwOnError:false}); }catch(e){} } }
-function flag(nick,count,kind){const d=document.createElement('div');d.className='flagmsg';
-  const what=kind==='fast'?'⚡ аномально быстрый ответ':'уход со вкладки';
-  d.textContent=`⚠ ${nick}: ${what}${count?` (${count})`:''}`;$('flags').appendChild(d);
-  setTimeout(()=>d.remove(),6000);}
-</script>
-</body>
+      /* ---------- QR fallback ---------- */
+      function drawQR(text) {
+        const n = 25,
+          cell = 170 / n;
+        let r = '';
+        let seed = 0;
+        for (const ch of text) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+        function rnd() {
+          seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+          return seed / 0x7fffffff;
+        }
+        for (let y = 0; y < n; y++)
+          for (let x = 0; x < n; x++) {
+            const finder = (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+            const on = finder
+              ? x % 6 === 0 || y % 6 === 0 || (x > 1 && x < 5 && y > 1 && y < 5)
+              : rnd() > 0.5;
+            if (on)
+              r += `<rect x="${10 + x * cell}" y="${10 + y * cell}" width="${cell + 0.4}" height="${cell + 0.4}" fill="#08111f"/>`;
+          }
+        $('qr').innerHTML = `<svg viewBox="0 0 190 190">${r}</svg>`;
+      }
+      function esc(s) {
+        return String(s).replace(
+          /[<>&'"]/g,
+          (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&#39;', '"': '&quot;' })[c]
+        );
+      }
+      function mathify(el) {
+        if (el && window.renderMathInElement) {
+          try {
+            renderMathInElement(el, {
+              delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$', right: '$', display: false },
+                { left: '\\(', right: '\\)', display: false },
+                { left: '\\[', right: '\\]', display: true },
+              ],
+              throwOnError: false,
+            });
+          } catch (e) {}
+        }
+      }
+      function flag(nick, count, kind) {
+        const d = document.createElement('div');
+        d.className = 'flagmsg';
+        const what = kind === 'fast' ? '⚡ аномально быстрый ответ' : 'уход со вкладки';
+        d.textContent = `⚠ ${nick}: ${what}${count ? ` (${count})` : ''}`;
+        $('flags').appendChild(d);
+        setTimeout(() => d.remove(), 6000);
+      }
+    </script>
+  </body>
 </html>
