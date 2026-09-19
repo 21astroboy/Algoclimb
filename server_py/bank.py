@@ -8,10 +8,10 @@
 Правильные ответы НИКОГДА не отправляются студенту — см. public_task().
 Это точный порт логики из tasks.js (Node).
 """
+
 from __future__ import annotations
 
 import json
-import os
 import random
 from pathlib import Path
 
@@ -51,7 +51,7 @@ def _parse_graph(payload, nodes):
     nset = set(nodes)
     seen = set()
     adj = {v: set() for v in nodes}
-    for e in (payload.get("edges") or []):
+    for e in payload.get("edges") or []:
         a, b = e[0], e[1]
         if a not in nset or b not in nset or a == b:
             return None
@@ -114,8 +114,7 @@ def _prop_check(kind, nodes, arg, payload):
     if kind == "anyCycle":
         return m == n and all(x == 2 for x in d) and comps == 1
     if kind == "anyPath":
-        return (m == n - 1 and d.count(1) == 2
-                and d.count(2) == n - 2 and comps == 1)
+        return m == n - 1 and d.count(1) == 2 and d.count(2) == n - 2 and comps == 1
     if kind == "anyTree":
         return m == n - 1 and comps == 1
     if kind == "anyComplete":
@@ -221,7 +220,7 @@ def _kruskal(ref_edges, nodes):
 # ---------------------------------------------------------------- обходы графа
 def _adj_of(nodes, edges):
     adj = {v: set() for v in nodes}
-    for e in (edges or []):
+    for e in edges or []:
         if e[0] in adj and e[1] in adj and e[0] != e[1]:
             adj[e[0]].add(e[1])
             adj[e[1]].add(e[0])
@@ -229,8 +228,12 @@ def _adj_of(nodes, edges):
 
 
 def _seq_ok(seq, nodes):
-    return (isinstance(seq, list) and len(seq) == len(nodes)
-            and len(set(seq)) == len(nodes) and all(v in nodes for v in seq))
+    return (
+        isinstance(seq, list)
+        and len(seq) == len(nodes)
+        and len(set(seq)) == len(nodes)
+        and all(v in nodes for v in seq)
+    )
 
 
 def _valid_dfs(task, payload):
@@ -271,7 +274,7 @@ def _valid_bfs(task, payload):
     while queue:
         u = queue.pop(0)
         nbrs = [w for w in adj[u] if w not in visited]
-        block = seq[i:i + len(nbrs)]
+        block = seq[i : i + len(nbrs)]
         if len(block) != len(nbrs):
             return False
         bs = set(block)
@@ -299,12 +302,14 @@ def sample_order(nodes, edges, start, mode):
                     visited.add(w)
                     q.append(w)
     else:
+
         def dfs(u):
             visited.add(u)
             order.append(u)
             for w in sorted(adj[u]):
                 if w not in visited:
                     dfs(w)
+
         dfs(start)
     return order
 
@@ -328,8 +333,12 @@ def simulate_sort(arr, algo, steps):
 
 
 def _arr_eq(x, y):
-    return (isinstance(x, list) and isinstance(y, list) and len(x) == len(y)
-            and all(str(v) == str(y[i]) for i, v in enumerate(x)))
+    return (
+        isinstance(x, list)
+        and isinstance(y, list)
+        and len(x) == len(y)
+        and all(str(v) == str(y[i]) for i, v in enumerate(x))
+    )
 
 
 def gen_sort_array(length):
@@ -390,13 +399,21 @@ def run_check(task, payload):
 # ---------------------------------------------------------------- публичная версия задачи
 def public_task(task):
     t = task
-    base = {"id": t["id"], "type": t["type"], "title": t["title"],
-            "prompt": t["prompt"], "topic": t.get("topic")}
+    base = {
+        "id": t["id"],
+        "type": t["type"],
+        "title": t["title"],
+        "prompt": t["prompt"],
+        "topic": t.get("topic"),
+    }
     if t["type"] == "choice":
         base["options"] = list(t["options"])
     if t["type"] == "graph":
-        base["nodes"] = (list(t["nodes"]) if t.get("nodes")
-                         else sorted(set(x for e in t.get("requiredEdges", []) for x in e)))
+        base["nodes"] = (
+            list(t["nodes"])
+            if t.get("nodes")
+            else sorted({x for e in t.get("requiredEdges", []) for x in e})
+        )
         if t.get("weighted") and t.get("refEdges"):
             base["weighted"] = True
             base["refEdges"] = [[a, b, w] for a, b, w in t["refEdges"]]
@@ -411,9 +428,12 @@ def public_task(task):
         base["steps"] = t["steps"]
     if t["type"] == "blank":
         base["template"] = t["template"]
-        base["blanks"] = [{"options": list(b["options"])}
-                          if isinstance(b.get("options"), list) and b["options"] else {}
-                          for b in t["blanks"]]
+        base["blanks"] = [
+            {"options": list(b["options"])}
+            if isinstance(b.get("options"), list) and b["options"]
+            else {}
+            for b in t["blanks"]
+        ]
     return base
 
 
@@ -426,21 +446,36 @@ def answer_text(t):
         if t.get("weighted") and t.get("refEdges"):
             mst = _kruskal(t["refEdges"], t["nodes"])
             w = sum(e[2] for e in mst)
-            return ("Минимальный остов (суммарный вес " + str(w) + "): "
-                    + ", ".join(f"{e[0]}–{e[1]} ({e[2]})" for e in mst))
+            return (
+                "Минимальный остов (суммарный вес "
+                + str(w)
+                + "): "
+                + ", ".join(f"{e[0]}–{e[1]} ({e[2]})" for e in mst)
+            )
         if t.get("requiredEdges") is not None:
             return "Рёбра: " + ", ".join(f"{e[0]}–{e[1]}" for e in t["requiredEdges"])
-        base = ("Любой граф с нужным свойством. " + t["hint"]) if t.get("hint") \
+        base = (
+            ("Любой граф с нужным свойством. " + t["hint"])
+            if t.get("hint")
             else "Любой граф с нужным свойством."
+        )
         ex = t.get("example")
         extra = (" Пример: " + ", ".join(f"{e[0]}–{e[1]}" for e in ex) + ".") if ex else ""
         return base + extra
     if ty == "order":
         ex = " → ".join(str(v) for v in sample_order(t["nodes"], t["edges"], t["start"], t["mode"]))
-        return (("BFS" if t["mode"] == "bfs" else "DFS") + " из " + str(t["start"])
-                + " — например: " + ex + " (принимается любой корректный порядок обхода)")
+        return (
+            ("BFS" if t["mode"] == "bfs" else "DFS")
+            + " из "
+            + str(t["start"])
+            + " — например: "
+            + ex
+            + " (принимается любой корректный порядок обхода)"
+        )
     if ty == "sort":
-        exp = ", ".join(str(v) for v in (t.get("expected") or simulate_sort(t["array"], t["algo"], t["steps"])))
+        exp = ", ".join(
+            str(v) for v in (t.get("expected") or simulate_sort(t["array"], t["algo"], t["steps"]))
+        )
         algo = "сортировки вставками" if t["algo"] == "insertion" else "пузырьковой сортировки"
         return f"После {t['steps']} шаг(ов) {algo}: [{exp}]"
     if ty == "blank":
@@ -455,19 +490,31 @@ def answer_text(t):
 def answer_edges(t):
     ty = t["type"]
     if ty == "order":
-        return {"nodes": list(t.get("nodes") or []),
-                "edges": [[e[0], e[1]] for e in (t.get("edges") or [])], "weighted": False}
+        return {
+            "nodes": list(t.get("nodes") or []),
+            "edges": [[e[0], e[1]] for e in (t.get("edges") or [])],
+            "weighted": False,
+        }
     if ty != "graph":
         return None
     if t.get("weighted") and t.get("refEdges"):
-        return {"nodes": list(t.get("nodes") or []),
-                "edges": _kruskal(t["refEdges"], t["nodes"]), "weighted": True}
+        return {
+            "nodes": list(t.get("nodes") or []),
+            "edges": _kruskal(t["refEdges"], t["nodes"]),
+            "weighted": True,
+        }
     if t.get("requiredEdges") is not None:
-        return {"nodes": list(t.get("nodes") or []),
-                "edges": [[e[0], e[1]] for e in t["requiredEdges"]], "weighted": False}
+        return {
+            "nodes": list(t.get("nodes") or []),
+            "edges": [[e[0], e[1]] for e in t["requiredEdges"]],
+            "weighted": False,
+        }
     if t.get("example"):
-        return {"nodes": list(t.get("nodes") or []),
-                "edges": [[e[0], e[1]] for e in t["example"]], "weighted": False}
+        return {
+            "nodes": list(t.get("nodes") or []),
+            "edges": [[e[0], e[1]] for e in t["example"]],
+            "weighted": False,
+        }
     return None
 
 
@@ -518,9 +565,13 @@ def _to_num_or_str(x):
 
 def build_custom_task(spec):
     import time
+
     if not isinstance(spec, dict):
         return None
-    tid = str(spec.get("id") or ("custom_" + str(int(time.time() * 1000)) + "_" + str(random.randint(0, 999))))
+    tid = str(
+        spec.get("id")
+        or ("custom_" + str(int(time.time() * 1000)) + "_" + str(random.randint(0, 999)))
+    )
     topic = spec.get("topic") if spec.get("topic") in ("asd", "graphs") else "graphs"
     try:
         level = int(spec.get("level"))
@@ -532,7 +583,14 @@ def build_custom_task(spec):
     prompt = str(spec.get("prompt") or "").strip()
     if not title or not prompt:
         return None
-    base = {"id": tid, "topic": topic, "level": level, "title": title, "prompt": prompt, "custom": True}
+    base = {
+        "id": tid,
+        "topic": topic,
+        "level": level,
+        "title": title,
+        "prompt": prompt,
+        "custom": True,
+    }
     if spec.get("hint"):
         base["hint"] = str(spec["hint"]).strip()
 
@@ -554,7 +612,14 @@ def build_custom_task(spec):
         mode = "dfs" if spec.get("mode") == "dfs" else "bfs"
         if len(nodes) < 2 or start not in nodes or not edges:
             return None
-        return {**base, "type": "order", "nodes": nodes, "edges": edges, "start": start, "mode": mode}
+        return {
+            **base,
+            "type": "order",
+            "nodes": nodes,
+            "edges": edges,
+            "start": start,
+            "mode": mode,
+        }
     if kind == "sort":
         arr = [x for x in (_to_num_or_str(v) for v in (spec.get("array") or [])) if x is not None]
         algo = "insertion" if spec.get("algo") == "insertion" else "bubble"
@@ -564,13 +629,19 @@ def build_custom_task(spec):
             steps = 1
         if len(arr) < 3:
             return None
-        return {**base, "type": "sort", "array": arr, "algo": algo, "steps": steps,
-                "expected": simulate_sort(arr, algo, steps)}
+        return {
+            **base,
+            "type": "sort",
+            "array": arr,
+            "algo": algo,
+            "steps": steps,
+            "expected": simulate_sort(arr, algo, steps),
+        }
     if kind == "blank":
         template = str(spec.get("template") or "")
         marks = template.count("___")
         blanks = []
-        for b in (spec.get("blanks") or []):
+        for b in spec.get("blanks") or []:
             b = b or {}
             out = {"answer": str(b.get("answer") if b.get("answer") is not None else "").strip()}
             alts = [str(x).strip() for x in (b.get("alts") or []) if str(x).strip()]
@@ -592,7 +663,9 @@ def build_custom_task(spec):
         if len(nodes) < 2:
             return None
         if spec.get("template") == "exact":
-            req = [[str(e[0]).strip(), str(e[1]).strip()] for e in (spec.get("requiredEdges") or [])]
+            req = [
+                [str(e[0]).strip(), str(e[1]).strip()] for e in (spec.get("requiredEdges") or [])
+            ]
             req = [e for e in req if e[0] in nodes and e[1] in nodes and e[0] != e[1]]
             if not req:
                 return None
@@ -605,9 +678,18 @@ def build_custom_task(spec):
 
 
 def catalog_data():
-    return [{"id": t["id"], "title": t["title"], "prompt": t["prompt"],
-             "topic": t.get("topic"), "type": t["type"], "level": t.get("level", 1),
-             "custom": bool(t.get("custom"))} for t in TASKS]
+    return [
+        {
+            "id": t["id"],
+            "title": t["title"],
+            "prompt": t["prompt"],
+            "topic": t.get("topic"),
+            "type": t["type"],
+            "level": t.get("level", 1),
+            "custom": bool(t.get("custom")),
+        }
+        for t in TASKS
+    ]
 
 
 def active_tasks(ids):

@@ -12,3 +12,13 @@ venv
 .DS_Store
 npm-debug.log
 server_py/e2e_test.py
+
+# Инструменты разработки/CI — в рантайме не нужны
+.github
+.ruff_cache
+.mypy_cache
+.pre-commit-config.yaml
+eslint.config.js
+.prettierrc.json
+.prettierignore
+package-lock.json

@@ -9,6 +9,7 @@ AlgoClimb — FastAPI-бэкенд (порт server.js).
 Запуск:  uvicorn server_py.main:app --host 0.0.0.0 --port 3000
          (или через ./algoclimb — см. README-DEPLOY.md)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +18,6 @@ import json
 import os
 import random
 import socket
-import string
 import time
 from pathlib import Path
 
@@ -111,8 +111,8 @@ class Game:
         self.lock = asyncio.Lock()
         self.current_stream = config.get("stream", 1)
         self.session = {"id": None, "status": "lobby", "test": False}
-        self.students = {}   # ws -> student
-        self.by_nick = {}    # nick -> student
+        self.students = {}  # ws -> student
+        self.by_nick = {}  # nick -> student
         self.teachers = set()
         self.order = []
         self.round = -1
@@ -146,7 +146,9 @@ class Game:
     def save_custom_tasks(self):
         try:
             CUSTOM_FILE.parent.mkdir(parents=True, exist_ok=True)
-            CUSTOM_FILE.write_text(json.dumps(self.custom_specs, ensure_ascii=False, indent=2), encoding="utf-8")
+            CUSTOM_FILE.write_text(
+                json.dumps(self.custom_specs, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         except Exception as e:
             print("Не удалось сохранить пользовательские задачи:", e)
 
@@ -179,11 +181,16 @@ class Game:
         else:
             ip = HOST_IP or (local_ips()[0] if local_ips() else "localhost")
             base = f"http://{ip}:{PORT}/"
-        self.join_url = (base + "?t=" + sec.current_token()) if config["qrRotation"].get("enabled") else base
+        self.join_url = (
+            (base + "?t=" + sec.current_token()) if config["qrRotation"].get("enabled") else base
+        )
         try:
             import segno
+
             buf = io.BytesIO()
-            segno.make(self.join_url, error="m").save(buf, kind="svg", xmldeclaration=False, border=1)
+            segno.make(self.join_url, error="m").save(
+                buf, kind="svg", xmldeclaration=False, border=1
+            )
             self.qr_svg = buf.getvalue().decode("utf-8")
         except Exception as e:
             print("[qr] segno недоступен — на экране будет только ссылка.", e)
@@ -202,23 +209,32 @@ class Game:
         return any(s["nick"] == nick for s in self.students.values())
 
     def roster_arr(self):
-        return [{"nick": s["nick"], "icon": s["icon"]}
-                for s in self.by_nick.values() if not s["kicked"]]
+        return [
+            {"nick": s["nick"], "icon": s["icon"]} for s in self.by_nick.values() if not s["kicked"]
+        ]
 
     def leaderboard(self):
         rows = []
         for s in self.by_nick.values():
             if s["kicked"]:
                 continue
-            answers = [({"correct": a["correct"], "answered": a["answered"]} if a else None)
-                       for a in (s["answers"].get(i) for i in range(len(self.order)))]
-            rows.append({
-                "nick": s["nick"], "icon": s["icon"], "score": s["score"], "correct": s["correct"],
-                "tabLeaves": s["tabLeaves"], "fastAnswers": s.get("fastAnswers", 0),
-                "connected": self.is_connected(s["nick"]),
-                "answeredThisRound": s["nick"] in self.round_answered,
-                "answers": answers,
-            })
+            answers = [
+                ({"correct": a["correct"], "answered": a["answered"]} if a else None)
+                for a in (s["answers"].get(i) for i in range(len(self.order)))
+            ]
+            rows.append(
+                {
+                    "nick": s["nick"],
+                    "icon": s["icon"],
+                    "score": s["score"],
+                    "correct": s["correct"],
+                    "tabLeaves": s["tabLeaves"],
+                    "fastAnswers": s.get("fastAnswers", 0),
+                    "connected": self.is_connected(s["nick"]),
+                    "answeredThisRound": s["nick"] in self.round_answered,
+                    "answers": answers,
+                }
+            )
         rows.sort(key=lambda r: (-r["score"], -r["correct"]))
         for i, r in enumerate(rows):
             r["rank"] = i + 1
@@ -226,8 +242,18 @@ class Game:
 
     def answer_key_data(self):
         pool = bank.active_tasks(config.get("activeTasks"))
-        return [{"id": t["id"], "title": t["title"], "prompt": t["prompt"], "topic": t.get("topic"),
-                 "type": t["type"], "level": t.get("level", 1), "answer": bank.answer_text(t)} for t in pool]
+        return [
+            {
+                "id": t["id"],
+                "title": t["title"],
+                "prompt": t["prompt"],
+                "topic": t.get("topic"),
+                "type": t["type"],
+                "level": t.get("level", 1),
+                "answer": bank.answer_text(t),
+            }
+            for t in pool
+        ]
 
     def session_details(self):
         out = []
@@ -237,22 +263,31 @@ class Game:
                 if s["kicked"]:
                     continue
                 a = s["answers"].get(ri)
-                responses.append({
-                    "nick": s["nick"], "icon": s["icon"],
-                    "answered": bool(a and a["answered"]),
-                    "correct": bool(a and a["correct"]),
-                    "ms": (a["ms"] if (a and a["answered"]) else None),
-                    "points": (a["points"] if a else 0),
-                    "answer": (a.get("ansText", "") if (a and a["answered"]) else None),
-                })
+                responses.append(
+                    {
+                        "nick": s["nick"],
+                        "icon": s["icon"],
+                        "answered": bool(a and a["answered"]),
+                        "correct": bool(a and a["correct"]),
+                        "ms": (a["ms"] if (a and a["answered"]) else None),
+                        "points": (a["points"] if a else 0),
+                        "answer": (a.get("ansText", "") if (a and a["answered"]) else None),
+                    }
+                )
             is_gr = task["type"] in ("graph", "order")
-            out.append({
-                "index": ri, "id": task["id"], "title": task["title"], "prompt": task["prompt"],
-                "type": task["type"], "correctAnswer": bank.answer_text(task),
-                "nodes": (task.get("nodes") or []) if is_gr else None,
-                "answerGraph": bank.answer_edges(task) if is_gr else None,
-                "responses": responses,
-            })
+            out.append(
+                {
+                    "index": ri,
+                    "id": task["id"],
+                    "title": task["title"],
+                    "prompt": task["prompt"],
+                    "type": task["type"],
+                    "correctAnswer": bank.answer_text(task),
+                    "nodes": (task.get("nodes") or []) if is_gr else None,
+                    "answerGraph": bank.answer_edges(task) if is_gr else None,
+                    "responses": responses,
+                }
+            )
         return out
 
     async def broadcast_teacher(self):
@@ -260,21 +295,30 @@ class Game:
         running = self.session["status"] == "running"
         payload = {
             "type": "state",
-            "session": {"status": self.session["status"], "stream": self.current_stream, "total": len(self.order)},
+            "session": {
+                "status": self.session["status"],
+                "stream": self.current_stream,
+                "total": len(self.order),
+            },
             "test": bool(self.session["test"]),
-            "round": self.round, "roundTotal": len(self.order),
+            "round": self.round,
+            "roundTotal": len(self.order),
             "currentType": task["type"] if task else None,
             "currentId": task["id"] if task else None,
             "currentTitle": task["title"] if task else None,
             "currentAnswer": bank.answer_text(task) if task else None,
-            "deadline": self.round_deadline if (running and not self.intermission and not self.paused) else 0,
+            "deadline": self.round_deadline
+            if (running and not self.intermission and not self.paused)
+            else 0,
             "limit": time_limit_for(task) if task else 0,
             "serverTime": int(time.time() * 1000),
             "answeredCount": len(self.round_answered),
             "activeCount": len(self.connected_nicks()),
-            "intermission": self.intermission, "paused": self.paused,
+            "intermission": self.intermission,
+            "paused": self.paused,
             "token": sec.current_token() if config["qrRotation"].get("enabled") else None,
-            "qrSvg": self.qr_svg, "joinUrl": self.join_url,
+            "qrSvg": self.qr_svg,
+            "joinUrl": self.join_url,
             "roster": self.roster_arr(),
             "leaderboard": self.leaderboard(),
             "details": self.session_details() if self.order else [],
@@ -289,13 +333,29 @@ class Game:
         pub = bank.public_task(task)
         if task["type"] == "choice" and self.round_perm:
             pub["options"] = [task["options"][i] for i in self.round_perm]
-        await self.send(ws, {"type": "task", "index": self.round, "total": len(self.order),
-                             "task": pub, "deadline": self.round_deadline,
-                             "serverTime": int(time.time() * 1000), "limit": time_limit_for(task)})
+        await self.send(
+            ws,
+            {
+                "type": "task",
+                "index": self.round,
+                "total": len(self.order),
+                "task": pub,
+                "deadline": self.round_deadline,
+                "serverTime": int(time.time() * 1000),
+                "limit": time_limit_for(task),
+            },
+        )
         a = s["answers"].get(self.round)
         if a and a["answered"]:
-            await self.send(ws, {"type": "answered", "correct": a["correct"],
-                                 "points": a["points"], "picked": a.get("picked")})
+            await self.send(
+                ws,
+                {
+                    "type": "answered",
+                    "correct": a["correct"],
+                    "points": a["points"],
+                    "picked": a.get("picked"),
+                },
+            )
         if self.paused:
             await self.send(ws, {"type": "paused"})
 
@@ -315,6 +375,7 @@ class Game:
                 return
             async with self.lock:
                 await coro_factory()
+
         task = asyncio.create_task(run())
         setattr(self, attr, task)
 
@@ -323,7 +384,9 @@ class Game:
         self.round = idx
         task = self.order[idx]
         self.round_answered = set()
-        self.round_perm = shuffle(list(range(len(task["options"])))) if task["type"] == "choice" else None
+        self.round_perm = (
+            shuffle(list(range(len(task["options"])))) if task["type"] == "choice" else None
+        )
         self.round_deadline = int(time.time() * 1000) + time_limit_for(task)
         self.paused = False
         self.pause_remain = 0
@@ -346,16 +409,26 @@ class Game:
                 continue
             a = s["answers"].get(self.round)
             if not a or not a["answered"]:
-                s["answers"][self.round] = {"taskId": self.order[self.round]["id"], "correct": False,
-                                            "points": 0, "answered": False}
+                s["answers"][self.round] = {
+                    "taskId": self.order[self.round]["id"],
+                    "correct": False,
+                    "points": 0,
+                    "answered": False,
+                }
                 s["streak"] = 0
         self.intermission = True
         for ws, s in list(self.students.items()):
             if s["kicked"]:
                 continue
             a = s["answers"].get(self.round)
-            await self.send(ws, {"type": "roundover", "correct": bool(a and a["correct"]),
-                                 "answered": bool(a and a["answered"])})
+            await self.send(
+                ws,
+                {
+                    "type": "roundover",
+                    "correct": bool(a and a["correct"]),
+                    "answered": bool(a and a["answered"]),
+                },
+            )
         await self.broadcast_teacher()
         self._schedule("_reveal", REVEAL_MS, self._advance)
 
@@ -375,7 +448,12 @@ class Game:
 
     # ---------- управление раундом ----------
     async def pause_round(self):
-        if self.session["status"] != "running" or self.round < 0 or self.intermission or self.paused:
+        if (
+            self.session["status"] != "running"
+            or self.round < 0
+            or self.intermission
+            or self.paused
+        ):
             return
         self.paused = True
         self.pause_remain = max(0, self.round_deadline - int(time.time() * 1000))
@@ -388,7 +466,12 @@ class Game:
         await self.broadcast_teacher()
 
     async def resume_round(self):
-        if self.session["status"] != "running" or self.round < 0 or self.intermission or not self.paused:
+        if (
+            self.session["status"] != "running"
+            or self.round < 0
+            or self.intermission
+            or not self.paused
+        ):
             return
         self.paused = False
         self.round_deadline = int(time.time() * 1000) + self.pause_remain
@@ -396,9 +479,15 @@ class Game:
         for ws, s in list(self.students.items()):
             if s["kicked"]:
                 continue
-            await self.send(ws, {"type": "resumed", "deadline": self.round_deadline,
-                                 "serverTime": int(time.time() * 1000),
-                                 "limit": time_limit_for(self.order[self.round])})
+            await self.send(
+                ws,
+                {
+                    "type": "resumed",
+                    "deadline": self.round_deadline,
+                    "serverTime": int(time.time() * 1000),
+                    "limit": time_limit_for(self.order[self.round]),
+                },
+            )
         await self.broadcast_teacher()
 
     async def skip_round(self):
@@ -419,13 +508,22 @@ class Game:
             await self.broadcast_teacher()
             return
         self.round_deadline += ms
-        self._schedule("_timer", max(0, self.round_deadline - int(time.time() * 1000)) + 400,
-                       lambda: self.end_round("timeout"))
+        self._schedule(
+            "_timer",
+            max(0, self.round_deadline - int(time.time() * 1000)) + 400,
+            lambda: self.end_round("timeout"),
+        )
         for ws, s in list(self.students.items()):
             if s["kicked"]:
                 continue
-            await self.send(ws, {"type": "addtime", "deadline": self.round_deadline,
-                                 "serverTime": int(time.time() * 1000)})
+            await self.send(
+                ws,
+                {
+                    "type": "addtime",
+                    "deadline": self.round_deadline,
+                    "serverTime": int(time.time() * 1000),
+                },
+            )
         await self.broadcast_teacher()
 
     async def finish_game(self):
@@ -442,16 +540,30 @@ class Game:
             review = []
             for ri, task in enumerate(self.order):
                 a = s["answers"].get(ri)
-                review.append({
-                    "title": task["title"], "prompt": task["prompt"], "type": task["type"],
-                    "answered": bool(a and a["answered"]), "correct": bool(a and a["correct"]),
-                    "yourAnswer": (a.get("ansText", "") if (a and a["answered"]) else None),
-                    "correctAnswer": bank.answer_text(task),
-                    "explain": EXPLAIN.get(task["id"], ""),
-                })
-            await self.send(ws, {"type": "sessionend", "place": place, "score": s["score"],
-                                 "correct": s["correct"], "total": len(self.order),
-                                 "bestStreak": s.get("bestStreak", 0), "review": review})
+                review.append(
+                    {
+                        "title": task["title"],
+                        "prompt": task["prompt"],
+                        "type": task["type"],
+                        "answered": bool(a and a["answered"]),
+                        "correct": bool(a and a["correct"]),
+                        "yourAnswer": (a.get("ansText", "") if (a and a["answered"]) else None),
+                        "correctAnswer": bank.answer_text(task),
+                        "explain": EXPLAIN.get(task["id"], ""),
+                    }
+                )
+            await self.send(
+                ws,
+                {
+                    "type": "sessionend",
+                    "place": place,
+                    "score": s["score"],
+                    "correct": s["correct"],
+                    "total": len(self.order),
+                    "bestStreak": s.get("bestStreak", 0),
+                    "review": review,
+                },
+            )
         await self.broadcast_teacher()
 
     # ---------- обработка сообщений студента ----------
@@ -462,26 +574,62 @@ class Game:
                 return await self.send(ws, {"type": "rejected", "reason": "Пустой ник."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)
             if not dbg and not sec.token_ok(msg.get("token")):
-                return await self.send(ws, {"type": "rejected",
-                                             "reason": "Неверный или устаревший код. Отсканируйте свежий QR."})
-            if not dbg and config["qrRotation"].get("enabled") and not sec.consume_nonce(msg.get("nonce")):
-                return await self.send(ws, {"type": "rejected",
-                                             "reason": "Сессия входа устарела. Обновите страницу и войдите снова."})
+                return await self.send(
+                    ws,
+                    {
+                        "type": "rejected",
+                        "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
+                    },
+                )
+            if (
+                not dbg
+                and config["qrRotation"].get("enabled")
+                and not sec.consume_nonce(msg.get("nonce"))
+            ):
+                return await self.send(
+                    ws,
+                    {
+                        "type": "rejected",
+                        "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
+                    },
+                )
             s = self.by_nick.get(nick)
             if s:
                 if s["kicked"]:
-                    return await self.send(ws, {"type": "rejected", "reason": "Вас удалили из сессии."})
+                    return await self.send(
+                        ws, {"type": "rejected", "reason": "Вас удалили из сессии."}
+                    )
                 self.students[ws] = s
             else:
                 if self.session["status"] != "lobby":
-                    return await self.send(ws, {"type": "rejected", "reason": "Сессия уже началась."})
-                s = {"nick": nick, "icon": msg.get("icon") or "👾", "ip": ip,
-                     "joinedAt": int(time.time() * 1000), "score": 0, "correct": 0, "streak": 0,
-                     "bestStreak": 0, "tabLeaves": 0, "fastAnswers": 0, "kicked": False, "answers": {}}
+                    return await self.send(
+                        ws, {"type": "rejected", "reason": "Сессия уже началась."}
+                    )
+                s = {
+                    "nick": nick,
+                    "icon": msg.get("icon") or "👾",
+                    "ip": ip,
+                    "joinedAt": int(time.time() * 1000),
+                    "score": 0,
+                    "correct": 0,
+                    "streak": 0,
+                    "bestStreak": 0,
+                    "tabLeaves": 0,
+                    "fastAnswers": 0,
+                    "kicked": False,
+                    "answers": {},
+                }
                 self.by_nick[nick] = s
                 self.students[ws] = s
-            await self.send(ws, {"type": "joined", "nick": s["nick"], "icon": s["icon"],
-                                 "status": self.session["status"]})
+            await self.send(
+                ws,
+                {
+                    "type": "joined",
+                    "nick": s["nick"],
+                    "icon": s["icon"],
+                    "status": self.session["status"],
+                },
+            )
             if self.session["status"] == "running" and not self.intermission:
                 await self.send_current_task(s, ws)
             await self.broadcast_teacher()
@@ -531,19 +679,34 @@ class Game:
             if ty == "choice" and picked is not None:
                 ans_text = task["options"][payload["choice"]]
             elif ty == "graph":
-                ans_text = ", ".join(f"{e[0]}–{e[1]}" for e in (raw_payload.get("edges") or [])) or "(пусто)"
+                ans_text = (
+                    ", ".join(f"{e[0]}–{e[1]}" for e in (raw_payload.get("edges") or []))
+                    or "(пусто)"
+                )
             elif ty == "order":
                 ans_text = " → ".join(str(x) for x in (raw_payload.get("order") or [])) or "(пусто)"
             elif ty == "sort":
                 ans_text = "[" + ", ".join(str(x) for x in (raw_payload.get("array") or [])) + "]"
             elif ty == "blank":
-                ans_text = " | ".join("∅" if (v == "" or v is None) else str(v)
-                                      for v in (raw_payload.get("blanks") or [])) or "(пусто)"
+                ans_text = (
+                    " | ".join(
+                        "∅" if (v == "" or v is None) else str(v)
+                        for v in (raw_payload.get("blanks") or [])
+                    )
+                    or "(пусто)"
+                )
             else:
                 ans_text = ""
             ans_ms = now - (self.round_deadline - limit)
-            s["answers"][self.round] = {"taskId": task["id"], "correct": correct, "points": points,
-                                        "answered": True, "picked": picked, "ansText": ans_text, "ms": ans_ms}
+            s["answers"][self.round] = {
+                "taskId": task["id"],
+                "correct": correct,
+                "points": points,
+                "answered": True,
+                "picked": picked,
+                "ansText": ans_text,
+                "ms": ans_ms,
+            }
             if not self.session["test"]:
                 db.record_answer(self.session["id"], s["nick"], task["id"], correct, ans_ms)
 
@@ -552,12 +715,29 @@ class Game:
                 if not self.session["test"]:
                     db.record_event(self.session["id"], s["nick"], "fast")
                 for t in list(self.teachers):
-                    await self.send(t, {"type": "flag", "nick": s["nick"], "kind": "fast",
-                                        "count": s["fastAnswers"]})
+                    await self.send(
+                        t,
+                        {
+                            "type": "flag",
+                            "nick": s["nick"],
+                            "kind": "fast",
+                            "count": s["fastAnswers"],
+                        },
+                    )
 
-            await self.send(ws, {"type": "answered", "correct": correct, "points": points,
-                                 "basePoints": base_points, "speedBonus": speed_bonus,
-                                 "streakBonus": streak_bonus, "streak": s["streak"], "picked": picked})
+            await self.send(
+                ws,
+                {
+                    "type": "answered",
+                    "correct": correct,
+                    "points": points,
+                    "basePoints": base_points,
+                    "speedBonus": speed_bonus,
+                    "streakBonus": streak_bonus,
+                    "streak": s["streak"],
+                    "picked": picked,
+                },
+            )
             await self.broadcast_teacher()
             await self.maybe_end_round()
             return
@@ -567,8 +747,15 @@ class Game:
             if not self.session["test"]:
                 db.record_event(self.session["id"], s["nick"], "tableave")
             for t in list(self.teachers):
-                await self.send(t, {"type": "flag", "nick": s["nick"], "kind": "tableave",
-                                    "count": s["tabLeaves"]})
+                await self.send(
+                    t,
+                    {
+                        "type": "flag",
+                        "nick": s["nick"],
+                        "kind": "tableave",
+                        "count": s["tabLeaves"],
+                    },
+                )
             await self.broadcast_teacher()
 
     async def on_student_disconnect(self, ws):
@@ -583,8 +770,16 @@ class Game:
             try:
                 await self.send(ws, {"type": "stats", **stats_data(msg.get("stream"), AC)})
             except Exception as e:
-                await self.send(ws, {"type": "stats", "sessions": [], "tasks": [],
-                                     "backend": db.backend, "error": str(e)})
+                await self.send(
+                    ws,
+                    {
+                        "type": "stats",
+                        "sessions": [],
+                        "tasks": [],
+                        "backend": db.backend,
+                        "error": str(e),
+                    },
+                )
             return
         if t == "wipeData":
             try:
@@ -597,11 +792,23 @@ class Game:
         if t == "addTask":
             task = bank.build_custom_task(msg.get("task"))
             if not task:
-                return await self.send(ws, {"type": "taskAdded", "ok": False,
-                                            "error": "Некорректная задача: проверьте обязательные поля."})
+                return await self.send(
+                    ws,
+                    {
+                        "type": "taskAdded",
+                        "ok": False,
+                        "error": "Некорректная задача: проверьте обязательные поля.",
+                    },
+                )
             if task["id"] in bank.BY_ID:
-                return await self.send(ws, {"type": "taskAdded", "ok": False,
-                                            "error": "Задача с таким кодом уже существует."})
+                return await self.send(
+                    ws,
+                    {
+                        "type": "taskAdded",
+                        "ok": False,
+                        "error": "Задача с таким кодом уже существует.",
+                    },
+                )
             bank.TASKS.append(task)
             bank.BY_ID[task["id"]] = task
             self.custom_specs.append({**msg["task"], "id": task["id"]})
@@ -609,13 +816,21 @@ class Game:
             for w in list(self.teachers):
                 await self.send(w, {"type": "catalog", "items": bank.catalog_data()})
                 await self.send(w, {"type": "answerkey", "items": self.answer_key_data()})
-            return await self.send(ws, {"type": "taskAdded", "ok": True, "id": task["id"], "title": task["title"]})
+            return await self.send(
+                ws, {"type": "taskAdded", "ok": True, "id": task["id"], "title": task["title"]}
+            )
         if t == "deleteTask" and msg.get("id"):
             tid = msg["id"]
             found = bank.BY_ID.get(tid)
             if not found or not found.get("custom"):
-                return await self.send(ws, {"type": "taskAdded", "ok": False,
-                                            "error": "Удалять можно только собственные задачи."})
+                return await self.send(
+                    ws,
+                    {
+                        "type": "taskAdded",
+                        "ok": False,
+                        "error": "Удалять можно только собственные задачи.",
+                    },
+                )
             bank.TASKS[:] = [x for x in bank.TASKS if x["id"] != tid]
             bank.BY_ID.pop(tid, None)
             self.custom_specs = [sp for sp in self.custom_specs if sp.get("id") != tid]
@@ -665,7 +880,9 @@ class Game:
         if t == "skip":
             return await self.skip_round()
         if t == "addTime":
-            return await self.add_round_time(msg["ms"] if isinstance(msg.get("ms"), (int, float)) else 15000)
+            return await self.add_round_time(
+                msg["ms"] if isinstance(msg.get("ms"), (int, float)) else 15000
+            )
         if t == "kick" and msg.get("nick"):
             s = self.by_nick.get(msg["nick"])
             if s:
@@ -715,6 +932,9 @@ class Game:
 
 game = Game()
 
+# Фоновые задачи (ротация QR, чистка nonce). Храним ссылки, чтобы их не собрал GC.
+_BG_TASKS: set[asyncio.Task] = set()
+
 # ================================================================ FastAPI
 app = FastAPI()
 
@@ -730,7 +950,9 @@ def client_ip(scope_client, headers):
 async def _startup():
     game.build_qr()
     print(f"\n  AlgoClimb (FastAPI) запущен · хранилище: {db.backend} · банк: {bank.BANK_SOURCE}")
-    print(f"  КЛЮЧ ПРЕПОДАВАТЕЛЯ: {TEACHER_KEY}  (введите на экране учителя; НЕ показывайте студентам)")
+    print(
+        f"  КЛЮЧ ПРЕПОДАВАТЕЛЯ: {TEACHER_KEY}  (введите на экране учителя; НЕ показывайте студентам)"
+    )
     print(f"  Преподаватель: http://localhost:{PORT}/teacher")
     for ip in local_ips():
         print(f"  Студенты:      http://{ip}:{PORT}/")
@@ -747,19 +969,24 @@ async def _startup():
             await asyncio.sleep(60)
             sec.sweep()
 
+    # Держим ссылки на фоновые задачи, иначе сборщик мусора может их прервать.
     if config["qrRotation"].get("enabled"):
-        asyncio.create_task(qr_loop())
-    asyncio.create_task(nonce_loop())
+        _BG_TASKS.add(asyncio.create_task(qr_loop()))
+    _BG_TASKS.add(asyncio.create_task(nonce_loop()))
 
 
 # ---------------------------------------------------------------- HTTP-маршруты
 @app.get("/api/nonce")
 async def api_nonce(request: Request):
-    if not ip_allowed(config, client_ip(request.scope.get("client"), request.headers)) \
-            and not (config["debug"].get("enabled") and is_loopback(client_ip(request.scope.get("client"), request.headers))):
+    if not ip_allowed(config, client_ip(request.scope.get("client"), request.headers)) and not (
+        config["debug"].get("enabled")
+        and is_loopback(client_ip(request.scope.get("client"), request.headers))
+    ):
         return PlainTextResponse("Доступ только из сети вуза", status_code=403)
-    return JSONResponse({"nonce": sec.issue_nonce(), "serverTime": int(time.time() * 1000)},
-                        headers={"Cache-Control": "no-store"})
+    return JSONResponse(
+        {"nonce": sec.issue_nonce(), "serverTime": int(time.time() * 1000)},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/export/analytics.xlsx")
@@ -769,12 +996,16 @@ async def export_xlsx(request: Request):
         return PlainTextResponse("Нужен ключ преподавателя", status_code=403)
     try:
         from analytics import build_xlsx
+
         buf = build_xlsx(analytics_sheets(request.query_params.get("stream"), AC))
         fname = f"algoclimb-аналитика-{time.strftime('%Y-%m-%d')}.xlsx"
         from urllib.parse import quote
-        return Response(content=buf,
-                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"})
+
+        return Response(
+            content=buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
+        )
     except Exception as e:
         return PlainTextResponse("Ошибка экспорта: " + str(e), status_code=500)
 
@@ -786,13 +1017,18 @@ async def debug_page(request: Request):
     on = config["debug"].get("enabled")
     key_block = (
         f'<div class="key"><span class="lab">Ключ преподавателя</span><code id="k">{TEACHER_KEY}</code>'
-        '<button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\'k\').textContent)">копировать</button></div>'
-        if (on and show_key) else
-        '<p class="muted">Ключ преподавателя показывается только при включённом debug и заходе с этой машины. Его печатает терминал сервера.</p>'
+        "<button onclick=\"navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('k').textContent)\">копировать</button></div>"
+        if (on and show_key)
+        else '<p class="muted">Ключ преподавателя показывается только при включённом debug и заходе с этой машины. Его печатает терминал сервера.</p>'
     )
-    off_warn = "" if on else (
-        '<div class="warn">Режим отладки <b>выключен</b>. Запустите <code>DEBUG=1</code>, '
-        'чтобы заходить студентом с localhost без кода.</div>')
+    off_warn = (
+        ""
+        if on
+        else (
+            '<div class="warn">Режим отладки <b>выключен</b>. Запустите <code>DEBUG=1</code>, '
+            "чтобы заходить студентом с localhost без кода.</div>"
+        )
+    )
     html = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>AlgoClimb — отладка</title>
 <style>
@@ -831,16 +1067,26 @@ async def debug_page(request: Request):
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
-_MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
-         ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff",
-         ".json": "application/json", ".png": "image/png", ".ico": "image/x-icon"}
+_MIME = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+}
 
 
 def _serve(rel):
     p = (PUBLIC / rel).resolve()
     if not str(p).startswith(str(PUBLIC.resolve())) or not p.is_file():
         return PlainTextResponse("not found", status_code=404)
-    return Response(content=p.read_bytes(), media_type=_MIME.get(p.suffix, "application/octet-stream"))
+    return Response(
+        content=p.read_bytes(), media_type=_MIME.get(p.suffix, "application/octet-stream")
+    )
 
 
 @app.get("/")
@@ -897,9 +1143,14 @@ async def teacher_ws(ws: WebSocket):
 async def student_ws(ws: WebSocket):
     await ws.accept()
     ip = client_ip(ws.scope.get("client"), ws.headers)
-    if config["ipAllowlist"].get("enabled") and not ip_allowed(config, ip) \
-            and not (config["debug"].get("enabled") and is_loopback(ip)):
-        await game.send(ws, {"type": "rejected", "reason": "Подключение разрешено только из сети вуза."})
+    if (
+        config["ipAllowlist"].get("enabled")
+        and not ip_allowed(config, ip)
+        and not (config["debug"].get("enabled") and is_loopback(ip))
+    ):
+        await game.send(
+            ws, {"type": "rejected", "reason": "Подключение разрешено только из сети вуза."}
+        )
         await ws.close()
         return
     try:

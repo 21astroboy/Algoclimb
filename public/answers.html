@@ -1,166 +1,448 @@
 <!doctype html>
 <html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AlgoClimb — ключ ответов (для преподавателя)</title>
-<style>
-  :root{--bg:#08111f;--panel:#102544;--panel2:#0c1c34;--line:#1d3a63;
-    --accent:#ffd23f;--blue:#5aa9ff;--text:#e8eef7;--muted:#8195b4;--green:#3ddc84}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    background:radial-gradient(1200px 700px at 70% -10%,#14385f,#0c1d36 45%,#08111f);color:var(--text);min-height:100vh}
-  .wrap{max-width:980px;margin:0 auto;padding:18px}
-  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-  .logo{font-weight:800;font-size:22px}.logo b{color:var(--accent)}
-  .tag{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:4px 9px;border-radius:999px}
-  .warn{font-size:12px;color:#ffd9a0;background:#3a2a16;border:1px solid #6b4b2b;border-radius:8px;padding:6px 10px}
-  input[type=search]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
-    padding:10px 12px;color:var(--text);font-size:15px}
-  .filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
-  .chip{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700}
-  .chip.on{background:var(--accent);color:#10243f;border-color:var(--accent)}
-  .now{background:linear-gradient(180deg,#16331f,#102b1c);border:1px solid #2c6b3f;border-radius:14px;padding:14px;margin-bottom:14px}
-  .now .lab{font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:1px;font-weight:800}
-  .now .q{font-size:17px;font-weight:700;margin:6px 0}
-  .now .a{font-size:16px;color:#d6f5e2;white-space:pre-wrap}
-  .item{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:10px}
-  .item.cur{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
-  .item .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
-  .item .ttl{font-weight:800;font-size:15px}
-  .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
-  .badge.g{color:#bfe0ff;border-color:var(--blue)}
-  .item .pr{color:var(--muted);font-size:14px;white-space:pre-wrap;margin:3px 0 7px}
-  .item .ans{font-size:15px;color:#d6f5e2;font-weight:600;white-space:pre-wrap}
-  .item .ans b{color:var(--green)}
-  .muted{color:var(--muted)}
-  .count{font-size:13px;color:var(--muted);margin-bottom:8px}
-  .katex{font-size:1.02em}
-</style>
-<link rel="stylesheet" href="/vendor/katex/katex.min.css">
-<script src="/vendor/katex/katex.min.js"></script>
-<script src="/vendor/katex/auto-render.min.js"></script>
-</head>
-<body>
-<style>
-  .loginback{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;
-    background:rgba(5,11,22,.92);backdrop-filter:blur(4px)}
-  .loginback.hidden{display:none}
-  .loginCard{width:min(92vw,380px);background:linear-gradient(180deg,#102544,#0c1c34);
-    border:1px solid #1d3a63;border-radius:16px;padding:24px;text-align:center}
-  .loginCard h2{margin:0 0 6px;font-size:20px}
-  .loginCard p{margin:0 0 14px;color:#8195b4;font-size:13px;line-height:1.45}
-  .loginCard input{width:100%;background:#0c1c34;border:1px solid #1d3a63;border-radius:10px;
-    padding:12px;color:#e8eef7;font-size:18px;letter-spacing:3px;text-align:center;text-transform:uppercase}
-  .loginCard button{width:100%;margin-top:12px;padding:12px;font-size:15px;cursor:pointer;
-    background:var(--accent);color:#10243f;border:none;border-radius:10px;font-weight:800}
-  .loginErr{color:#ff6b6b;font-size:13px;min-height:18px;margin-top:8px}
-</style>
-<div class="loginback hidden" id="loginBox">
-  <form class="loginCard" id="keyForm" autocomplete="off">
-    <h2>🔒 Вход преподавателя</h2>
-    <p>Введите ключ доступа из терминала сервера. Студентам он не виден.</p>
-    <input type="password" id="keyInput" inputmode="latin" placeholder="КЛЮЧ" autocomplete="off" autofocus>
-    <div class="loginErr" id="loginErr"></div>
-    <button type="submit">Войти</button>
-  </form>
-</div>
-<div class="wrap">
-  <header>
-    <div class="logo">Algo<b>Climb</b></div>
-    <span class="tag">ключ ответов</span>
-    <span class="tag" id="dot">подключение…</span>
-    <span class="warn">Только для преподавателя — не показывайте студентам этот экран.</span>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AlgoClimb — ключ ответов (для преподавателя)</title>
+    <style>
+      :root {
+        --bg: #08111f;
+        --panel: #102544;
+        --panel2: #0c1c34;
+        --line: #1d3a63;
+        --accent: #ffd23f;
+        --blue: #5aa9ff;
+        --text: #e8eef7;
+        --muted: #8195b4;
+        --green: #3ddc84;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        background: radial-gradient(1200px 700px at 70% -10%, #14385f, #0c1d36 45%, #08111f);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 18px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .logo {
+        font-weight: 800;
+        font-size: 22px;
+      }
+      .logo b {
+        color: var(--accent);
+      }
+      .tag {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        padding: 4px 9px;
+        border-radius: 999px;
+      }
+      .warn {
+        font-size: 12px;
+        color: #ffd9a0;
+        background: #3a2a16;
+        border: 1px solid #6b4b2b;
+        border-radius: 8px;
+        padding: 6px 10px;
+      }
+      input[type='search'] {
+        flex: 1;
+        min-width: 200px;
+        background: var(--panel2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: var(--text);
+        font-size: 15px;
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 6px 0 14px;
+      }
+      .chip {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--text);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .chip.on {
+        background: var(--accent);
+        color: #10243f;
+        border-color: var(--accent);
+      }
+      .now {
+        background: linear-gradient(180deg, #16331f, #102b1c);
+        border: 1px solid #2c6b3f;
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+      .now .lab {
+        font-size: 12px;
+        color: var(--green);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 800;
+      }
+      .now .q {
+        font-size: 17px;
+        font-weight: 700;
+        margin: 6px 0;
+      }
+      .now .a {
+        font-size: 16px;
+        color: #d6f5e2;
+        white-space: pre-wrap;
+      }
+      .item {
+        background: linear-gradient(180deg, var(--panel), var(--panel2));
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 13px 15px;
+        margin-bottom: 10px;
+      }
+      .item.cur {
+        border-color: var(--green);
+        box-shadow: 0 0 0 1px var(--green) inset;
+      }
+      .item .top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 5px;
+      }
+      .item .ttl {
+        font-weight: 800;
+        font-size: 15px;
+      }
+      .badge {
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+      .badge.g {
+        color: #bfe0ff;
+        border-color: var(--blue);
+      }
+      .item .pr {
+        color: var(--muted);
+        font-size: 14px;
+        white-space: pre-wrap;
+        margin: 3px 0 7px;
+      }
+      .item .ans {
+        font-size: 15px;
+        color: #d6f5e2;
+        font-weight: 600;
+        white-space: pre-wrap;
+      }
+      .item .ans b {
+        color: var(--green);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .count {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .katex {
+        font-size: 1.02em;
+      }
+    </style>
+    <link rel="stylesheet" href="/vendor/katex/katex.min.css" />
+    <script src="/vendor/katex/katex.min.js"></script>
+    <script src="/vendor/katex/auto-render.min.js"></script>
+  </head>
+  <body>
+    <style>
+      .loginback {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        background: rgba(5, 11, 22, 0.92);
+        backdrop-filter: blur(4px);
+      }
+      .loginback.hidden {
+        display: none;
+      }
+      .loginCard {
+        width: min(92vw, 380px);
+        background: linear-gradient(180deg, #102544, #0c1c34);
+        border: 1px solid #1d3a63;
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+      }
+      .loginCard h2 {
+        margin: 0 0 6px;
+        font-size: 20px;
+      }
+      .loginCard p {
+        margin: 0 0 14px;
+        color: #8195b4;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .loginCard input {
+        width: 100%;
+        background: #0c1c34;
+        border: 1px solid #1d3a63;
+        border-radius: 10px;
+        padding: 12px;
+        color: #e8eef7;
+        font-size: 18px;
+        letter-spacing: 3px;
+        text-align: center;
+        text-transform: uppercase;
+      }
+      .loginCard button {
+        width: 100%;
+        margin-top: 12px;
+        padding: 12px;
+        font-size: 15px;
+        cursor: pointer;
+        background: var(--accent);
+        color: #10243f;
+        border: none;
+        border-radius: 10px;
+        font-weight: 800;
+      }
+      .loginErr {
+        color: #ff6b6b;
+        font-size: 13px;
+        min-height: 18px;
+        margin-top: 8px;
+      }
+    </style>
+    <div class="loginback hidden" id="loginBox">
+      <form class="loginCard" id="keyForm" autocomplete="off">
+        <h2>🔒 Вход преподавателя</h2>
+        <p>Введите ключ доступа из терминала сервера. Студентам он не виден.</p>
+        <input
+          type="password"
+          id="keyInput"
+          inputmode="latin"
+          placeholder="КЛЮЧ"
+          autocomplete="off"
+          autofocus />
+        <div class="loginErr" id="loginErr"></div>
+        <button type="submit">Войти</button>
+      </form>
+    </div>
+    <div class="wrap">
+      <header>
+        <div class="logo">
+          Algo
+          <b>Climb</b>
+        </div>
+        <span class="tag">ключ ответов</span>
+        <span class="tag" id="dot">подключение…</span>
+        <span class="warn">Только для преподавателя — не показывайте студентам этот экран.</span>
+      </header>
 
-  <div class="now hidden" id="now">
-    <div class="lab">Текущий вопрос</div>
-    <div class="q" id="nowQ"></div>
-    <div class="a" id="nowA"></div>
-  </div>
+      <div class="now hidden" id="now">
+        <div class="lab">Текущий вопрос</div>
+        <div class="q" id="nowQ"></div>
+        <div class="a" id="nowA"></div>
+      </div>
 
-  <input type="search" id="q" placeholder="Поиск по названию, условию или ответу…">
-  <div class="filters" id="filters">
-    <button class="chip on" data-f="all">Все</button>
-    <button class="chip" data-f="asd">АиСД</button>
-    <button class="chip" data-f="graphs">Графы</button>
-    <button class="chip" data-f="choice">Выбор</button>
-    <button class="chip" data-f="graph">Построение</button>
-  </div>
-  <div class="count" id="count"></div>
-  <div id="list"></div>
-</div>
+      <input type="search" id="q" placeholder="Поиск по названию, условию или ответу…" />
+      <div class="filters" id="filters">
+        <button class="chip on" data-f="all">Все</button>
+        <button class="chip" data-f="asd">АиСД</button>
+        <button class="chip" data-f="graphs">Графы</button>
+        <button class="chip" data-f="choice">Выбор</button>
+        <button class="chip" data-f="graph">Построение</button>
+      </div>
+      <div class="count" id="count"></div>
+      <div id="list"></div>
+    </div>
 
-<script>
-const $=id=>document.getElementById(id);
-let items=[], curId=null, filter='all', query='';
-const proto=location.protocol==='https:'?'wss':'ws';
-const KEY_STORE='algoclimb_tkey';
-let ws=null;
-function connect(key){
-  try{ws&&ws.close();}catch{}
-  ws=new WebSocket(`${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`);
-  ws.onopen=()=>$('dot').textContent='в сети';
-  ws.onclose=()=>$('dot').textContent='нет связи';
-  ws.onmessage=e=>{ const m=JSON.parse(e.data);
-    if(m.type==='rejected'){ onReject(m.reason); return; }
-    hideLogin(); try{localStorage.setItem(KEY_STORE,key);}catch{}
-    if(m.type==='answerkey'){ items=m.items||[]; render(); }
-    if(m.type==='state'){ curId=m.currentId||null; renderNow(m); markCurrent(); }
-  };
-}
-function onReject(reason){ try{localStorage.removeItem(KEY_STORE);}catch{} showLogin(reason||'Доступ запрещён'); }
-function showLogin(err){ $('loginBox').classList.remove('hidden'); $('loginErr').textContent=err||''; $('keyInput').value=''; setTimeout(()=>$('keyInput').focus(),50); }
-function hideLogin(){ $('loginBox').classList.add('hidden'); }
-$('keyForm').onsubmit=e=>{ e.preventDefault(); const k=$('keyInput').value.trim(); if(k) connect(k); };
-(function init(){ let saved=''; try{saved=localStorage.getItem(KEY_STORE)||'';}catch{} if(saved) connect(saved); else showLogin(); })();
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let items = [],
+        curId = null,
+        filter = 'all',
+        query = '';
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const KEY_STORE = 'algoclimb_tkey';
+      let ws = null;
+      function connect(key) {
+        try {
+          ws && ws.close();
+        } catch {}
+        ws = new WebSocket(
+          `${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`
+        );
+        ws.onopen = () => ($('dot').textContent = 'в сети');
+        ws.onclose = () => ($('dot').textContent = 'нет связи');
+        ws.onmessage = (e) => {
+          const m = JSON.parse(e.data);
+          if (m.type === 'rejected') {
+            onReject(m.reason);
+            return;
+          }
+          hideLogin();
+          try {
+            localStorage.setItem(KEY_STORE, key);
+          } catch {}
+          if (m.type === 'answerkey') {
+            items = m.items || [];
+            render();
+          }
+          if (m.type === 'state') {
+            curId = m.currentId || null;
+            renderNow(m);
+            markCurrent();
+          }
+        };
+      }
+      function onReject(reason) {
+        try {
+          localStorage.removeItem(KEY_STORE);
+        } catch {}
+        showLogin(reason || 'Доступ запрещён');
+      }
+      function showLogin(err) {
+        $('loginBox').classList.remove('hidden');
+        $('loginErr').textContent = err || '';
+        $('keyInput').value = '';
+        setTimeout(() => $('keyInput').focus(), 50);
+      }
+      function hideLogin() {
+        $('loginBox').classList.add('hidden');
+      }
+      $('keyForm').onsubmit = (e) => {
+        e.preventDefault();
+        const k = $('keyInput').value.trim();
+        if (k) connect(k);
+      };
+      (function init() {
+        let saved = '';
+        try {
+          saved = localStorage.getItem(KEY_STORE) || '';
+        } catch {}
+        if (saved) connect(saved);
+        else showLogin();
+      })();
 
-$('q').oninput=()=>{ query=$('q').value.trim().toLowerCase(); render(); };
-$('filters').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return;
-  filter=b.dataset.f;
-  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b));
-  render(); };
+      $('q').oninput = () => {
+        query = $('q').value.trim().toLowerCase();
+        render();
+      };
+      $('filters').onclick = (e) => {
+        const b = e.target.closest('.chip');
+        if (!b) return;
+        filter = b.dataset.f;
+        document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
+        render();
+      };
 
-function matches(it){
-  if(filter==='asd'&&it.topic!=='asd') return false;
-  if(filter==='graphs'&&it.topic!=='graphs') return false;
-  if(filter==='choice'&&it.type!=='choice') return false;
-  if(filter==='graph'&&it.type!=='graph') return false;
-  if(query){ const hay=(it.title+' '+it.prompt+' '+it.answer+' '+it.id).toLowerCase();
-    if(!hay.includes(query)) return false; }
-  return true;
-}
-function render(){
-  const list=items.filter(matches);
-  $('count').textContent=`Показано ${list.length} из ${items.length} задач`;
-  $('list').innerHTML=list.map(it=>{
-    const tp=({graph:'<span class="badge g">построение</span>',order:'<span class="badge g">обход</span>',sort:'<span class="badge g">сортировка</span>',blank:'<span class="badge g">пропуски</span>'}[it.type])||'<span class="badge">выбор</span>';
-    const to=it.topic==='asd'?'<span class="badge">АиСД</span>':'<span class="badge">графы</span>';
-    return `<div class="item ${it.id===curId?'cur':''}" data-id="${it.id}">
+      function matches(it) {
+        if (filter === 'asd' && it.topic !== 'asd') return false;
+        if (filter === 'graphs' && it.topic !== 'graphs') return false;
+        if (filter === 'choice' && it.type !== 'choice') return false;
+        if (filter === 'graph' && it.type !== 'graph') return false;
+        if (query) {
+          const hay = (it.title + ' ' + it.prompt + ' ' + it.answer + ' ' + it.id).toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      }
+      function render() {
+        const list = items.filter(matches);
+        $('count').textContent = `Показано ${list.length} из ${items.length} задач`;
+        $('list').innerHTML =
+          list
+            .map((it) => {
+              const tp =
+                {
+                  graph: '<span class="badge g">построение</span>',
+                  order: '<span class="badge g">обход</span>',
+                  sort: '<span class="badge g">сортировка</span>',
+                  blank: '<span class="badge g">пропуски</span>',
+                }[it.type] || '<span class="badge">выбор</span>';
+              const to =
+                it.topic === 'asd'
+                  ? '<span class="badge">АиСД</span>'
+                  : '<span class="badge">графы</span>';
+              return `<div class="item ${it.id === curId ? 'cur' : ''}" data-id="${it.id}">
       <div class="top"><span class="ttl">${esc(it.title)}</span> ${tp} ${to}
         <span class="badge">ур. ${it.level}</span></div>
       <div class="pr">${esc(it.prompt)}</div>
       <div class="ans"><b>Ответ:</b> ${esc(it.answer)}</div>
     </div>`;
-  }).join('') || '<div class="muted">Ничего не найдено.</div>';
-  mathify($('list'));
-}
-function markCurrent(){
-  document.querySelectorAll('.item').forEach(el=>el.classList.toggle('cur',el.dataset.id===curId));
-}
-function renderNow(m){
-  if(m.session&&m.session.status==='running'&&m.currentAnswer){
-    $('now').classList.remove('hidden');
-    $('nowQ').textContent=(m.currentTitle?m.currentTitle+' — ':'')+'вопрос '+(m.round+1)+'/'+m.roundTotal;
-    $('nowA').innerHTML='<b style="color:var(--green)">Ответ:</b> '+esc(m.currentAnswer);
-    mathify($('now'));
-  } else $('now').classList.add('hidden');
-}
-function esc(s){return String(s).replace(/[<>&'"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]));}
-function mathify(el){ if(el&&window.renderMathInElement){ try{ renderMathInElement(el,{
-  delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},
-    {left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],
-  throwOnError:false}); }catch(e){} } }
-</script>
-</body>
+            })
+            .join('') || '<div class="muted">Ничего не найдено.</div>';
+        mathify($('list'));
+      }
+      function markCurrent() {
+        document
+          .querySelectorAll('.item')
+          .forEach((el) => el.classList.toggle('cur', el.dataset.id === curId));
+      }
+      function renderNow(m) {
+        if (m.session && m.session.status === 'running' && m.currentAnswer) {
+          $('now').classList.remove('hidden');
+          $('nowQ').textContent =
+            (m.currentTitle ? m.currentTitle + ' — ' : '') +
+            'вопрос ' +
+            (m.round + 1) +
+            '/' +
+            m.roundTotal;
+          $('nowA').innerHTML = '<b style="color:var(--green)">Ответ:</b> ' + esc(m.currentAnswer);
+          mathify($('now'));
+        } else $('now').classList.add('hidden');
+      }
+      function esc(s) {
+        return String(s).replace(
+          /[<>&'"]/g,
+          (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&#39;', '"': '&quot;' })[c]
+        );
+      }
+      function mathify(el) {
+        if (el && window.renderMathInElement) {
+          try {
+            renderMathInElement(el, {
+              delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$', right: '$', display: false },
+                { left: '\\(', right: '\\)', display: false },
+                { left: '\\[', right: '\\]', display: true },
+              ],
+              throwOnError: false,
+            });
+          } catch (e) {}
+        }
+      }
+    </script>
+  </body>
 </html>

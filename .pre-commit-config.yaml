@@ -1,0 +1,52 @@
+# Хуки pre-commit: те же проверки, что и в CI, но локально перед коммитом.
+# Установка (один раз):  pipx install pre-commit && pre-commit install
+# Прогнать вручную по всем файлам:  pre-commit run --all-files
+minimum_pre_commit_version: "3.5.0"
+
+repos:
+  # ---------- Python: Ruff (линтер + форматтер) ----------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff
+        name: ruff (линтер)
+        args: [--fix]
+      - id: ruff-format
+        name: ruff (форматтер)
+
+  # ---------- Python: mypy (проверка типов) ----------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.18.2
+    hooks:
+      - id: mypy
+        name: mypy (типы)
+        files: ^server_py/
+        args: [--config-file=pyproject.toml]
+
+  # ---------- Общая гигиена файлов ----------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+
+  # ---------- Frontend: Prettier + ESLint (локальные хуки) ----------
+  # Запускаем через уже установленные npm-пакеты (см. package.json devDependencies).
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier (формат фронтенда)
+        entry: npx prettier --write
+        language: system
+        files: ^public/.*\.html$
+        exclude: ^public/vendor/
+      - id: eslint
+        name: eslint (линт фронтенда)
+        entry: npx eslint
+        language: system
+        files: ^public/.*\.html$
+        exclude: ^public/vendor/
