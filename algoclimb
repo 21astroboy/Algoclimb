@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# AlgoClimb — единая команда управления сервером на VPS.
+#
+#   ./algoclimb up        собрать и запустить в фоне (история в ./data сохраняется)
+#   ./algoclimb down      остановить
+#   ./algoclimb restart   перезапустить
+#   ./algoclimb logs      смотреть логи (Ctrl+C — выйти)
+#   ./algoclimb key       показать ключ преподавателя
+#   ./algoclimb status    состояние контейнера
+#
+# По умолчанию использует Docker Compose. Если Docker нет — переключается на
+# локальный запуск через Python venv (тот же ./data, та же БД).
+#
+# Настройки берутся из файла .env рядом со скриптом (см. .env.example).
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+cd "$(dirname "$0")"
+
+[ -f .env ] && set -a && . ./.env && set +a || true
+PORT="${PORT:-3000}"
+
+say()  { printf '%s\n' "$*"; }
+die()  { printf 'Ошибка: %s\n' "$*" >&2; exit 1; }
+
+# --- какой движок доступен ---
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"; ENGINE="docker"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC="docker-compose"; ENGINE="docker"
+else
+  ENGINE="local"
+fi
+
+check_bank() {
+  # task-bank.json приватный (в .gitignore) — на свежем клоне его может не быть.
+  if [ ! -f task-bank.json ]; then
+    say "⚠  task-bank.json не найден — приложение запустится с демо-банком (6 задач)."
+    say "   Скопируйте полный банк с рабочей машины, например:"
+    say "     scp task-bank.json explanations.json <user>@<vps>:$(pwd)/"
+    say
+  fi
+}
+
+up_docker() {
+  check_bank
+  mkdir -p data
+  say "Сборка и запуск (Docker)…"
+  $DC up -d --build
+  sleep 2
+  say
+  key_docker || true
+  say
+  say "Готово. Преподаватель: http://<адрес-сервера>:${PORT}/teacher"
+  say "Логи: ./algoclimb logs   ·  Остановить: ./algoclimb down"
+}
+
+key_docker() {
+  local k
+  k="$($DC logs algoclimb 2>/dev/null | grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' | tail -1 | sed 's/.*КЛЮЧ ПРЕПОДАВАТЕЛЯ: //')"
+  [ -n "${k:-}" ] && say "🔑 Ключ преподавателя: ${k}" || say "Ключ ещё не в логах — попробуйте: ./algoclimb logs"
+}
+
+# --- локальный режим без Docker ---
+VENV=".venv"
+ensure_venv() {
+  command -v python3 >/dev/null 2>&1 || die "Не найден ни Docker, ни python3."
+  [ -d "$VENV" ] || python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q -r requirements.txt
+}
+
+up_local() {
+  check_bank
+  ensure_venv
+  mkdir -p data
+  if [ -f algoclimb.pid ] && kill -0 "$(cat algoclimb.pid)" 2>/dev/null; then
+    die "Уже запущено (PID $(cat algoclimb.pid)). Сначала ./algoclimb down."
+  fi
+  say "Запуск (локальный Python)…"
+  PORT="$PORT" nohup "$VENV/bin/python" -m uvicorn main:app --app-dir server_py \
+      --host 0.0.0.0 --port "$PORT" > algoclimb.out 2>&1 &
+  echo $! > algoclimb.pid
+  sleep 3
+  grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' algoclimb.out | tail -1 | sed 's/.*: /🔑 Ключ преподавателя: /' || true
+  say "Готово (PID $(cat algoclimb.pid)). Логи: ./algoclimb logs"
+}
+
+down_local() {
+  [ -f algoclimb.pid ] || { say "Не запущено."; return; }
+  kill "$(cat algoclimb.pid)" 2>/dev/null || true
+  rm -f algoclimb.pid
+  say "Остановлено."
+}
+
+CMD="${1:-up}"
+case "$CMD" in
+  up)      [ "$ENGINE" = docker ] && up_docker || up_local ;;
+  down)    [ "$ENGINE" = docker ] && $DC down || down_local ;;
+  restart) [ "$ENGINE" = docker ] && { $DC restart; key_docker; } || { down_local; up_local; } ;;
+  logs)    [ "$ENGINE" = docker ] && $DC logs -f --tail=100 || { touch algoclimb.out; tail -f algoclimb.out; } ;;
+  key)     [ "$ENGINE" = docker ] && key_docker || { grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' algoclimb.out | tail -1; } ;;
+  status)  [ "$ENGINE" = docker ] && $DC ps || { [ -f algoclimb.pid ] && kill -0 "$(cat algoclimb.pid)" 2>/dev/null && say "работает (PID $(cat algoclimb.pid))" || say "остановлено"; } ;;
+  *)       die "Неизвестная команда: $CMD (up|down|restart|logs|key|status)" ;;
+esac

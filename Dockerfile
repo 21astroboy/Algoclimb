@@ -1,20 +1,21 @@
-# AlgoClimb — образ для запуска без установки Node на хосте.
-# Node 22 нужен для встроенного node:sqlite (без нативной сборки).
-FROM node:22-alpine
+# AlgoClimb — образ FastAPI-бэкенда (Python). Запускается без установки Python на хосте.
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Сначала только манифесты — чтобы слой с npm install кешировался.
-COPY package.json ./
-RUN npm install --omit=dev
+# Сначала только зависимости — чтобы слой с pip install кешировался.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Затем код приложения.
+# Затем код приложения (task-bank.json / explanations.json копируются, если лежат рядом).
 COPY . .
 
-# data/ — том для базы (SQLite/JSONL), чтобы посещаемость и результаты переживали перезапуск.
+# data/ — том для базы SQLite, чтобы история сессий переживала перезапуск.
 VOLUME ["/app/data"]
 
 EXPOSE 3000
 
-# Флаг включает встроенный node:sqlite в Node 22 (иначе db.js падает на JSONL).
-CMD ["node", "--experimental-sqlite", "server.js"]
+# Один воркер обязателен: состояние игры живёт в памяти процесса (asyncio.Lock),
+# несколько воркеров рассинхронизировали бы игру.
+CMD ["python", "-m", "uvicorn", "main:app", "--app-dir", "server_py", \
+     "--host", "0.0.0.0", "--port", "3000"]

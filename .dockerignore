@@ -1,5 +1,14 @@
+# Не тащим в образ лишнее. ВАЖНО: task-bank.json и explanations.json
+# НЕ исключаем — они нужны приложению внутри контейнера.
 node_modules
 data
+.git
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
 *.zip
 .DS_Store
 npm-debug.log
+server_py/e2e_test.py

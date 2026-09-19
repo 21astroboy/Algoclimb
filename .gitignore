@@ -5,9 +5,11 @@
 
 # настоящий банк задач (вопросы + ответы)
 task-bank.js
+task-bank.json
 
 # разборы/объяснения к задачам
 explanations.js
+explanations.json
 
 # тест банка с эталонными ответами
 verify_tasks.js
@@ -20,3 +22,14 @@ node_modules/
 .DS_Store
 *.log
 npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime / деплой
+.env
+algoclimb.pid
+algoclimb.out

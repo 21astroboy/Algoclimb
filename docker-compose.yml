@@ -3,14 +3,19 @@ services:
     build: .
     container_name: algoclimb
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      # Адрес ноутбука в сети вуза — попадёт в QR-код для студентов.
-      # Узнать: macOS — System Settings → Wi-Fi → Details; или `ipconfig getifaddr en0`.
-      # Если не задать, QR покажет внутренний IP контейнера и телефоны не подключатся.
+      # Публичный адрес сервера — попадёт в QR-код и ссылку для студентов.
+      # Напр. PUBLIC_URL=https://algoclimb.example.ru  или  http://203.0.113.10:3000
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      # Альтернатива: только IP/хост (если PUBLIC_URL не задан).
       - HOST_IP=${HOST_IP:-}
-      - PORT=3000
+      # Фиксированный ключ преподавателя (иначе генерируется случайный при старте).
+      - TEACHER_KEY=${TEACHER_KEY:-}
+      # Ротация входных кодов (TOTP): 1 — включить, 0 — выключить.
+      - QR_ROTATION=${QR_ROTATION:-}
+      - QR_INTERVAL=${QR_INTERVAL:-}
     volumes:
-      # База и журналы переживают перезапуск контейнера.
+      # База SQLite и кастомные задачи переживают перезапуск и пересборку контейнера.
       - ./data:/app/data
     restart: unless-stopped
