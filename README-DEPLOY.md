@@ -1,13 +1,25 @@
 # Развёртывание AlgoClimb на VPS
 
-Бэкенд переписан на **FastAPI** (папка `server_py/`). Фронтенд (`public/`) не менялся.
-История сессий хранится в SQLite (`data/algoclimb.db`) и переживает перезапуски.
+Бэкенд — **FastAPI** (папка `backend/`). Фронтенд — статика в `frontend/`.
+Старый Node-бэкенд лежит в `legacy/` (не используется). История сессий хранится в
+SQLite (`backend/data/runtime/algoclimb.db`) и переживает перезапуски.
+
+Структура проекта:
+
+```
+backend/     — FastAPI-приложение (main.py, bank.py, db.py, …)
+  config/    — config.json
+  data/      — банк задач и разборы (+ runtime/: БД, логи)
+frontend/    — HTML-страницы (teacher / student / answers) + vendor/
+legacy/      — старый Node-бэкенд (архив)
+```
 
 ## Что нужно знать про приватные файлы
 
-`task-bank.json` (вопросы + ответы) и `explanations.json` (разборы) **не лежат в Git** —
-они в `.gitignore`, чтобы студенты не нашли ответы. При деплое их нужно скопировать
-на сервер отдельно. Без них приложение запустится, но с демо-банком из 6 задач.
+`backend/data/task-bank.json` (вопросы + ответы) и `backend/data/explanations.json`
+(разборы) **не лежат в Git** — они в `.gitignore`, чтобы студенты не нашли ответы.
+При деплое их нужно скопировать на сервер отдельно. Без них приложение запустится,
+но с демо-банком из 6 задач.
 
 ## Первичная установка (один раз)
 
@@ -20,7 +32,7 @@ git clone https://github.com/21astroboy/Algoclimb.git algoclimb
 cd algoclimb
 
 # 2. Докинуть приватные файлы с рабочей машины (выполнять со своего ноутбука)
-scp task-bank.json explanations.json <user>@<vps>:~/algoclimb/
+scp backend/data/task-bank.json backend/data/explanations.json <user>@<vps>:~/algoclimb/backend/data/
 
 # 3. Настроить окружение
 cp .env.example .env
@@ -41,7 +53,7 @@ TEACHER_KEY=<свой-постоянный-ключ>
 ```
 
 Собирает и стартует приложение в фоне, печатает ключ преподавателя.
-История в `./data` сохраняется между перезапусками и пересборками.
+История в `./backend/data/runtime` сохраняется между перезапусками и пересборками.
 
 Остальные команды:
 
@@ -65,7 +77,7 @@ TEACHER_KEY=<свой-постоянный-ключ>
 
 ```bash
 git pull
-./algoclimb restart      # Docker пересоберёт образ; данные в ./data не тронутся
+./algoclimb restart      # Docker пересоберёт образ; данные в ./backend/data/runtime не тронутся
 ```
 
 ## HTTPS и домен (по желанию)
@@ -88,7 +100,7 @@ algoclimb.example.ru {
 - `TEACHER_KEY` — ключ учителя; не показывайте студентам.
 - `QR_ROTATION=1` включает сменные одноразовые коды входа (TOTP) — код в QR
   меняется каждые `QR_INTERVAL` секунд, повторный вход по старому коду невозможен.
-- Ограничение по сети вуза (IP-allowlist) настраивается в `config.json` → `ipAllowlist`.
+- Ограничение по сети вуза (IP-allowlist) настраивается в `backend/config/config.json` → `ipAllowlist`.
 
 ## Запуск без скрипта
 
@@ -98,7 +110,7 @@ docker compose up -d --build
 
 # или напрямую (Python)
 pip install -r requirements.txt
-python -m uvicorn main:app --app-dir server_py --host 0.0.0.0 --port 3000
+python -m uvicorn main:app --app-dir backend --host 0.0.0.0 --port 3000
 ```
 
 > Только один воркер: состояние игры живёт в памяти процесса. Несколько воркеров

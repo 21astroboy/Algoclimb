@@ -15,13 +15,15 @@ import json
 import random
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+# Каталог бэкенда (backend/). Данные лежат в backend/data/.
+BASE = Path(__file__).resolve().parent
+DATA_DIR = BASE / "data"
 
 
 # ---------------------------------------------------------------- загрузка банка
 def _load_bank_file():
-    priv = ROOT / "task-bank.json"
-    demo = ROOT / "task-bank.example.json"
+    priv = DATA_DIR / "task-bank.json"
+    demo = DATA_DIR / "task-bank.example.json"
     if priv.exists():
         return json.loads(priv.read_text(encoding="utf-8")), "task-bank.json"
     if demo.exists():

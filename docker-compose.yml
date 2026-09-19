@@ -17,5 +17,5 @@ services:
       - QR_INTERVAL=${QR_INTERVAL:-}
     volumes:
       # База SQLite и кастомные задачи переживают перезапуск и пересборку контейнера.
-      - ./data:/app/data
+      - ./backend/data/runtime:/app/backend/data/runtime
     restart: unless-stopped

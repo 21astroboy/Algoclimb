@@ -7,15 +7,15 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Затем код приложения (task-bank.json / explanations.json копируются, если лежат рядом).
+# Затем код приложения (backend/data/task-bank.json и explanations.json копируются, если есть).
 COPY . .
 
-# data/ — том для базы SQLite, чтобы история сессий переживала перезапуск.
-VOLUME ["/app/data"]
+# Том для БД SQLite и логов — история сессий переживает перезапуск и пересборку.
+VOLUME ["/app/backend/data/runtime"]
 
 EXPOSE 3000
 
 # Один воркер обязателен: состояние игры живёт в памяти процесса (asyncio.Lock),
 # несколько воркеров рассинхронизировали бы игру.
-CMD ["python", "-m", "uvicorn", "main:app", "--app-dir", "server_py", \
+CMD ["python", "-m", "uvicorn", "main:app", "--app-dir", "backend", \
      "--host", "0.0.0.0", "--port", "3000"]

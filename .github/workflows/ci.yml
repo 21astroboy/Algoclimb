@@ -40,7 +40,7 @@ jobs:
         run: mypy
 
       - name: Smoke test (без приватного банка)
-        working-directory: server_py
+        working-directory: backend
         run: python -m smoke_test
 
   # ─────────────────────────────── Frontend (public/) ────────────────────

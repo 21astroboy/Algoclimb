@@ -34,17 +34,17 @@ fi
 
 check_bank() {
   # task-bank.json приватный (в .gitignore) — на свежем клоне его может не быть.
-  if [ ! -f task-bank.json ]; then
-    say "⚠  task-bank.json не найден — приложение запустится с демо-банком (6 задач)."
+  if [ ! -f backend/data/task-bank.json ]; then
+    say "⚠  backend/data/task-bank.json не найден — приложение запустится с демо-банком (6 задач)."
     say "   Скопируйте полный банк с рабочей машины, например:"
-    say "     scp task-bank.json explanations.json <user>@<vps>:$(pwd)/"
+    say "     scp backend/data/task-bank.json backend/data/explanations.json <user>@<vps>:$(pwd)/backend/data/"
     say
   fi
 }
 
 up_docker() {
   check_bank
-  mkdir -p data
+  mkdir -p backend/data/runtime
   say "Сборка и запуск (Docker)…"
   $DC up -d --build
   sleep 2
@@ -73,12 +73,12 @@ ensure_venv() {
 up_local() {
   check_bank
   ensure_venv
-  mkdir -p data
+  mkdir -p backend/data/runtime
   if [ -f algoclimb.pid ] && kill -0 "$(cat algoclimb.pid)" 2>/dev/null; then
     die "Уже запущено (PID $(cat algoclimb.pid)). Сначала ./algoclimb down."
   fi
   say "Запуск (локальный Python)…"
-  PORT="$PORT" nohup "$VENV/bin/python" -m uvicorn main:app --app-dir server_py \
+  PORT="$PORT" nohup "$VENV/bin/python" -m uvicorn main:app --app-dir backend \
       --host 0.0.0.0 --port "$PORT" > algoclimb.out 2>&1 &
   echo $! > algoclimb.pid
   sleep 3
