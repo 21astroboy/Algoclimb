@@ -34,7 +34,14 @@ PROJECT = BASE.parent  # корень проекта
 PUBLIC = PROJECT / "frontend"  # статика (было public/)
 
 # ---------------------------------------------------------------- конфиг + env
-config = json.loads((BASE / "config" / "config.json").read_text(encoding="utf-8"))
+# CONFIG_PATH — явный путь к config.json (для деплоя удобно подложить свой).
+# Если реального config.json нет — берём config.example.json из репозитория.
+_config_path = Path(
+    (os.environ.get("CONFIG_PATH") or "").strip() or (BASE / "config" / "config.json")
+)
+if not _config_path.exists():
+    _config_path = BASE / "config" / "config.example.json"
+config = json.loads(_config_path.read_text(encoding="utf-8"))
 config.setdefault("qrRotation", {})
 config.setdefault("debug", {"enabled": False})
 config.setdefault("ipAllowlist", {"enabled": False, "cidrs": []})
@@ -67,11 +74,25 @@ def gen_key():
 TEACHER_KEY = (os.environ.get("TEACHER_KEY") or config.get("teacherKey") or "").strip() or gen_key()
 sec = Security(config)
 
-# Объяснения к задачам (после игры). Экспортируются из explanations.js в JSON.
-try:
-    EXPLAIN = json.loads((BASE / "data" / "explanations.json").read_text(encoding="utf-8"))
-except Exception:
-    EXPLAIN = {}
+
+# Объяснения к задачам (после игры). Приватный файл — подкладывается так же, как банк:
+# EXPLANATIONS_PATH → secrets/explanations.json → backend/data/explanations.json. Нет файла — {}.
+def _explanations_candidates():
+    env = (os.environ.get("EXPLANATIONS_PATH") or "").strip()
+    if env:
+        yield Path(env)
+    yield PROJECT / "secrets" / "explanations.json"
+    yield BASE / "data" / "explanations.json"
+
+
+EXPLAIN = {}
+for _ep in _explanations_candidates():
+    try:
+        if _ep.exists():
+            EXPLAIN = json.loads(_ep.read_text(encoding="utf-8"))
+            break
+    except Exception:
+        EXPLAIN = {}
 
 CUSTOM_FILE = BASE / "data" / "runtime" / "custom-tasks.json"
 

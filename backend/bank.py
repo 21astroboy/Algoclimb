@@ -12,26 +12,45 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 from pathlib import Path
 
-# Каталог бэкенда (backend/). Данные лежат в backend/data/.
+# Каталог бэкенда (backend/) и корень проекта. В Docker WORKDIR=/app, поэтому
+# PROJECT/secrets соответствует примонтированной папке /app/secrets.
 BASE = Path(__file__).resolve().parent
 DATA_DIR = BASE / "data"
+SECRETS_DIR = BASE.parent / "secrets"
 
 
 # ---------------------------------------------------------------- загрузка банка
+def _bank_candidates():
+    """Где искать банк задач, по приоритету.
+
+    1) TASK_BANK_PATH — явный путь из окружения (перекрывает всё).
+    2) secrets/task-bank.json — единая папка для приватных файлов; сюда их
+       подкладывают при деплое, её же монтирует Docker (/app/secrets). В образ
+       и в Git файл не попадает.
+    3) backend/data/task-bank.json — приватный банк рядом с кодом (back-compat).
+    4) backend/data/task-bank.example.json — демо-банк из репозитория (fallback).
+    """
+    env = (os.environ.get("TASK_BANK_PATH") or "").strip()
+    if env:
+        p = Path(env)
+        yield p, p.name
+    yield SECRETS_DIR / "task-bank.json", "secrets/task-bank.json"
+    yield DATA_DIR / "task-bank.json", "task-bank.json"
+    yield DATA_DIR / "task-bank.example.json", "task-bank.example.json"
+
+
 def _load_bank_file():
-    priv = DATA_DIR / "task-bank.json"
-    demo = DATA_DIR / "task-bank.example.json"
-    if priv.exists():
-        return json.loads(priv.read_text(encoding="utf-8")), "task-bank.json"
-    if demo.exists():
-        return json.loads(demo.read_text(encoding="utf-8")), "task-bank.example.json"
+    for path, label in _bank_candidates():
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8")), label
     raise RuntimeError(
-        "AlgoClimb: не найден банк задач. Ожидается task-bank.json "
-        "(или task-bank.example.json). Сгенерируйте его из Node-банка "
-        "(node export-bank.js) или скопируйте пример."
+        "AlgoClimb: не найден банк задач. Задайте TASK_BANK_PATH, положите "
+        "task-bank.json в backend/data/ (или в примонтированную папку secrets/), "
+        "либо оставьте task-bank.example.json для демо-банка."
     )
 
 

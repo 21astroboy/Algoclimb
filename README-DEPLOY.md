@@ -8,18 +8,27 @@ SQLite (`backend/data/runtime/algoclimb.db`) и переживает перез�
 
 ```
 backend/     — FastAPI-приложение (main.py, bank.py, db.py, …)
-  config/    — config.json
-  data/      — банк задач и разборы (+ runtime/: БД, логи)
+  config/    — config.example.json (шаблон; config.json — не в Git)
+  data/      — демо-банк + runtime/ (БД, логи)
+secrets/     — приватный банк и разборы (монтируются в Docker) — не в Git
 frontend/    — HTML-страницы (teacher / student / answers) + vendor/
 legacy/      — старый Node-бэкенд (архив)
 ```
 
 ## Что нужно знать про приватные файлы
 
-`backend/data/task-bank.json` (вопросы + ответы) и `backend/data/explanations.json`
-(разборы) **не лежат в Git** — они в `.gitignore`, чтобы студенты не нашли ответы.
-При деплое их нужно скопировать на сервер отдельно. Без них приложение запустится,
-но с демо-банком из 6 задач.
+Банк с вопросами и правильными ответами (`task-bank.json`) и разборы
+(`explanations.json`) **не лежат в Git** и **не «вшиваются» в Docker-образ** —
+иначе студенты нашли бы ответы. Их подкладывают отдельно, в папку **`secrets/`**.
+
+`docker-compose.yml` монтирует `./secrets` внутрь контейнера (только чтение) и
+указывает на файлы через переменные `TASK_BANK_PATH` / `EXPLANATIONS_PATH`.
+Бэкенд читает банк именно оттуда. Если файлов нет — приложение запустится с
+демо-банком (`task-bank.example.json`). Пересобирать образ при подмене банка не
+нужно: файлы монтируются на лету, достаточно `./algoclimb restart`.
+
+Подробности и альтернативы (свой путь через `.env`, локальный запуск) —
+в `secrets/README.md`.
 
 ## Первичная установка (один раз)
 
@@ -32,7 +41,7 @@ git clone https://github.com/21astroboy/Algoclimb.git algoclimb
 cd algoclimb
 
 # 2. Докинуть приватные файлы с рабочей машины (выполнять со своего ноутбука)
-scp backend/data/task-bank.json backend/data/explanations.json <user>@<vps>:~/algoclimb/backend/data/
+scp secrets/task-bank.json secrets/explanations.json <user>@<vps>:~/algoclimb/secrets/
 
 # 3. Настроить окружение
 cp .env.example .env

@@ -1,5 +1,10 @@
-# Не тащим в образ лишнее. ВАЖНО: backend/data/task-bank.json и explanations.json
-# НЕ исключаем — они нужны приложению внутри контейнера.
+# Не тащим в образ лишнее.
+# Приватный банк и разборы В ОБРАЗ НЕ ПОПАДАЮТ: они монтируются на лету из ./secrets
+# (см. docker-compose.yml, TASK_BANK_PATH/EXPLANATIONS_PATH).
+secrets
+backend/data/task-bank.json
+backend/data/explanations.json
+
 node_modules
 backend/data/runtime
 .git

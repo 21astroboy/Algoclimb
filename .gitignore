@@ -11,6 +11,14 @@ legacy/task-bank.js
 backend/data/explanations.json
 legacy/explanations.js
 
+# папка для подкладывания приватных файлов при деплое (монтируется в Docker)
+# — коммитим только README, содержимое игнорируем
+secrets/*
+!secrets/README.md
+
+# рабочий config.json преподавателя (в Git — только config.example.json)
+backend/config/config.json
+
 # тест банка с эталонными ответами
 legacy/verify_tasks.js
 

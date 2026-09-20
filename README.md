@@ -12,8 +12,9 @@
 
 ```
 backend/     — FastAPI-приложение (main.py, bank.py, db.py, security.py, analytics.py)
-  config/    — config.json (настройки)
-  data/      — банк задач и разборы (+ runtime/: БД SQLite, логи сессий)
+  config/    — config.example.json (шаблон; свой config.json — не в Git)
+  data/      — демо-банк task-bank.example.json (+ runtime/: БД SQLite, логи сессий)
+secrets/     — приватный банк и разборы (task-bank.json, explanations.json) — не в Git
 frontend/    — HTML-страницы: teacher / student / answers + vendor/ (KaTeX)
 legacy/      — старый Node-бэкенд (server.js, tasks.js…) — архив, не используется
 ```

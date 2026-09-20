@@ -33,13 +33,15 @@ else
 fi
 
 check_bank() {
-  # task-bank.json приватный (в .gitignore) — на свежем клоне его может не быть.
-  if [ ! -f backend/data/task-bank.json ]; then
-    say "⚠  backend/data/task-bank.json не найден — приложение запустится с демо-банком (6 задач)."
-    say "   Скопируйте полный банк с рабочей машины, например:"
-    say "     scp backend/data/task-bank.json backend/data/explanations.json <user>@<vps>:$(pwd)/backend/data/"
-    say
-  fi
+  # Приватный банк (в .gitignore) — на свежем клоне его может не быть.
+  # Ищем в примонтированной папке secrets/ (путь по умолчанию для Docker),
+  # затем рядом с кодом (backend/data). Явный TASK_BANK_PATH тоже учитываем.
+  if [ -n "${TASK_BANK_PATH:-}" ] && [ -f "${TASK_BANK_PATH}" ]; then return; fi
+  if [ -f secrets/task-bank.json ] || [ -f backend/data/task-bank.json ]; then return; fi
+  say "⚠  Приватный банк не найден — приложение запустится с демо-банком."
+  say "   Положите файлы в папку secrets/ (см. secrets/README.md), например:"
+  say "     scp secrets/task-bank.json secrets/explanations.json <user>@<vps>:$(pwd)/secrets/"
+  say
 }
 
 up_docker() {
