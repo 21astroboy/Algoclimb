@@ -13,6 +13,7 @@ AlgoClimb — FastAPI-бэкенд (порт server.js).
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import json
 import os
@@ -210,12 +211,17 @@ class Game:
             import segno
 
             buf = io.BytesIO()
-            # border=4 — стандартная «тихая зона» QR (quiet zone). С border=1
-            # многие камеры/сканеры не фиксируют код, особенно с экрана/проектора.
-            segno.make(self.join_url, error="m").save(
-                buf, kind="svg", xmldeclaration=False, border=4
+            # Растровый PNG, а не SVG: при масштабировании SVG на экране между
+            # модулями появляются тонкие швы (анти-алиасинг) — QR выглядит
+            # «порезанным» и не читается камерой. PNG с border=4 (тихая зона)
+            # и крупным scale даёт чёткие чёрно-белые модули.
+            segno.make(self.join_url, error="m").save(buf, kind="png", scale=12, border=4)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            self.qr_svg = (
+                f'<img src="data:image/png;base64,{b64}" alt="QR" '
+                'style="width:100%;height:100%;display:block;'
+                'image-rendering:pixelated">'
             )
-            self.qr_svg = buf.getvalue().decode("utf-8")
         except Exception as e:
             print("[qr] segno недоступен — на экране будет только ссылка.", e)
 

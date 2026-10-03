@@ -205,6 +205,12 @@
         height: 100%;
         display: block;
       }
+      .qr img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        image-rendering: pixelated;
+      }
       .url {
         font-family: ui-monospace, Menlo, monospace;
         color: var(--accent);
@@ -2857,7 +2863,7 @@
             if (on)
               r += `<rect x="${10 + x * cell}" y="${10 + y * cell}" width="${cell + 0.4}" height="${cell + 0.4}" fill="#08111f"/>`;
           }
-        $('qr').innerHTML = `<svg viewBox="0 0 190 190">${r}</svg>`;
+        $('qr').innerHTML = `<svg viewBox="0 0 190 190" shape-rendering="crispEdges">${r}</svg>`;
       }
       function esc(s) {
         return String(s).replace(
