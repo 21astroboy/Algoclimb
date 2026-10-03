@@ -210,8 +210,10 @@ class Game:
             import segno
 
             buf = io.BytesIO()
+            # border=4 — стандартная «тихая зона» QR (quiet zone). С border=1
+            # многие камеры/сканеры не фиксируют код, особенно с экрана/проектора.
             segno.make(self.join_url, error="m").save(
-                buf, kind="svg", xmldeclaration=False, border=1
+                buf, kind="svg", xmldeclaration=False, border=4
             )
             self.qr_svg = buf.getvalue().decode("utf-8")
         except Exception as e:
