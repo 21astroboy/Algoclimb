@@ -2132,7 +2132,9 @@
         const url = m.joinUrl || `http://${location.host}/`;
         $('url').textContent = url;
         if (m.qrSvg) $('qr').innerHTML = m.qrSvg;
-        else drawQR(url);
+        else
+          $('qr').innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:8px;text-align:center;color:#08111f;font-size:13px;line-height:1.4">QR недоступен —<br>откройте адрес ниже вручную</div>';
         if (m.token) {
           $('token').classList.remove('hidden');
           $('token').textContent = 'Код: ' + m.token;
@@ -2843,28 +2845,6 @@
         };
       }
 
-      /* ---------- QR fallback ---------- */
-      function drawQR(text) {
-        const n = 25,
-          cell = 170 / n;
-        let r = '';
-        let seed = 0;
-        for (const ch of text) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-        function rnd() {
-          seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-          return seed / 0x7fffffff;
-        }
-        for (let y = 0; y < n; y++)
-          for (let x = 0; x < n; x++) {
-            const finder = (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
-            const on = finder
-              ? x % 6 === 0 || y % 6 === 0 || (x > 1 && x < 5 && y > 1 && y < 5)
-              : rnd() > 0.5;
-            if (on)
-              r += `<rect x="${10 + x * cell}" y="${10 + y * cell}" width="${cell + 0.4}" height="${cell + 0.4}" fill="#08111f"/>`;
-          }
-        $('qr').innerHTML = `<svg viewBox="0 0 190 190" shape-rendering="crispEdges">${r}</svg>`;
-      }
       function esc(s) {
         return String(s).replace(
           /[<>&'"]/g,
