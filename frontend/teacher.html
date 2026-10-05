@@ -1006,6 +1006,11 @@
             <button class="chip" data-f="level" data-v="3">ур.3</button>
           </div>
           <div class="bar">
+            <span class="muted" style="align-self: center">Готовые наборы:</span>
+            <button class="chip on" data-f="block" data-v="all">Все задачи</button>
+            <button class="chip" data-f="block" data-v="comb1">Комбинаторика: Блок 1</button>
+          </div>
+          <div class="bar">
             <button class="btn ghost" id="catAll">Выбрать видимые</button>
             <button class="btn ghost" id="catNone">Снять все</button>
             <button class="btn ghost" id="catRand">🎲 Случайно 10 из видимых</button>
@@ -1551,12 +1556,13 @@
       /* ---------- конструктор сессии ---------- */
       let CATALOG = [],
         SELECTED = new Set(),
-        catF = { topic: 'all', type: 'all', level: 'all' },
+        catF = { topic: 'all', type: 'all', level: 'all', block: 'all' },
         catQ = '';
       function catMatch(it) {
         if (catF.topic !== 'all' && it.topic !== catF.topic) return false;
         if (catF.type !== 'all' && it.type !== catF.type) return false;
         if (catF.level !== 'all' && String(it.level) !== catF.level) return false;
+        if (catF.block !== 'all' && it.block !== catF.block) return false;
         if (catQ) {
           const h = (it.title + ' ' + it.prompt + ' ' + it.id).toLowerCase();
           if (!h.includes(catQ)) return false;

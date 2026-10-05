@@ -707,6 +707,7 @@ def catalog_data():
             "topic": t.get("topic"),
             "type": t["type"],
             "level": t.get("level", 1),
+            "block": t.get("block"),
             "custom": bool(t.get("custom")),
         }
         for t in TASKS
