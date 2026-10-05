@@ -1,7 +1,12 @@
-# Не тащим в образ лишнее. ВАЖНО: task-bank.json и explanations.json
-# НЕ исключаем — они нужны приложению внутри контейнера.
+# Не тащим в образ лишнее.
+# Приватный банк и разборы В ОБРАЗ НЕ ПОПАДАЮТ: они монтируются на лету из ./secrets
+# (см. docker-compose.yml, TASK_BANK_PATH/EXPLANATIONS_PATH).
+secrets
+backend/data/task-bank.json
+backend/data/explanations.json
+
 node_modules
-data
+backend/data/runtime
 .git
 __pycache__
 **/__pycache__
@@ -11,9 +16,12 @@ venv
 *.zip
 .DS_Store
 npm-debug.log
-server_py/e2e_test.py
+backend/e2e_test.py
 
-# Инструменты разработки/CI — в рантайме не нужны
+# Легаси Node-бэкенд — в Python-образе не нужен
+legacy
+
+# Фронтенд-тулинг и инструменты разработки/CI — в рантайме не нужны
 .github
 .ruff_cache
 .mypy_cache
@@ -21,4 +29,6 @@ server_py/e2e_test.py
 eslint.config.js
 .prettierrc.json
 .prettierignore
+package.json
 package-lock.json
+pyproject.toml

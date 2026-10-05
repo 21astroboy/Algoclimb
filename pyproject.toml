@@ -1,10 +1,10 @@
-# Конфигурация инструментов качества кода для Python-бэкенда (server_py/).
+# Конфигурация инструментов качества кода для Python-бэкенда (backend/).
 # Ruff — линтер + форматтер (замена flake8/black/isort). mypy — проверка типов.
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["server_py"]
+src = ["backend"]
 
 [tool.ruff.lint]
 # Прагматичный, но строгий набор: ошибки, пуле, импорты, апгрейды синтаксиса,
@@ -24,7 +24,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Тестовый клиент: допускаем блокирующие конструкции и т.п.
-"server_py/e2e_test.py" = ["E402", "F841"]
+"backend/e2e_test.py" = ["E402", "F841"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -32,11 +32,11 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.11"
-files = ["server_py"]
+files = ["backend"]
 # Прагматичный уровень: ловим явные ошибки, но не требуем полной типизации
 # динамичного, построенного на dict игрового состояния.
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
-exclude = ["server_py/e2e_test\\.py$"]
+exclude = ["backend/e2e_test\\.py$"]

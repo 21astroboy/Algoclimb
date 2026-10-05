@@ -524,12 +524,38 @@
       );
 
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${proto}://${location.host}/?role=student`);
-      ws.onmessage = (e) => handle(JSON.parse(e.data));
-      ws.onclose = () => {
-        if (me && !me.done)
-          $('fb').innerHTML = '<span class="no">Соединение потеряно. Обнови страницу.</span>';
-      };
+      // Самовосстанавливающееся соединение: если сокет закрылся или ещё
+      // не открылся в момент нажатия «Войти», кнопка не «проваливается»
+      // молча — заявка запоминается и уходит, как только связь появится.
+      let ws = null;
+      let pendingJoin = null; // {type:'join',...} — отправить при открытии
+      let lastJoin = null; // последняя заявка — для переподключения после входа
+      function connectWS() {
+        ws = new WebSocket(`${proto}://${location.host}/?role=student`);
+        ws.onopen = () => {
+          // после восстановления связи заново регистрируем сокет,
+          // если студент уже входил (иначе сервер не узнает этот сокет).
+          const p = pendingJoin || (me && !me.done ? lastJoin : null);
+          pendingJoin = null;
+          if (p) {
+            try {
+              ws.send(JSON.stringify(p));
+            } catch (e) {}
+          }
+        };
+        ws.onmessage = (e) => handle(JSON.parse(e.data));
+        ws.onerror = () => {
+          try {
+            ws.close();
+          } catch (e) {}
+        };
+        ws.onclose = () => {
+          if (me && me.done) return; // игра закончена — переподключаться не нужно
+          if (me) $('fb').innerHTML = '<span class="no">Связь потеряна, восстанавливаю…</span>';
+          setTimeout(connectWS, 1000); // авто-переподключение
+        };
+      }
+      connectWS();
 
       // Код входа из QR (?t=КОД): подставляем сам, ручной ввод не нужен.
       const urlTok = (new URLSearchParams(location.search).get('t') || '').trim().toUpperCase();
@@ -552,7 +578,22 @@
         }
         if (!joinNonce) await fetchNonce();
         const token = urlTok || $('tok').value.trim().toUpperCase();
-        ws.send(JSON.stringify({ type: 'join', nick, icon, token, nonce: joinNonce }));
+        const payload = { type: 'join', nick, icon, token, nonce: joinNonce };
+        lastJoin = payload;
+        $('joinErr').textContent = '';
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify(payload));
+          } catch (e) {
+            pendingJoin = payload;
+            $('joinErr').textContent = 'Нет связи с сервером, переподключаюсь…';
+            connectWS();
+          }
+        } else {
+          pendingJoin = payload; // уйдёт автоматически при открытии сокета
+          $('joinErr').textContent = 'Подключаюсь к серверу…';
+          if (!ws || ws.readyState === WebSocket.CLOSED) connectWS();
+        }
       };
 
       function handle(m) {

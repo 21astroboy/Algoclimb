@@ -8,18 +8,34 @@
 
 ---
 
+## Структура проекта
+
+```
+backend/     — FastAPI-приложение (main.py, bank.py, db.py, security.py, analytics.py)
+  config/    — config.example.json (шаблон; свой config.json — не в Git)
+  data/      — демо-банк task-bank.example.json (+ runtime/: БД SQLite, логи сессий)
+secrets/     — приватный банк и разборы (task-bank.json, explanations.json) — не в Git
+frontend/    — HTML-страницы: teacher / student / answers + vendor/ (KaTeX)
+legacy/      — старый Node-бэкенд (server.js, tasks.js…) — архив, не используется
+```
+
+Деплой на сервер описан в [README-DEPLOY.md](README-DEPLOY.md).
+
 ## Требования
 
-- **Node.js 22 или новее** (нужен встроенный модуль `node:sqlite` — без него данные пишутся в JSON-файлы как запасной вариант).
-  Проверить: `node --version`. Если меньше 22 — обнови с https://nodejs.org
+- **Python 3.11 или новее** (бэкенд на FastAPI). Проверить: `python3 --version`.
+- Для локального запуска на macOS удобнее двойной клик по **«Запустить AlgoClimb.command»**.
 
 ## Запуск
 
 ```bash
 cd algoclimb
-npm install      # ставит ws + qrcode, нативной сборки нет
-npm start
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn main:app --app-dir backend --host 0.0.0.0 --port 3000
 ```
+
+Либо одной командой (Docker или Python — автоопределение): `./algoclimb up`.
 
 В консоли появятся адреса:
 
@@ -85,10 +101,9 @@ HOST_IP=$(ipconfig getifaddr en0) docker compose up --build
 
 ## Где лежат данные
 
-`algoclimb/data/algoclimb.db` (SQLite) — таблицы `attendance`, `answers`, `results`, `events`, `sessions`.
-Если Node старый и SQLite недоступен — те же данные в `data/*.jsonl`.
+`backend/data/runtime/algoclimb.db` (SQLite) — таблицы `attendance`, `answers`, `results`, `events`, `sessions`.
 
-## Настройки — `config.json`
+## Настройки — `backend/config/config.json`
 
 ```jsonc
 {

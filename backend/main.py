@@ -13,6 +13,7 @@ AlgoClimb — FastAPI-бэкенд (порт server.js).
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import json
 import os
@@ -29,11 +30,19 @@ import db
 from analytics import analytics_sheets, stats_data
 from security import Security, ip_allowed, is_loopback
 
-ROOT = Path(__file__).resolve().parent.parent
-PUBLIC = ROOT / "public"
+BASE = Path(__file__).resolve().parent  # backend/
+PROJECT = BASE.parent  # корень проекта
+PUBLIC = PROJECT / "frontend"  # статика (было public/)
 
 # ---------------------------------------------------------------- конфиг + env
-config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+# CONFIG_PATH — явный путь к config.json (для деплоя удобно подложить свой).
+# Если реального config.json нет — берём config.example.json из репозитория.
+_config_path = Path(
+    (os.environ.get("CONFIG_PATH") or "").strip() or (BASE / "config" / "config.json")
+)
+if not _config_path.exists():
+    _config_path = BASE / "config" / "config.example.json"
+config = json.loads(_config_path.read_text(encoding="utf-8"))
 config.setdefault("qrRotation", {})
 config.setdefault("debug", {"enabled": False})
 config.setdefault("ipAllowlist", {"enabled": False, "cidrs": []})
@@ -66,13 +75,27 @@ def gen_key():
 TEACHER_KEY = (os.environ.get("TEACHER_KEY") or config.get("teacherKey") or "").strip() or gen_key()
 sec = Security(config)
 
-# Объяснения к задачам (после игры). Экспортируются из explanations.js в JSON.
-try:
-    EXPLAIN = json.loads((ROOT / "explanations.json").read_text(encoding="utf-8"))
-except Exception:
-    EXPLAIN = {}
 
-CUSTOM_FILE = ROOT / "data" / "custom-tasks.json"
+# Объяснения к задачам (после игры). Приватный файл — подкладывается так же, как банк:
+# EXPLANATIONS_PATH → secrets/explanations.json → backend/data/explanations.json. Нет файла — {}.
+def _explanations_candidates():
+    env = (os.environ.get("EXPLANATIONS_PATH") or "").strip()
+    if env:
+        yield Path(env)
+    yield PROJECT / "secrets" / "explanations.json"
+    yield BASE / "data" / "explanations.json"
+
+
+EXPLAIN = {}
+for _ep in _explanations_candidates():
+    try:
+        if _ep.exists():
+            EXPLAIN = json.loads(_ep.read_text(encoding="utf-8"))
+            break
+    except Exception:
+        EXPLAIN = {}
+
+CUSTOM_FILE = BASE / "data" / "runtime" / "custom-tasks.json"
 
 
 def time_limit_for(task):
@@ -188,10 +211,17 @@ class Game:
             import segno
 
             buf = io.BytesIO()
-            segno.make(self.join_url, error="m").save(
-                buf, kind="svg", xmldeclaration=False, border=1
+            # Растровый PNG, а не SVG: при масштабировании SVG на экране между
+            # модулями появляются тонкие швы (анти-алиасинг) — QR выглядит
+            # «порезанным» и не читается камерой. PNG с border=4 (тихая зона)
+            # и крупным scale даёт чёткие чёрно-белые модули.
+            segno.make(self.join_url, error="m").save(buf, kind="png", scale=12, border=4)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            self.qr_svg = (
+                f'<img src="data:image/png;base64,{b64}" alt="QR" '
+                'style="width:100%;height:100%;display:block;'
+                'image-rendering:pixelated">'
             )
-            self.qr_svg = buf.getvalue().decode("utf-8")
         except Exception as e:
             print("[qr] segno недоступен — на экране будет только ссылка.", e)
 

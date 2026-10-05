@@ -1,30 +1,16 @@
 # Зависимости и данные
 node_modules/
-data/
 .venv/
 __pycache__/
 
 # Сторонний код (не форматируем)
-public/vendor/
-lib/xlsx-lite.js
+frontend/vendor/
 
-# Легаси Node-бэкенд — заменён на server_py/ (FastAPI), не трогаем
-server.js
-tasks.js
-db.js
-e2e.js
-runtest.js
-min.js
-verify_tasks.js
-explanations.js
-task-bank.js
-task-bank.example.js
+# Легаси Node-бэкенд — заменён на backend/ (FastAPI), не трогаем
+legacy/
 
-# Крупные сгенерированные/приватные данные
-task-bank.json
-task-bank.example.json
-explanations.json
+# Python форматирует Ruff, а не Prettier (включая данные/конфиг бэкенда)
+backend/
+
+# Прочее
 package-lock.json
-
-# Python форматирует Ruff, не Prettier
-server_py/

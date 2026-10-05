@@ -13,8 +13,9 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT / "data"
+# Рантайм-данные (БД, логи сессий) — в backend/data/runtime/ (том Docker).
+BASE = Path(__file__).resolve().parent
+DATA_DIR = BASE / "data" / "runtime"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "algoclimb.db"
 
