@@ -9,7 +9,7 @@
   "demo": { "enabled": true, "count": 10, "onePerType": true },
 
   "_comment_time": "Время на вопрос в секундах: choice — выбор варианта, graph — построение графа.",
-  "timeLimits": { "choice": 15, "graph": 30 },
+  "timeLimits": { "choice": 17, "graph": 30 },
 
   "_comment_scoring": "Очки за верный ответ = base*сложность*minFraction (гарантия) + base*сложность*(1-minFraction)*доля_оставшегося_времени (бонус за скорость) + бонус за серию. streakStep — очки за каждый верный ответ подряд начиная со 2-го, streakMax — потолок бонуса за серию. Неверный/нет ответа = 0 и сброс серии.",
   "scoring": { "base": 100, "minFraction": 0.4, "streakStep": 25, "streakMax": 100 },

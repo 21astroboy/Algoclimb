@@ -609,32 +609,38 @@ class Game:
             if not nick:
                 return await self.send(ws, {"type": "rejected", "reason": "Пустой ник."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)
-            if not dbg and not sec.token_ok(msg.get("token")):
-                return await self.send(
-                    ws,
-                    {
-                        "type": "rejected",
-                        "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
-                    },
-                )
-            if (
-                not dbg
-                and config["qrRotation"].get("enabled")
-                and not sec.consume_nonce(msg.get("nonce"))
-            ):
-                return await self.send(
-                    ws,
-                    {
-                        "type": "rejected",
-                        "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
-                    },
-                )
-            s = self.by_nick.get(nick)
-            if s:
-                if s["kicked"]:
+            existing = self.by_nick.get(nick)
+            # Переподключение уже допущенного ника НЕ требует свежего кода входа.
+            # Код/nonce из QR проверяем только при первом входе — иначе при разрыве
+            # связи (блокировка экрана телефона, смена Wi-Fi, ротация QR) студент
+            # получал бы отказ и вылетал из игры. Состояние (очки, ответы) при
+            # обрыве сокета сохраняется в by_nick, поэтому вернуть его безопасно.
+            is_reconnect = existing is not None and not existing["kicked"]
+            if not dbg and not is_reconnect:
+                if not sec.token_ok(msg.get("token")):
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "rejected",
+                            "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
+                        },
+                    )
+                if config["qrRotation"].get("enabled") and not sec.consume_nonce(
+                    msg.get("nonce")
+                ):
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "rejected",
+                            "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
+                        },
+                    )
+            if existing:
+                if existing["kicked"]:
                     return await self.send(
                         ws, {"type": "rejected", "reason": "Вас удалили из сессии."}
                     )
+                s = existing
                 self.students[ws] = s
             else:
                 if self.session["status"] != "lobby":
@@ -666,8 +672,14 @@ class Game:
                     "status": self.session["status"],
                 },
             )
-            if self.session["status"] == "running" and not self.intermission:
+            if self.session["status"] == "running":
+                # Всегда возвращаем текущий вопрос (в т.ч. при переподключении),
+                # чтобы вернувшийся студент не завис на экране лобби. Если идёт
+                # пауза между вопросами — следом шлём roundover, чтобы показать
+                # «итоги/следующий вопрос», а не живой таймер.
                 await self.send_current_task(s, ws)
+                if self.intermission:
+                    await self.send(ws, {"type": "roundover"})
             await self.broadcast_teacher()
             return
 
