@@ -1214,6 +1214,29 @@
 
       <!-- RESULTS -->
       <section id="resultsView" class="hidden">
+        <div class="card" id="gradesCard" style="display: none; margin-bottom: 16px">
+          <div class="row spread">
+            <h2 class="s">Выгрузка в Google Sheets</h2>
+            <div class="row">
+              <button
+                class="btn ghost"
+                id="gradesPreviewBtn"
+                title="Показать, что будет записано, ничего не меняя">
+                👁 Предпросмотр
+              </button>
+              <button
+                class="btn primary"
+                id="gradesCommitBtn"
+                title="Записать баллы на лист «Оценки»">
+                ⬆ Выгрузить в Оценки
+              </button>
+            </div>
+          </div>
+          <div id="gradesReport" class="muted" style="margin-top: 10px; font-size: 13px">
+            Участникам будет записано 2 балла в новый столбец «Algoclimb №n» на листе «Оценки».
+            Начните с предпросмотра.
+          </div>
+        </div>
         <div class="card">
           <div class="row spread">
             <h2 class="s">Итоги сессии</h2>
@@ -1520,6 +1543,24 @@
       $('finishBtn').onclick = () => ws.send(JSON.stringify({ type: 'finish' }));
       $('resetBtn').onclick = () => {
         if (confirm('Сбросить сессию и лобби?')) ws.send(JSON.stringify({ type: 'reset' }));
+      };
+      // Выгрузка баллов в Google Sheets: сперва предпросмотр (dryRun), затем запись.
+      function setGradesBusy(busy) {
+        $('gradesPreviewBtn').disabled = busy;
+        $('gradesCommitBtn').disabled = busy;
+      }
+      $('gradesPreviewBtn').onclick = () => {
+        if (!(ws && ws.readyState === 1)) return;
+        setGradesBusy(true);
+        $('gradesReport').textContent = 'Проверяю таблицу…';
+        ws.send(JSON.stringify({ type: 'exportGrades', dryRun: true }));
+      };
+      $('gradesCommitBtn').onclick = () => {
+        if (!(ws && ws.readyState === 1)) return;
+        if (!confirm('Записать баллы участникам на лист «Оценки»?')) return;
+        setGradesBusy(true);
+        $('gradesReport').textContent = 'Записываю в таблицу…';
+        ws.send(JSON.stringify({ type: 'exportGrades', dryRun: false }));
       };
       // Управление раундом на лету: пауза/продолжение, +время, пропуск.
       $('pauseBtn').onclick = () => {
@@ -2105,6 +2146,10 @@
           if (!m.ok) alert('Не удалось очистить: ' + (m.error || ''));
           return;
         }
+        if (m.type === 'gradesExport') {
+          onGradesExport(m);
+          return;
+        }
         if (m.type !== 'state') return;
         state = m;
         TOTAL = m.session.total || TOTAL;
@@ -2282,8 +2327,41 @@
       }
 
       /* ---------- results ---------- */
+      function onGradesExport(m) {
+        $('gradesPreviewBtn').disabled = false;
+        $('gradesCommitBtn').disabled = false;
+        const box = $('gradesReport');
+        if (!m.ok) {
+          box.innerHTML = `<span style="color:var(--bad,#e23)">Ошибка: ${esc(m.error || 'неизвестно')}</span>`;
+          return;
+        }
+        const r = m.report || {};
+        const nMatched = (r.matched || []).length;
+        const unmatched = r.unmatched || [];
+        const head = m.dryRun
+          ? `Предпросмотр: столбец <b>${esc(r.column)}</b>, заголовок «<b>${esc(r.header)}</b>». Будет записано ${r.points} балла — участников: <b>${nMatched}</b>.`
+          : `✅ Записано: столбец <b>${esc(r.column)}</b> «<b>${esc(r.header)}</b>», баллов проставлено: <b>${nMatched}</b>.`;
+        let warn = '';
+        if (unmatched.length) {
+          const items = unmatched
+            .map((u) => {
+              const why =
+                u.reason === 'no_login_in_sheet'
+                  ? 'нет логина в «Данные для входа»'
+                  : 'не найдена строка в «Оценки»';
+              return `<li>${esc(u.login)}${u.fio ? ' (' + esc(u.fio) + ')' : ''} — ${why}</li>`;
+            })
+            .join('');
+          warn = `<div style="margin-top:8px;color:var(--warn,#c80)">Не сопоставлены (${unmatched.length}):<ul style="margin:4px 0 0 18px">${items}</ul></div>`;
+        }
+        const tableName = r.spreadsheetTitle ? ` · таблица «${esc(r.spreadsheetTitle)}»` : '';
+        box.innerHTML = `<div>${head} Поток ${esc(String(r.stream))}${tableName}.</div>${warn}`;
+      }
+
       function renderResults(m) {
         clearInterval(timerInt);
+        // Карточка выгрузки в Google Sheets — на реальных сессиях (не тест).
+        $('gradesCard').style.display = m.test ? 'none' : '';
         const rows = m.leaderboard;
         const totalQ = m.roundTotal || TOTAL;
         $('resMeta').textContent = `${rows.length} участников · ${totalQ} вопросов`;

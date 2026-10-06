@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 
 import bank
 import db
+import gsheets
 from analytics import analytics_sheets, stats_data
 from security import Security, ip_allowed, is_loopback
 
@@ -46,6 +47,7 @@ config = json.loads(_config_path.read_text(encoding="utf-8"))
 config.setdefault("qrRotation", {})
 config.setdefault("debug", {"enabled": False})
 config.setdefault("ipAllowlist", {"enabled": False, "cidrs": []})
+config.setdefault("gsheets", {"enabled": False})
 if os.environ.get("QR_ROTATION") == "1":
     config["qrRotation"]["enabled"] = True
 if os.environ.get("QR_ROTATION") == "0":
@@ -56,6 +58,10 @@ if os.environ.get("DEBUG") == "1":
     config["debug"]["enabled"] = True
 if os.environ.get("DEBUG") == "0":
     config["debug"]["enabled"] = False
+if os.environ.get("GSHEETS") == "1":
+    config["gsheets"]["enabled"] = True
+if os.environ.get("GSHEETS") == "0":
+    config["gsheets"]["enabled"] = False
 
 PORT = int(os.environ.get("PORT") or config.get("port", 3000))
 HOST_IP = (os.environ.get("HOST_IP") or "").strip()
@@ -943,6 +949,34 @@ class Game:
                 except Exception:
                     pass
                 await self.broadcast_teacher()
+            return
+        if t == "exportGrades":
+            gcfg = config.get("gsheets") or {}
+            if not gcfg.get("enabled"):
+                return await self.send(
+                    ws,
+                    {
+                        "type": "gradesExport",
+                        "ok": False,
+                        "error": "Выгрузка в Google Sheets выключена (gsheets.enabled).",
+                    },
+                )
+            logins = [s["nick"] for s in self.by_nick.values() if not s["kicked"]]
+            if not logins:
+                return await self.send(
+                    ws,
+                    {"type": "gradesExport", "ok": False, "error": "Нет участников для выгрузки."},
+                )
+            dry = msg.get("dryRun", True) is not False  # по умолчанию «предпросмотр»
+            try:
+                report = await asyncio.to_thread(
+                    gsheets.export_grades, gcfg, self.current_stream, logins, dry
+                )
+                await self.send(
+                    ws, {"type": "gradesExport", "ok": True, "dryRun": dry, "report": report}
+                )
+            except Exception as e:
+                await self.send(ws, {"type": "gradesExport", "ok": False, "error": str(e)})
             return
         if t == "reset":
             self._cancel_timers()
