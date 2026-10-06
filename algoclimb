@@ -81,7 +81,7 @@ up_local() {
   fi
   say "Запуск (локальный Python)…"
   PORT="$PORT" nohup "$VENV/bin/python" -m uvicorn main:app --app-dir backend \
-      --host 0.0.0.0 --port "$PORT" > algoclimb.out 2>&1 &
+      --host 0.0.0.0 --port "$PORT" --ws wsproto > algoclimb.out 2>&1 &
   echo $! > algoclimb.pid
   sleep 3
   grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' algoclimb.out | tail -1 | sed 's/.*: /🔑 Ключ преподавателя: /' || true
