@@ -22,7 +22,7 @@ import socket
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 import bank
@@ -1012,7 +1012,69 @@ game = Game()
 _BG_TASKS: set[asyncio.Task] = set()
 
 # ================================================================ FastAPI
-app = FastAPI()
+API_DESCRIPTION = """
+**AlgoClimb** — соревновательная викторина по алгоритмам (в духе Kahoot).
+Сервер на FastAPI, состояние игры — в памяти одного процесса (asyncio.Lock),
+поэтому запускать **только один воркер** uvicorn.
+
+Эта страница (`/docs`) описывает HTTP-ручки. Сама игра общается по **WebSocket** —
+их Swagger не рисует, поэтому протокол описан ниже.
+
+---
+
+### Роли и экраны
+| Адрес | Кто | Что |
+|-------|-----|-----|
+| `GET /` | студент | экран игрока (`student.html`) |
+| `GET /teacher` | преподаватель | пульт управления (`teacher.html`), вход по ключу |
+| `GET /answers` | преподаватель | ключ ответов по банку |
+| `GET /debug` | — | лаунчер со ссылками (удобно тестить с одной машины) |
+
+### Ключ преподавателя
+Защищает пульт, ключ ответов и экспорт. Печатается в терминале при старте
+(или задаётся `TEACHER_KEY` / `teacherKey` в конфиге). Студенты его не видят.
+
+---
+
+### WebSocket преподавателя — `ws(s)://<host>/teacher?key=<TEACHER_KEY>`
+После подключения сервер шлёт `answerkey`, `catalog`, `taskTemplates`, затем `state`.
+Команды от преподавателя (JSON-текст):
+
+```jsonc
+{"type":"start", "taskIds":["c1_...","c2_..."], "test":false} // test:true — НЕ писать в БД
+{"type":"next"}        // следующий вопрос
+{"type":"pause"}       // пауза / снятие паузы
+{"type":"reset"}       // сброс в лобби
+{"type":"kick", "nick":"Вася"}   // удалить игрока
+```
+
+### WebSocket студента — `ws(s)://<host>/?role=student`
+```jsonc
+// 1) вход
+{"type":"join", "nick":"Вася", "icon":"🦊", "token":"ABC123", "nonce":"<из /api/nonce>"}
+// 2) сервер отвечает одним из: joined | rejected
+// 3) во время игры сервер шлёт: task | answered | roundover | paused | sessionend
+// 4) ответ на вопрос
+{"type":"answer", "taskId":"c1_...", "payload":{"choice":0}}   // payload зависит от типа задачи
+```
+
+В **debug**-режиме (`DEBUG=1`) вход с localhost не требует `token`/`nonce`.
+При включённой ротации QR нужен свежий `token` (из QR) и одноразовый `nonce` (из `/api/nonce`).
+"""
+
+tags_metadata = [
+    {"name": "Вход и доступ", "description": "Выдача одноразовых nonce, проверка доступа."},
+    {"name": "Экспорт", "description": "Выгрузка аналитики (нужен ключ преподавателя)."},
+    {"name": "Страницы", "description": "HTML-экраны студента, преподавателя и отладки."},
+]
+
+app = FastAPI(
+    title="AlgoClimb API",
+    version="1.0.0",
+    description=API_DESCRIPTION,
+    openapi_tags=tags_metadata,
+    contact={"name": "AlgoClimb"},
+)
 
 
 def client_ip(scope_client, headers):
@@ -1052,7 +1114,27 @@ async def _startup():
 
 
 # ---------------------------------------------------------------- HTTP-маршруты
-@app.get("/api/nonce")
+@app.get(
+    "/api/nonce",
+    tags=["Вход и доступ"],
+    summary="Выдать одноразовый nonce для входа студента",
+    description=(
+        "Возвращает свежий `nonce` (живёт ~2 минуты, сгорает после первого входа) и "
+        "`serverTime` для синхронизации таймеров. Экран студента дёргает это перед `join`. "
+        "Доступ ограничен IP-allowlist'ом (если включён); с localhost в debug — всегда разрешён."
+    ),
+    responses={
+        200: {
+            "description": "Nonce выдан",
+            "content": {
+                "application/json": {
+                    "example": {"nonce": "x7Kq9fLp2mAb", "serverTime": 1738000000000}
+                }
+            },
+        },
+        403: {"description": "Доступ только из сети вуза"},
+    },
+)
 async def api_nonce(request: Request):
     if not ip_allowed(config, client_ip(request.scope.get("client"), request.headers)) and not (
         config["debug"].get("enabled")
@@ -1065,15 +1147,35 @@ async def api_nonce(request: Request):
     )
 
 
-@app.get("/export/analytics.xlsx")
-async def export_xlsx(request: Request):
-    key = (request.query_params.get("key") or "").strip()
-    if key != TEACHER_KEY:
+@app.get(
+    "/export/analytics.xlsx",
+    tags=["Экспорт"],
+    summary="Выгрузить аналитику в Excel (.xlsx)",
+    description=(
+        "Отдаёт файл аналитики за занятие. Нужен `key` — ключ преподавателя. "
+        "Необязательный `stream` фильтрует по номеру потока."
+    ),
+    responses={
+        200: {
+            "description": "XLSX-файл",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            },
+        },
+        403: {"description": "Нужен ключ преподавателя"},
+        500: {"description": "Ошибка экспорта"},
+    },
+)
+async def export_xlsx(
+    key: str = Query("", description="Ключ преподавателя"),
+    stream: str | None = Query(None, description="Номер потока (необязательно)"),
+):
+    if key.strip() != TEACHER_KEY:
         return PlainTextResponse("Нужен ключ преподавателя", status_code=403)
     try:
         from analytics import build_xlsx
 
-        buf = build_xlsx(analytics_sheets(request.query_params.get("stream"), AC))
+        buf = build_xlsx(analytics_sheets(stream, AC))
         fname = f"algoclimb-аналитика-{time.strftime('%Y-%m-%d')}.xlsx"
         from urllib.parse import quote
 
@@ -1086,7 +1188,16 @@ async def export_xlsx(request: Request):
         return PlainTextResponse("Ошибка экспорта: " + str(e), status_code=500)
 
 
-@app.get("/debug", response_class=HTMLResponse)
+@app.get(
+    "/debug",
+    response_class=HTMLResponse,
+    tags=["Страницы"],
+    summary="Лаунчер отладки",
+    description=(
+        "HTML со ссылками на экраны студента/преподавателя/ключа ответов. "
+        "При `DEBUG=1` и заходе с localhost показывает ключ преподавателя."
+    ),
+)
 async def debug_page(request: Request):
     ip = client_ip(request.scope.get("client"), request.headers)
     show_key = bool(config["debug"].get("enabled") and is_loopback(ip))
@@ -1165,22 +1276,37 @@ def _serve(rel):
     )
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["Страницы"],
+    summary="Экран студента",
+    description="HTML экрана игрока (`student.html`). Дальше общение идёт по WebSocket `/`.",
+)
 async def root_page():
     return _serve("student.html")
 
 
-@app.get("/teacher")
+@app.get(
+    "/teacher",
+    tags=["Страницы"],
+    summary="Пульт преподавателя",
+    description="HTML пульта (`teacher.html`). Управление идёт по WebSocket `/teacher?key=...`.",
+)
 async def teacher_page():
     return _serve("teacher.html")
 
 
-@app.get("/answers")
+@app.get(
+    "/answers",
+    tags=["Страницы"],
+    summary="Ключ ответов",
+    description="HTML со списком правильных ответов по банку задач (`answers.html`).",
+)
 async def answers_page():
     return _serve("answers.html")
 
 
-@app.get("/{path:path}")
+@app.get("/{path:path}", include_in_schema=False)
 async def static_files(path: str):
     return _serve(path)
 
