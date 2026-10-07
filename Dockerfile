@@ -17,5 +17,8 @@ EXPOSE 3000
 
 # Один воркер обязателен: состояние игры живёт в памяти процесса (asyncio.Lock),
 # несколько воркеров рассинхронизировали бы игру.
+# --ws wsproto: НЕ использовать реализацию websockets (legacy) по умолчанию — под
+# нагрузкой её keepalive-ping падает с AssertionError в _drain_helper и рвёт
+# соединения студентов. wsproto стабилен (проверено нагрузочным тестом на 200 WS).
 CMD ["python", "-m", "uvicorn", "main:app", "--app-dir", "backend", \
-     "--host", "0.0.0.0", "--port", "3000"]
+     "--host", "0.0.0.0", "--port", "3000", "--ws", "wsproto"]

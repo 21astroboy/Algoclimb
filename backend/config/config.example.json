@@ -9,7 +9,7 @@
   "demo": { "enabled": true, "count": 10, "onePerType": true },
 
   "_comment_time": "Время на вопрос в секундах: choice — выбор варианта, graph — построение графа.",
-  "timeLimits": { "choice": 10, "graph": 30 },
+  "timeLimits": { "choice": 17, "graph": 30 },
 
   "_comment_scoring": "Очки за верный ответ = base*сложность*minFraction (гарантия) + base*сложность*(1-minFraction)*доля_оставшегося_времени (бонус за скорость) + бонус за серию. streakStep — очки за каждый верный ответ подряд начиная со 2-го, streakMax — потолок бонуса за серию. Неверный/нет ответа = 0 и сброс серии.",
   "scoring": { "base": 100, "minFraction": 0.4, "streakStep": 25, "streakMax": 100 },
@@ -42,5 +42,27 @@
     "intervalSec": 12,
     "graceWindows": 4,
     "secret": ""
+  },
+
+  "_comment_gsheets": "Выгрузка результатов в Google Sheets (лист «Оценки»). enabled=true — кнопка «Выгрузить в Оценки» на экране преподавателя активна. Сервер заходит в таблицу текущего потока (streams: номер потока → id таблицы из URL /d/<ID>/), по логинам участников находит их строки на листе «Оценки», берёт первый свободный столбец заданий, пишет заголовок columnPrefix+№n (n — авто, по максимуму существующих «Algoclimb №k») и ставит участникам points балла; отсутствующим — ничего, максимальный балл не трогаем. Связь логин→строка: лист «Данные для входа» (login.*: строка заголовка headerRow, столбцы Группа/ФИО/Логин) даёт по логину Группу и полное ФИО; на «Оценках» (grade.*: строка заголовков заданий headerRow, первая строка студентов firstDataRow, столбцы Группа/ФИО, первый столбец заданий firstAssignmentCol) ищем строку по Группе и «Фамилия Имя». serviceAccountFile — путь к JSON-ключу сервисного аккаунта (относительный — от корня проекта, т.е. secrets/). Таблицы нужно расшарить на email сервисного аккаунта с правом редактирования.",
+  "gsheets": {
+    "enabled": false,
+    "serviceAccountFile": "secrets/service-account.json",
+    "points": 2,
+    "columnPrefix": "Algoclimb",
+    "loginSheet": "Данные для входа",
+    "gradeSheet": "Оценки",
+    "streams": {
+      "1": "1aKjabeaI66jFzwdcDzFh4yBGacH_NcyywdgwVuKlwpg",
+      "2": "1pc17iksAi8P9ne1bxLQ7dsmvw27kB9Kn7OX6ipGP5Pw"
+    },
+    "login": { "headerRow": 1, "groupCol": "A", "fioCol": "B", "loginCol": "D" },
+    "grade": {
+      "headerRow": 2,
+      "firstDataRow": 6,
+      "groupCol": "A",
+      "fioCol": "B",
+      "firstAssignmentCol": "F"
+    }
   }
 }

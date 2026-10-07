@@ -20,13 +20,15 @@ import os
 import random
 import socket
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 import bank
 import db
+import gsheets
 from analytics import analytics_sheets, stats_data
 from security import Security, ip_allowed, is_loopback
 
@@ -46,6 +48,7 @@ config = json.loads(_config_path.read_text(encoding="utf-8"))
 config.setdefault("qrRotation", {})
 config.setdefault("debug", {"enabled": False})
 config.setdefault("ipAllowlist", {"enabled": False, "cidrs": []})
+config.setdefault("gsheets", {"enabled": False})
 if os.environ.get("QR_ROTATION") == "1":
     config["qrRotation"]["enabled"] = True
 if os.environ.get("QR_ROTATION") == "0":
@@ -56,6 +59,10 @@ if os.environ.get("DEBUG") == "1":
     config["debug"]["enabled"] = True
 if os.environ.get("DEBUG") == "0":
     config["debug"]["enabled"] = False
+if os.environ.get("GSHEETS") == "1":
+    config["gsheets"]["enabled"] = True
+if os.environ.get("GSHEETS") == "0":
+    config["gsheets"]["enabled"] = False
 
 PORT = int(os.environ.get("PORT") or config.get("port", 3000))
 HOST_IP = (os.environ.get("HOST_IP") or "").strip()
@@ -227,10 +234,25 @@ class Game:
 
     # ---------- рассылки ----------
     async def send(self, ws, msg):
+        # Таймаут обязателен: без него один «залипший» сокет (телефон с плохим
+        # Wi-Fi, забитый TCP-буфер) блокирует отправку под общим game.lock и
+        # подвешивает весь раунд для остальных. 5с — отваливаем медленного.
         try:
-            await ws.send_text(json.dumps(msg, ensure_ascii=False))
+            await asyncio.wait_for(ws.send_text(json.dumps(msg, ensure_ascii=False)), timeout=5)
         except Exception:
             pass
+
+    async def broadcast_students(self, make_msg):
+        # Рассылка всем студентам ПАРАЛЛЕЛЬНО, а не по очереди, чтобы медленный
+        # клиент не тормозил доставку остальным. make_msg(s) -> dict | None.
+        targets = [(ws, s) for ws, s in list(self.students.items()) if not s["kicked"]]
+        coros = []
+        for ws, s in targets:
+            msg = make_msg(s)
+            if msg is not None:
+                coros.append(self.send(ws, msg))
+        if coros:
+            await asyncio.gather(*coros)
 
     def connected_nicks(self):
         return {s["nick"] for s in self.students.values() if not s["kicked"]}
@@ -420,9 +442,13 @@ class Game:
         self.round_deadline = int(time.time() * 1000) + time_limit_for(task)
         self.paused = False
         self.pause_remain = 0
-        for ws, s in list(self.students.items()):
-            if not s["kicked"]:
-                await self.send_current_task(s, ws)
+        await asyncio.gather(
+            *(
+                self.send_current_task(s, ws)
+                for ws, s in list(self.students.items())
+                if not s["kicked"]
+            )
+        )
         if self._timer:
             self._timer.cancel()
         self._schedule("_timer", time_limit_for(task) + 400, lambda: self.end_round("timeout"))
@@ -447,18 +473,16 @@ class Game:
                 }
                 s["streak"] = 0
         self.intermission = True
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
+
+        def _roundover(s):
             a = s["answers"].get(self.round)
-            await self.send(
-                ws,
-                {
-                    "type": "roundover",
-                    "correct": bool(a and a["correct"]),
-                    "answered": bool(a and a["answered"]),
-                },
-            )
+            return {
+                "type": "roundover",
+                "correct": bool(a and a["correct"]),
+                "answered": bool(a and a["answered"]),
+            }
+
+        await self.broadcast_students(_roundover)
         await self.broadcast_teacher()
         self._schedule("_reveal", REVEAL_MS, self._advance)
 
@@ -490,9 +514,7 @@ class Game:
         if self._timer:
             self._timer.cancel()
             self._timer = None
-        for ws, s in list(self.students.items()):
-            if not s["kicked"]:
-                await self.send(ws, {"type": "paused"})
+        await self.broadcast_students(lambda s: {"type": "paused"})
         await self.broadcast_teacher()
 
     async def resume_round(self):
@@ -506,18 +528,14 @@ class Game:
         self.paused = False
         self.round_deadline = int(time.time() * 1000) + self.pause_remain
         self._schedule("_timer", self.pause_remain + 400, lambda: self.end_round("timeout"))
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
-            await self.send(
-                ws,
-                {
-                    "type": "resumed",
-                    "deadline": self.round_deadline,
-                    "serverTime": int(time.time() * 1000),
-                    "limit": time_limit_for(self.order[self.round]),
-                },
-            )
+        await self.broadcast_students(
+            lambda s: {
+                "type": "resumed",
+                "deadline": self.round_deadline,
+                "serverTime": int(time.time() * 1000),
+                "limit": time_limit_for(self.order[self.round]),
+            }
+        )
         await self.broadcast_teacher()
 
     async def skip_round(self):
@@ -563,9 +581,8 @@ class Game:
             db.set_session_status(self.session["id"], "finished")
             for i, r in enumerate(ranked):
                 db.record_result(self.session["id"], r["nick"], 0, 1, r["score"], i + 1)
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
+
+        def _sessionend(s):
             place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
             review = []
             for ri, task in enumerate(self.order):
@@ -582,18 +599,17 @@ class Game:
                         "explain": EXPLAIN.get(task["id"], ""),
                     }
                 )
-            await self.send(
-                ws,
-                {
-                    "type": "sessionend",
-                    "place": place,
-                    "score": s["score"],
-                    "correct": s["correct"],
-                    "total": len(self.order),
-                    "bestStreak": s.get("bestStreak", 0),
-                    "review": review,
-                },
-            )
+            return {
+                "type": "sessionend",
+                "place": place,
+                "score": s["score"],
+                "correct": s["correct"],
+                "total": len(self.order),
+                "bestStreak": s.get("bestStreak", 0),
+                "review": review,
+            }
+
+        await self.broadcast_students(_sessionend)
         await self.broadcast_teacher()
 
     # ---------- обработка сообщений студента ----------
@@ -603,32 +619,36 @@ class Game:
             if not nick:
                 return await self.send(ws, {"type": "rejected", "reason": "Пустой ник."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)
-            if not dbg and not sec.token_ok(msg.get("token")):
-                return await self.send(
-                    ws,
-                    {
-                        "type": "rejected",
-                        "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
-                    },
-                )
-            if (
-                not dbg
-                and config["qrRotation"].get("enabled")
-                and not sec.consume_nonce(msg.get("nonce"))
-            ):
-                return await self.send(
-                    ws,
-                    {
-                        "type": "rejected",
-                        "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
-                    },
-                )
-            s = self.by_nick.get(nick)
-            if s:
-                if s["kicked"]:
+            existing = self.by_nick.get(nick)
+            # Переподключение уже допущенного ника НЕ требует свежего кода входа.
+            # Код/nonce из QR проверяем только при первом входе — иначе при разрыве
+            # связи (блокировка экрана телефона, смена Wi-Fi, ротация QR) студент
+            # получал бы отказ и вылетал из игры. Состояние (очки, ответы) при
+            # обрыве сокета сохраняется в by_nick, поэтому вернуть его безопасно.
+            is_reconnect = existing is not None and not existing["kicked"]
+            if not dbg and not is_reconnect:
+                if not sec.token_ok(msg.get("token")):
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "rejected",
+                            "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
+                        },
+                    )
+                if config["qrRotation"].get("enabled") and not sec.consume_nonce(msg.get("nonce")):
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "rejected",
+                            "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
+                        },
+                    )
+            if existing:
+                if existing["kicked"]:
                     return await self.send(
                         ws, {"type": "rejected", "reason": "Вас удалили из сессии."}
                     )
+                s = existing
                 self.students[ws] = s
             else:
                 if self.session["status"] != "lobby":
@@ -660,8 +680,14 @@ class Game:
                     "status": self.session["status"],
                 },
             )
-            if self.session["status"] == "running" and not self.intermission:
+            if self.session["status"] == "running":
+                # Всегда возвращаем текущий вопрос (в т.ч. при переподключении),
+                # чтобы вернувшийся студент не завис на экране лобби. Если идёт
+                # пауза между вопросами — следом шлём roundover, чтобы показать
+                # «итоги/следующий вопрос», а не живой таймер.
                 await self.send_current_task(s, ws)
+                if self.intermission:
+                    await self.send(ws, {"type": "roundover"})
             await self.broadcast_teacher()
             return
 
@@ -944,6 +970,34 @@ class Game:
                     pass
                 await self.broadcast_teacher()
             return
+        if t == "exportGrades":
+            gcfg = config.get("gsheets") or {}
+            if not gcfg.get("enabled"):
+                return await self.send(
+                    ws,
+                    {
+                        "type": "gradesExport",
+                        "ok": False,
+                        "error": "Выгрузка в Google Sheets выключена (gsheets.enabled).",
+                    },
+                )
+            logins = [s["nick"] for s in self.by_nick.values() if not s["kicked"]]
+            if not logins:
+                return await self.send(
+                    ws,
+                    {"type": "gradesExport", "ok": False, "error": "Нет участников для выгрузки."},
+                )
+            dry = msg.get("dryRun", True) is not False  # по умолчанию «предпросмотр»
+            try:
+                report = await asyncio.to_thread(
+                    gsheets.export_grades, gcfg, self.current_stream, logins, dry
+                )
+                await self.send(
+                    ws, {"type": "gradesExport", "ok": True, "dryRun": dry, "report": report}
+                )
+            except Exception as e:
+                await self.send(ws, {"type": "gradesExport", "ok": False, "error": str(e)})
+            return
         if t == "reset":
             self._cancel_timers()
             self.session = {"id": None, "status": "lobby", "test": False}
@@ -966,18 +1020,66 @@ game = Game()
 _BG_TASKS: set[asyncio.Task] = set()
 
 # ================================================================ FastAPI
-app = FastAPI()
+API_DESCRIPTION = """
+**AlgoClimb** — соревновательная викторина по алгоритмам (в духе Kahoot).
+Сервер на FastAPI, состояние игры — в памяти одного процесса (asyncio.Lock),
+поэтому запускать **только один воркер** uvicorn.
+
+Эта страница (`/docs`) описывает HTTP-ручки. Сама игра общается по **WebSocket** —
+их Swagger не рисует, поэтому протокол описан ниже.
+
+---
+
+### Роли и экраны
+| Адрес | Кто | Что |
+|-------|-----|-----|
+| `GET /` | студент | экран игрока (`student.html`) |
+| `GET /teacher` | преподаватель | пульт управления (`teacher.html`), вход по ключу |
+| `GET /answers` | преподаватель | ключ ответов по банку |
+| `GET /debug` | — | лаунчер со ссылками (удобно тестить с одной машины) |
+
+### Ключ преподавателя
+Защищает пульт, ключ ответов и экспорт. Печатается в терминале при старте
+(или задаётся `TEACHER_KEY` / `teacherKey` в конфиге). Студенты его не видят.
+
+---
+
+### WebSocket преподавателя — `ws(s)://<host>/teacher?key=<TEACHER_KEY>`
+После подключения сервер шлёт `answerkey`, `catalog`, `taskTemplates`, затем `state`.
+Команды от преподавателя (JSON-текст):
+
+```jsonc
+{"type":"start", "taskIds":["c1_...","c2_..."], "test":false} // test:true — НЕ писать в БД
+{"type":"next"}        // следующий вопрос
+{"type":"pause"}       // пауза / снятие паузы
+{"type":"reset"}       // сброс в лобби
+{"type":"kick", "nick":"Вася"}   // удалить игрока
+```
+
+### WebSocket студента — `ws(s)://<host>/?role=student`
+```jsonc
+// 1) вход
+{"type":"join", "nick":"Вася", "icon":"🦊", "token":"ABC123", "nonce":"<из /api/nonce>"}
+// 2) сервер отвечает одним из: joined | rejected
+// 3) во время игры сервер шлёт: task | answered | roundover | paused | sessionend
+// 4) ответ на вопрос
+{"type":"answer", "taskId":"c1_...", "payload":{"choice":0}}   // payload зависит от типа задачи
+```
+
+В **debug**-режиме (`DEBUG=1`) вход с localhost не требует `token`/`nonce`.
+При включённой ротации QR нужен свежий `token` (из QR) и одноразовый `nonce` (из `/api/nonce`).
+"""
+
+tags_metadata = [
+    {"name": "Вход и доступ", "description": "Выдача одноразовых nonce, проверка доступа."},
+    {"name": "Экспорт", "description": "Выгрузка аналитики (нужен ключ преподавателя)."},
+    {"name": "Страницы", "description": "HTML-экраны студента, преподавателя и отладки."},
+]
 
 
-def client_ip(scope_client, headers):
-    xff = headers.get("x-forwarded-for", "")
-    if xff:
-        return xff.split(",")[0].strip().replace("::ffff:", "")
-    return (scope_client[0] if scope_client else "").replace("::ffff:", "")
-
-
-@app.on_event("startup")
-async def _startup():
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Старт: печатаем адреса/ключ и поднимаем фоновые задачи (ротация QR, чистка nonce).
     game.build_qr()
     print(f"\n  AlgoClimb (FastAPI) запущен · хранилище: {db.backend} · банк: {bank.BANK_SOURCE}")
     print(
@@ -1004,9 +1106,60 @@ async def _startup():
         _BG_TASKS.add(asyncio.create_task(qr_loop()))
     _BG_TASKS.add(asyncio.create_task(nonce_loop()))
 
+    yield
+
+    # Остановка: гасим фоновые задачи, чтобы не висли при перезапуске.
+    for t in _BG_TASKS:
+        t.cancel()
+    _BG_TASKS.clear()
+
+
+# Swagger (/docs, /redoc, /openapi.json) показываем только в debug-режиме или при
+# явном DOCS=1 — чтобы на реальном занятии студенты не видели описание API.
+_show_docs = config["debug"].get("enabled") or os.environ.get("DOCS") == "1"
+
+app = FastAPI(
+    title="AlgoClimb API",
+    version="1.0.0",
+    description=API_DESCRIPTION,
+    openapi_tags=tags_metadata,
+    contact={"name": "AlgoClimb"},
+    lifespan=lifespan,
+    docs_url="/docs" if _show_docs else None,
+    redoc_url="/redoc" if _show_docs else None,
+    openapi_url="/openapi.json" if _show_docs else None,
+)
+
+
+def client_ip(scope_client, headers):
+    xff = headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip().replace("::ffff:", "")
+    return (scope_client[0] if scope_client else "").replace("::ffff:", "")
+
 
 # ---------------------------------------------------------------- HTTP-маршруты
-@app.get("/api/nonce")
+@app.get(
+    "/api/nonce",
+    tags=["Вход и доступ"],
+    summary="Выдать одноразовый nonce для входа студента",
+    description=(
+        "Возвращает свежий `nonce` (живёт ~2 минуты, сгорает после первого входа) и "
+        "`serverTime` для синхронизации таймеров. Экран студента дёргает это перед `join`. "
+        "Доступ ограничен IP-allowlist'ом (если включён); с localhost в debug — всегда разрешён."
+    ),
+    responses={
+        200: {
+            "description": "Nonce выдан",
+            "content": {
+                "application/json": {
+                    "example": {"nonce": "x7Kq9fLp2mAb", "serverTime": 1738000000000}
+                }
+            },
+        },
+        403: {"description": "Доступ только из сети вуза"},
+    },
+)
 async def api_nonce(request: Request):
     if not ip_allowed(config, client_ip(request.scope.get("client"), request.headers)) and not (
         config["debug"].get("enabled")
@@ -1019,15 +1172,33 @@ async def api_nonce(request: Request):
     )
 
 
-@app.get("/export/analytics.xlsx")
-async def export_xlsx(request: Request):
-    key = (request.query_params.get("key") or "").strip()
-    if key != TEACHER_KEY:
+@app.get(
+    "/export/analytics.xlsx",
+    tags=["Экспорт"],
+    summary="Выгрузить аналитику в Excel (.xlsx)",
+    description=(
+        "Отдаёт файл аналитики за занятие. Нужен `key` — ключ преподавателя. "
+        "Необязательный `stream` фильтрует по номеру потока."
+    ),
+    responses={
+        200: {
+            "description": "XLSX-файл",
+            "content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}},
+        },
+        403: {"description": "Нужен ключ преподавателя"},
+        500: {"description": "Ошибка экспорта"},
+    },
+)
+async def export_xlsx(
+    key: str = Query("", description="Ключ преподавателя"),
+    stream: str | None = Query(None, description="Номер потока (необязательно)"),
+):
+    if key.strip() != TEACHER_KEY:
         return PlainTextResponse("Нужен ключ преподавателя", status_code=403)
     try:
         from analytics import build_xlsx
 
-        buf = build_xlsx(analytics_sheets(request.query_params.get("stream"), AC))
+        buf = build_xlsx(analytics_sheets(stream, AC))
         fname = f"algoclimb-аналитика-{time.strftime('%Y-%m-%d')}.xlsx"
         from urllib.parse import quote
 
@@ -1040,7 +1211,16 @@ async def export_xlsx(request: Request):
         return PlainTextResponse("Ошибка экспорта: " + str(e), status_code=500)
 
 
-@app.get("/debug", response_class=HTMLResponse)
+@app.get(
+    "/debug",
+    response_class=HTMLResponse,
+    tags=["Страницы"],
+    summary="Лаунчер отладки",
+    description=(
+        "HTML со ссылками на экраны студента/преподавателя/ключа ответов. "
+        "При `DEBUG=1` и заходе с localhost показывает ключ преподавателя."
+    ),
+)
 async def debug_page(request: Request):
     ip = client_ip(request.scope.get("client"), request.headers)
     show_key = bool(config["debug"].get("enabled") and is_loopback(ip))
@@ -1119,22 +1299,37 @@ def _serve(rel):
     )
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["Страницы"],
+    summary="Экран студента",
+    description="HTML экрана игрока (`student.html`). Дальше общение идёт по WebSocket `/`.",
+)
 async def root_page():
     return _serve("student.html")
 
 
-@app.get("/teacher")
+@app.get(
+    "/teacher",
+    tags=["Страницы"],
+    summary="Пульт преподавателя",
+    description="HTML пульта (`teacher.html`). Управление идёт по WebSocket `/teacher?key=...`.",
+)
 async def teacher_page():
     return _serve("teacher.html")
 
 
-@app.get("/answers")
+@app.get(
+    "/answers",
+    tags=["Страницы"],
+    summary="Ключ ответов",
+    description="HTML со списком правильных ответов по банку задач (`answers.html`).",
+)
 async def answers_page():
     return _serve("answers.html")
 
 
-@app.get("/{path:path}")
+@app.get("/{path:path}", include_in_schema=False)
 async def static_files(path: str):
     return _serve(path)
 

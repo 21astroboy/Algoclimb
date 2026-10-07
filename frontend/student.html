@@ -724,12 +724,16 @@
         ).join('');
         $('prompt').textContent = m.task.prompt;
         mathify($('prompt'));
-        startTimer();
+        // Сначала рисуем поля ответа, потом запускаем таймер: если раунд пришёл уже
+        // почти истёкшим (после паузы/переподключения), первый тик таймера должен
+        // блокировать реальные кнопки и показать «Время вышло», а не оставлять
+        // «живые» на вид, но мёртвые по клику элементы.
         if (m.task.type === 'choice') renderChoice(m.task);
         else if (m.task.type === 'graph') renderGraph(m.task);
         else if (m.task.type === 'order') renderOrder(m.task);
         else if (m.task.type === 'sort') renderSort(m.task);
         else if (m.task.type === 'blank') renderBlank(m.task);
+        startTimer();
       }
 
       function lockInputs() {
