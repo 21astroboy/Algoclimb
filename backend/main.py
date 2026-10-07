@@ -102,6 +102,11 @@ for _ep in _explanations_candidates():
         EXPLAIN = {}
 
 CUSTOM_FILE = BASE / "data" / "runtime" / "custom-tasks.json"
+# Снимок состояния живой сессии (ростер, очки, текущий вопрос, фаза). Лежит в
+# примонтированном runtime/ — переживает краш/перезапуск/пересборку контейнера.
+# Пишется периодически во время игры; при старте процесс восстанавливает сессию,
+# чтобы падение посреди пары не обнуляло занятие в пустое лобби.
+SNAPSHOT_FILE = BASE / "data" / "runtime" / "session-state.json"
 
 
 def time_limit_for(task):
@@ -180,6 +185,97 @@ class Game:
             )
         except Exception as e:
             print("Не удалось сохранить пользовательские задачи:", e)
+
+    # ---------- снимок состояния сессии (анти-краш) ----------
+    def _is_active(self):
+        # Сессию стоит хранить, пока есть участники или идёт игра. Пустое лобби
+        # (после reset) — хранить нечего, снимок удаляем.
+        return self.session["status"] == "running" or bool(self.by_nick)
+
+    def snapshot_dict(self):
+        # Только сериализуемые поля: без ws-сокетов, таймеров и asyncio-объектов.
+        # by_nick/order восстанавливают очки, ответы и сам набор задач (с учётом
+        # параметризации), round_* — текущий вопрос и дедлайн.
+        return {
+            "v": 1,
+            "savedAt": int(time.time() * 1000),
+            "current_stream": self.current_stream,
+            "session": self.session,
+            "by_nick": self.by_nick,
+            "order": self.order,
+            "round": self.round,
+            "round_deadline": self.round_deadline,
+            "round_perm": self.round_perm,
+            "round_answered": list(self.round_answered),
+            "intermission": self.intermission,
+            "paused": self.paused,
+            "pause_remain": self.pause_remain,
+        }
+
+    def save_snapshot(self):
+        # Пишем атомарно (temp + replace), чтобы краш в момент записи не оставил
+        # битый файл. Любая ошибка не должна ронять игру — молча пропускаем.
+        try:
+            if not self._is_active():
+                SNAPSHOT_FILE.unlink(missing_ok=True)
+                return
+            SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp = SNAPSHOT_FILE.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(self.snapshot_dict(), ensure_ascii=False), encoding="utf-8")
+            tmp.replace(SNAPSHOT_FILE)
+        except Exception as e:
+            print("Не удалось сохранить снимок сессии:", e)
+
+    def load_snapshot(self):
+        # Восстанавливаем состояние из снимка при старте процесса. Возвращаем True,
+        # если восстановлена идущая игра (нужно досоздать таймер раунда в lifespan).
+        try:
+            if not SNAPSHOT_FILE.exists():
+                return False
+            data = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or data.get("v") != 1:
+                return False
+            self.current_stream = data.get("current_stream", self.current_stream)
+            self.session = data.get("session") or {"id": None, "status": "lobby", "test": False}
+            # JSON приводит целочисленные ключи answers к строкам — возвращаем int.
+            by_nick = {}
+            for nick, s in (data.get("by_nick") or {}).items():
+                ans = s.get("answers") or {}
+                s["answers"] = {int(k): v for k, v in ans.items()}
+                by_nick[nick] = s
+            self.by_nick = by_nick
+            self.order = data.get("order") or []
+            self.round = data.get("round", -1)
+            self.round_deadline = data.get("round_deadline", 0)
+            self.round_perm = data.get("round_perm")
+            self.round_answered = set(data.get("round_answered") or [])
+            self.intermission = bool(data.get("intermission"))
+            self.paused = bool(data.get("paused"))
+            self.pause_remain = data.get("pause_remain", 0)
+            n = len(self.by_nick)
+            print(f"  Восстановлена сессия: статус={self.session['status']}, участников={n}")
+            return self.session["status"] == "running"
+        except Exception as e:
+            print("Не удалось восстановить снимок сессии:", e)
+            return False
+
+    async def reschedule_after_restore(self):
+        # После восстановления идущей игры досоздаём таймер раунда с учётом уже
+        # прошедшего времени. На паузе таймера нет (его вернёт resume).
+        async with self.lock:
+            if (
+                self.session["status"] != "running"
+                or self.round < 0
+                or self.round >= len(self.order)
+            ):
+                return
+            if self.paused:
+                return
+            if self.intermission:
+                self._schedule("_reveal", REVEAL_MS, self._advance)
+                return
+            remain = self.round_deadline - int(time.time() * 1000)
+            self._schedule("_timer", max(0, remain) + 400, lambda: self.end_round("timeout"))
 
     # ---------- отбор задач ----------
     def select_tasks(self):
@@ -1009,13 +1105,17 @@ class Game:
             self.intermission = False
             self.paused = False
             self.pause_remain = 0
+            self.save_snapshot()  # лобби пустое — снимок удалится
             await self.broadcast_teacher()
             return
 
 
 game = Game()
+# Восстанавливаем прерванную сессию из снимка (если процесс падал посреди игры).
+_restored_running = game.load_snapshot()
 
-# Фоновые задачи (ротация QR, чистка nonce). Храним ссылки, чтобы их не собрал GC.
+# Фоновые задачи (ротация QR, чистка nonce, снимки состояния). Храним ссылки,
+# чтобы их не собрал GC.
 _BG_TASKS: set[asyncio.Task] = set()
 
 # ================================================================ FastAPI
@@ -1100,17 +1200,37 @@ async def lifespan(_app: FastAPI):
             await asyncio.sleep(60)
             sec.sweep()
 
+    async def snapshot_loop():
+        # Периодически сохраняем состояние живой сессии на диск. Худший случай при
+        # падении — потеря ~2 секунд прогресса. Под game.lock, чтобы снимок был
+        # консистентным (не попал на середину обновления очков).
+        while True:
+            await asyncio.sleep(2)
+            try:
+                async with game.lock:
+                    game.save_snapshot()
+            except Exception:
+                pass
+
+    # Восстановленную игру нужно «дотолкнуть»: досоздать таймер текущего раунда.
+    if _restored_running:
+        await game.reschedule_after_restore()
+
     # Держим ссылки на фоновые задачи, иначе сборщик мусора может их прервать.
     if config["qrRotation"].get("enabled"):
         _BG_TASKS.add(asyncio.create_task(qr_loop()))
     _BG_TASKS.add(asyncio.create_task(nonce_loop()))
+    _BG_TASKS.add(asyncio.create_task(snapshot_loop()))
 
     yield
 
-    # Остановка: гасим фоновые задачи, чтобы не висли при перезапуске.
+    # Остановка: гасим фоновые задачи и сохраняем финальный снимок (на случай
+    # штатного рестарта контейнера посреди игры — поднимемся с того же места).
     for t in _BG_TASKS:
         t.cancel()
     _BG_TASKS.clear()
+    async with game.lock:
+        game.save_snapshot()
 
 
 # Swagger (/docs, /redoc, /openapi.json) показываем только в debug-режиме или при
@@ -1135,6 +1255,14 @@ def client_ip(scope_client, headers):
     if xff:
         return xff.split(",")[0].strip().replace("::ffff:", "")
     return (scope_client[0] if scope_client else "").replace("::ffff:", "")
+
+
+@app.get("/healthz", include_in_schema=False)
+async def healthz():
+    # Лёгкая проверка живости для Docker healthcheck. Отвечает, только если
+    # event loop обрабатывает запросы — «зависший» процесс сюда не ответит,
+    # и контейнер будет помечен unhealthy (перезапуск — через autoheal).
+    return PlainTextResponse("ok")
 
 
 # ---------------------------------------------------------------- HTTP-маршруты
