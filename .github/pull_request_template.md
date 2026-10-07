@@ -1,16 +1,16 @@
-## Что меняется
+## What changes
 
-<!-- Кратко: что и зачем. Если есть связанный issue — укажи (#номер). -->
+<!-- Briefly: what and why. If there is a related issue, link it (#number). -->
 
-## Как проверить
+## How to test
 
-<!-- Шаги для ревьюера: что запустить, на что посмотреть. -->
+<!-- Steps for the reviewer: what to run, what to look at. -->
 
-## Чек-лист
+## Checklist
 
-- [ ] Прогнал локально: `ruff check . && ruff format --check .`
-- [ ] Прогнал `mypy`
-- [ ] Прогнал `cd backend && python -m smoke_test`
-- [ ] Прогнал `npm run lint` (если менял фронтенд)
-- [ ] Обновил README / конфиг, если менял поведение или переменные окружения
-- [ ] Нет приватных данных в диффе (банк ответов, ключи, `.env`, `service-account.json`)
+- [ ] Ran locally: `ruff check . && ruff format --check .`
+- [ ] Ran `mypy`
+- [ ] Ran `cd backend && python -m smoke_test`
+- [ ] Ran `npm run lint` (if the frontend changed)
+- [ ] Updated README / config if behavior or environment variables changed
+- [ ] No private data in the diff (answer bank, keys, `.env`, `service-account.json`)
