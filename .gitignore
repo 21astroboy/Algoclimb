@@ -5,11 +5,9 @@
 
 # настоящий банк задач (вопросы + ответы)
 backend/data/task-bank.json
-legacy/task-bank.js
 
 # разборы/объяснения к задачам
 backend/data/explanations.json
-legacy/explanations.js
 
 # папка для подкладывания приватных файлов при деплое (монтируется в Docker)
 # — коммитим только README, содержимое игнорируем
@@ -18,9 +16,6 @@ secrets/*
 
 # рабочий config.json преподавателя (в Git — только config.example.json)
 backend/config/config.json
-
-# тест банка с эталонными ответами
-legacy/verify_tasks.js
 
 # Данные занятий: БД, логи сессий, кастомные задачи преподавателя
 backend/data/runtime/

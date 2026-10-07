@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "description": "Интерактивное приложение для лекций: лобби, интерактивные графы, гора прогресса, посещаемость",
   "type": "commonjs",
-  "main": "legacy/server.js",
   "scripts": {
-    "start:legacy": "node legacy/server.js",
     "lint:js": "eslint \"frontend/**/*.html\"",
     "lint:js:fix": "eslint \"frontend/**/*.html\" --fix",
     "format": "prettier --write \"frontend/**/*.html\"",

@@ -18,9 +18,6 @@ venv
 npm-debug.log
 backend/e2e_test.py
 
-# Легаси Node-бэкенд — в Python-образе не нужен
-legacy
-
 # Фронтенд-тулинг и инструменты разработки/CI — в рантайме не нужны
 .github
 .ruff_cache

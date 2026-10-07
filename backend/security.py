@@ -1,5 +1,5 @@
 """
-Защита входа: TOTP-код (HMAC по окну времени), одноразовые nonce, IP-allowlist.
+Защита входа: TOTP-код (HMAC по окну времени) и одноразовые nonce.
 Точный порт логики из server.js — коды входа совместимы (тот же алгоритм и алфавит).
 """
 
@@ -69,39 +69,7 @@ class Security:
             self._nonces.pop(n, None)
 
 
-# ---------- IP allowlist ----------
-def _ip_to_int(ip):
-    p = ip.replace("::ffff:", "").split(".")
-    if len(p) != 4:
-        return None
-    try:
-        q = [int(x) for x in p]
-    except ValueError:
-        return None
-    if any(x < 0 or x > 255 for x in q):
-        return None
-    return (q[0] << 24) + (q[1] << 16) + (q[2] << 8) + q[3]
-
-
-def _in_cidr(ip, cidr):
-    net, bits_s = cidr.split("/")
-    bits = int(bits_s)
-    a, b = _ip_to_int(ip), _ip_to_int(net)
-    if a is None or b is None:
-        return False
-    mask = 0 if bits == 0 else ((~0 << (32 - bits)) & 0xFFFFFFFF)
-    return (a & mask) == (b & mask)
-
-
+# ---------- loopback (для debug-режима с localhost) ----------
 def is_loopback(ip):
     a = (ip or "").replace("::ffff:", "")
     return a in ("127.0.0.1", "::1", "localhost") or a.startswith("127.")
-
-
-def ip_allowed(config, ip):
-    al = config.get("ipAllowlist", {}) or {}
-    if not al.get("enabled"):
-        return True
-    if ip in ("127.0.0.1", "::1"):
-        return True
-    return any(_in_cidr(ip, c) for c in al.get("cidrs", []))

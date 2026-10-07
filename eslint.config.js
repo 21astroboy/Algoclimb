@@ -1,6 +1,5 @@
 // Плоская конфигурация ESLint (v9) для фронтенда AlgoClimb.
 // Линтим HTML-страницы в frontend/ (структуру и встроенные <script>-скрипты).
-// Легаси Node-бэкенд (legacy/) заменён на backend/ (FastAPI) и не проверяется.
 
 const html = require('@html-eslint/eslint-plugin');
 const htmlParser = require('@html-eslint/parser');
@@ -10,7 +9,6 @@ module.exports = [
     ignores: [
       'node_modules/**',
       'backend/**',
-      'legacy/**', // легаси Node-бэкенд (заменён на backend/)
       'frontend/vendor/**',
     ],
   },
