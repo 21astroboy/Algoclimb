@@ -20,6 +20,7 @@ import os
 import random
 import socket
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
@@ -1076,24 +1077,9 @@ tags_metadata = [
     {"name": "Страницы", "description": "HTML-экраны студента, преподавателя и отладки."},
 ]
 
-app = FastAPI(
-    title="AlgoClimb API",
-    version="1.0.0",
-    description=API_DESCRIPTION,
-    openapi_tags=tags_metadata,
-    contact={"name": "AlgoClimb"},
-)
-
-
-def client_ip(scope_client, headers):
-    xff = headers.get("x-forwarded-for", "")
-    if xff:
-        return xff.split(",")[0].strip().replace("::ffff:", "")
-    return (scope_client[0] if scope_client else "").replace("::ffff:", "")
-
-
-@app.on_event("startup")
-async def _startup():
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Старт: печатаем адреса/ключ и поднимаем фоновые задачи (ротация QR, чистка nonce).
     game.build_qr()
     print(f"\n  AlgoClimb (FastAPI) запущен · хранилище: {db.backend} · банк: {bank.BANK_SOURCE}")
     print(
@@ -1119,6 +1105,30 @@ async def _startup():
     if config["qrRotation"].get("enabled"):
         _BG_TASKS.add(asyncio.create_task(qr_loop()))
     _BG_TASKS.add(asyncio.create_task(nonce_loop()))
+
+    yield
+
+    # Остановка: гасим фоновые задачи, чтобы не висли при перезапуске.
+    for t in _BG_TASKS:
+        t.cancel()
+    _BG_TASKS.clear()
+
+
+app = FastAPI(
+    title="AlgoClimb API",
+    version="1.0.0",
+    description=API_DESCRIPTION,
+    openapi_tags=tags_metadata,
+    contact={"name": "AlgoClimb"},
+    lifespan=lifespan,
+)
+
+
+def client_ip(scope_client, headers):
+    xff = headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip().replace("::ffff:", "")
+    return (scope_client[0] if scope_client else "").replace("::ffff:", "")
 
 
 # ---------------------------------------------------------------- HTTP-маршруты

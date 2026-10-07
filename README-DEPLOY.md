@@ -156,13 +156,42 @@ reverse-proxy (Caddy или nginx), проксируйте на `127.0.0.1:3000`
 разрешите WebSocket** (проброс заголовков `Upgrade`/`Connection`). Затем укажите
 `PUBLIC_URL=https://ваш-домен` в `.env` и `./algoclimb restart`.
 
-Пример для Caddy (`Caddyfile`) — WebSocket он проксирует автоматически:
+Пример для Caddy (`Caddyfile`) — WebSocket он проксирует автоматически и idle-таймаут
+по умолчанию не режет:
 
 ```
 algoclimb.example.ru {
     reverse_proxy 127.0.0.1:3000
 }
 ```
+
+**nginx — обязательно поднимите таймауты!** По умолчанию nginx рвёт соединение после
+60 секунд тишины (`proxy_read_timeout`), а между вопросами и в лобби WebSocket как раз
+«молчит» — отсюда массовые отвалы студентов. Увеличьте таймауты и пробросьте заголовки
+`Upgrade`/`Connection`:
+
+```nginx
+server {
+    server_name algoclimb.example.ru;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Держим WebSocket живым во время занятия (по умолчанию было 60s):
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+    }
+}
+```
+
+Если reverse-proxy нет и студенты заходят прямо на `http://IP:3000` — таймаут не грозит,
+прокси просто отсутствует. На всякий случай студенческая страница сама переподключается
+при обрыве и восстанавливает состояние (очки/ответы сохраняются на сервере).
 
 ## Безопасность входа
 
