@@ -283,17 +283,8 @@ npm run lint                               # фронтенд (ESLint + Prettier
 Хуки `pre-commit` (`.pre-commit-config.yaml`) ловят часть проблем ещё до коммита:
 `pip install pre-commit && pre-commit install`.
 
-### Защита ветки `main` (настроить на GitHub один раз)
-
-**Settings → Branches → Add branch ruleset** (или *Add rule*) для `main`:
-
-- ✅ **Require a pull request before merging** — прямой push запрещён.
-- ✅ **Require status checks to pass** → отметь все три джоба CI (Python, Frontend, Docker).
-- ✅ **Require branches to be up to date before merging**.
-- Approvals можно оставить **0** — ты единственный мейнтейнер и свой PR не апрувишь.
-  Если появится второй разработчик — подними требование до 1 аппрува.
-
-После этого смёржить в прод можно только зелёный PR из ветки.
+Ветка `main` защищена на GitHub: прямой push закрыт, смёржить можно только PR с зелёным CI.
+Сервер деплоится с `main`, так что в прод попадает только то, что прошло проверки.
 
 ## Нагрузочный тест
 
