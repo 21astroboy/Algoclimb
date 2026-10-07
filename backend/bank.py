@@ -593,7 +593,7 @@ def build_custom_task(spec):
         spec.get("id")
         or ("custom_" + str(int(time.time() * 1000)) + "_" + str(random.randint(0, 999)))
     )
-    topic = spec.get("topic") if spec.get("topic") in ("asd", "graphs") else "graphs"
+    topic = (str(spec.get("topic")).strip() if spec.get("topic") is not None else "") or None
     try:
         level = int(spec.get("level"))
     except (TypeError, ValueError):

@@ -276,11 +276,7 @@
 
       <input type="search" id="q" placeholder="Поиск по названию, условию или ответу…" />
       <div class="filters" id="filters">
-        <button class="chip on" data-f="all">Все</button>
-        <button class="chip" data-f="asd">АиСД</button>
-        <button class="chip" data-f="graphs">Графы</button>
-        <button class="chip" data-f="choice">Выбор</button>
-        <button class="chip" data-f="graph">Построение</button>
+        <button class="chip on" data-kind="all" data-val="all">Все</button>
       </div>
       <div class="count" id="count"></div>
       <div id="list"></div>
@@ -290,8 +286,41 @@
       const $ = (id) => document.getElementById(id);
       let items = [],
         curId = null,
-        filter = 'all',
+        fKind = 'all',
+        fVal = 'all',
         query = '';
+      // Темы и типы задаёт сам банк. Для демо-банка — красивые подписи,
+      // для любого другого предмета подпись = значение из банка.
+      const TOPIC_LABELS = { asd: 'АиСД', graphs: 'Графы' };
+      const TYPE_LABELS = {
+        choice: 'Выбор',
+        graph: 'Построение',
+        order: 'Обход',
+        sort: 'Сортировка',
+        blank: 'Пропуски',
+      };
+      const topicLabel = (t) => TOPIC_LABELS[t] || t || '';
+      function uniqSorted(vals) {
+        return [...new Set(vals.filter((v) => v != null && v !== ''))].sort();
+      }
+      function buildFilters() {
+        const topics = uniqSorted(items.map((it) => it.topic));
+        const types = uniqSorted(items.map((it) => it.type));
+        const html = [
+          `<button class="chip${fKind === 'all' ? ' on' : ''}" data-kind="all" data-val="all">Все</button>`,
+        ];
+        topics.forEach((t) =>
+          html.push(
+            `<button class="chip${fKind === 'topic' && fVal === t ? ' on' : ''}" data-kind="topic" data-val="${esc(t)}">${esc(topicLabel(t))}</button>`
+          )
+        );
+        types.forEach((t) =>
+          html.push(
+            `<button class="chip${fKind === 'type' && fVal === t ? ' on' : ''}" data-kind="type" data-val="${esc(t)}">${esc(TYPE_LABELS[t] || t)}</button>`
+          )
+        );
+        $('filters').innerHTML = html.join('');
+      }
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const KEY_STORE = 'algoclimb_tkey';
       let ws = null;
@@ -316,6 +345,7 @@
           } catch {}
           if (m.type === 'answerkey') {
             items = m.items || [];
+            buildFilters();
             render();
           }
           if (m.type === 'state') {
@@ -361,16 +391,17 @@
       $('filters').onclick = (e) => {
         const b = e.target.closest('.chip');
         if (!b) return;
-        filter = b.dataset.f;
-        document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c === b));
+        fKind = b.dataset.kind;
+        fVal = b.dataset.val;
+        $('filters')
+          .querySelectorAll('.chip')
+          .forEach((c) => c.classList.toggle('on', c === b));
         render();
       };
 
       function matches(it) {
-        if (filter === 'asd' && it.topic !== 'asd') return false;
-        if (filter === 'graphs' && it.topic !== 'graphs') return false;
-        if (filter === 'choice' && it.type !== 'choice') return false;
-        if (filter === 'graph' && it.type !== 'graph') return false;
+        if (fKind === 'topic' && it.topic !== fVal) return false;
+        if (fKind === 'type' && it.type !== fVal) return false;
         if (query) {
           const hay = (it.title + ' ' + it.prompt + ' ' + it.answer + ' ' + it.id).toLowerCase();
           if (!hay.includes(query)) return false;
@@ -390,10 +421,9 @@
                   sort: '<span class="badge g">сортировка</span>',
                   blank: '<span class="badge g">пропуски</span>',
                 }[it.type] || '<span class="badge">выбор</span>';
-              const to =
-                it.topic === 'asd'
-                  ? '<span class="badge">АиСД</span>'
-                  : '<span class="badge">графы</span>';
+              const to = it.topic
+                ? '<span class="badge">' + esc(topicLabel(it.topic)) + '</span>'
+                : '';
               return `<div class="item ${it.id === curId ? 'cur' : ''}" data-id="${it.id}">
       <div class="top"><span class="ttl">${esc(it.title)}</span> ${tp} ${to}
         <span class="badge">ур. ${it.level}</span></div>
