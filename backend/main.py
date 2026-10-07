@@ -233,10 +233,25 @@ class Game:
 
     # ---------- рассылки ----------
     async def send(self, ws, msg):
+        # Таймаут обязателен: без него один «залипший» сокет (телефон с плохим
+        # Wi-Fi, забитый TCP-буфер) блокирует отправку под общим game.lock и
+        # подвешивает весь раунд для остальных. 5с — отваливаем медленного.
         try:
-            await ws.send_text(json.dumps(msg, ensure_ascii=False))
+            await asyncio.wait_for(ws.send_text(json.dumps(msg, ensure_ascii=False)), timeout=5)
         except Exception:
             pass
+
+    async def broadcast_students(self, make_msg):
+        # Рассылка всем студентам ПАРАЛЛЕЛЬНО, а не по очереди, чтобы медленный
+        # клиент не тормозил доставку остальным. make_msg(s) -> dict | None.
+        targets = [(ws, s) for ws, s in list(self.students.items()) if not s["kicked"]]
+        coros = []
+        for ws, s in targets:
+            msg = make_msg(s)
+            if msg is not None:
+                coros.append(self.send(ws, msg))
+        if coros:
+            await asyncio.gather(*coros)
 
     def connected_nicks(self):
         return {s["nick"] for s in self.students.values() if not s["kicked"]}
@@ -426,9 +441,13 @@ class Game:
         self.round_deadline = int(time.time() * 1000) + time_limit_for(task)
         self.paused = False
         self.pause_remain = 0
-        for ws, s in list(self.students.items()):
-            if not s["kicked"]:
-                await self.send_current_task(s, ws)
+        await asyncio.gather(
+            *(
+                self.send_current_task(s, ws)
+                for ws, s in list(self.students.items())
+                if not s["kicked"]
+            )
+        )
         if self._timer:
             self._timer.cancel()
         self._schedule("_timer", time_limit_for(task) + 400, lambda: self.end_round("timeout"))
@@ -453,18 +472,16 @@ class Game:
                 }
                 s["streak"] = 0
         self.intermission = True
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
+
+        def _roundover(s):
             a = s["answers"].get(self.round)
-            await self.send(
-                ws,
-                {
-                    "type": "roundover",
-                    "correct": bool(a and a["correct"]),
-                    "answered": bool(a and a["answered"]),
-                },
-            )
+            return {
+                "type": "roundover",
+                "correct": bool(a and a["correct"]),
+                "answered": bool(a and a["answered"]),
+            }
+
+        await self.broadcast_students(_roundover)
         await self.broadcast_teacher()
         self._schedule("_reveal", REVEAL_MS, self._advance)
 
@@ -496,9 +513,7 @@ class Game:
         if self._timer:
             self._timer.cancel()
             self._timer = None
-        for ws, s in list(self.students.items()):
-            if not s["kicked"]:
-                await self.send(ws, {"type": "paused"})
+        await self.broadcast_students(lambda s: {"type": "paused"})
         await self.broadcast_teacher()
 
     async def resume_round(self):
@@ -512,18 +527,14 @@ class Game:
         self.paused = False
         self.round_deadline = int(time.time() * 1000) + self.pause_remain
         self._schedule("_timer", self.pause_remain + 400, lambda: self.end_round("timeout"))
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
-            await self.send(
-                ws,
-                {
-                    "type": "resumed",
-                    "deadline": self.round_deadline,
-                    "serverTime": int(time.time() * 1000),
-                    "limit": time_limit_for(self.order[self.round]),
-                },
-            )
+        await self.broadcast_students(
+            lambda s: {
+                "type": "resumed",
+                "deadline": self.round_deadline,
+                "serverTime": int(time.time() * 1000),
+                "limit": time_limit_for(self.order[self.round]),
+            }
+        )
         await self.broadcast_teacher()
 
     async def skip_round(self):
@@ -569,9 +580,7 @@ class Game:
             db.set_session_status(self.session["id"], "finished")
             for i, r in enumerate(ranked):
                 db.record_result(self.session["id"], r["nick"], 0, 1, r["score"], i + 1)
-        for ws, s in list(self.students.items()):
-            if s["kicked"]:
-                continue
+        def _sessionend(s):
             place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
             review = []
             for ri, task in enumerate(self.order):
@@ -588,18 +597,17 @@ class Game:
                         "explain": EXPLAIN.get(task["id"], ""),
                     }
                 )
-            await self.send(
-                ws,
-                {
-                    "type": "sessionend",
-                    "place": place,
-                    "score": s["score"],
-                    "correct": s["correct"],
-                    "total": len(self.order),
-                    "bestStreak": s.get("bestStreak", 0),
-                    "review": review,
-                },
-            )
+            return {
+                "type": "sessionend",
+                "place": place,
+                "score": s["score"],
+                "correct": s["correct"],
+                "total": len(self.order),
+                "bestStreak": s.get("bestStreak", 0),
+                "review": review,
+            }
+
+        await self.broadcast_students(_sessionend)
         await self.broadcast_teacher()
 
     # ---------- обработка сообщений студента ----------
