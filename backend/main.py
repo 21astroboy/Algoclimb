@@ -6,8 +6,8 @@ AlgoClimb — FastAPI-бэкенд (порт server.js).
 Протокол WebSocket/HTTP полностью совпадает с Node-версией, поэтому фронтенд
 (public/) используется без изменений.
 
-Запуск:  uvicorn server_py.main:app --host 0.0.0.0 --port 3000
-         (или через ./algoclimb — см. README-DEPLOY.md)
+Запуск:  uvicorn main:app --app-dir backend --host 0.0.0.0 --port 3000
+         (или через ./algoclimb — см. README.md)
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import bank
 import db
 import gsheets
 from analytics import analytics_sheets, stats_data
-from security import Security, ip_allowed, is_loopback
+from security import Security, is_loopback
 
 BASE = Path(__file__).resolve().parent  # backend/
 PROJECT = BASE.parent  # корень проекта
@@ -47,7 +47,6 @@ if not _config_path.exists():
 config = json.loads(_config_path.read_text(encoding="utf-8"))
 config.setdefault("qrRotation", {})
 config.setdefault("debug", {"enabled": False})
-config.setdefault("ipAllowlist", {"enabled": False, "cidrs": []})
 config.setdefault("gsheets", {"enabled": False})
 if os.environ.get("QR_ROTATION") == "1":
     config["qrRotation"]["enabled"] = True
@@ -1145,8 +1144,7 @@ def client_ip(scope_client, headers):
     summary="Выдать одноразовый nonce для входа студента",
     description=(
         "Возвращает свежий `nonce` (живёт ~2 минуты, сгорает после первого входа) и "
-        "`serverTime` для синхронизации таймеров. Экран студента дёргает это перед `join`. "
-        "Доступ ограничен IP-allowlist'ом (если включён); с localhost в debug — всегда разрешён."
+        "`serverTime` для синхронизации таймеров. Экран студента дёргает это перед `join`."
     ),
     responses={
         200: {
@@ -1157,15 +1155,9 @@ def client_ip(scope_client, headers):
                 }
             },
         },
-        403: {"description": "Доступ только из сети вуза"},
     },
 )
 async def api_nonce(request: Request):
-    if not ip_allowed(config, client_ip(request.scope.get("client"), request.headers)) and not (
-        config["debug"].get("enabled")
-        and is_loopback(client_ip(request.scope.get("client"), request.headers))
-    ):
-        return PlainTextResponse("Доступ только из сети вуза", status_code=403)
     return JSONResponse(
         {"nonce": sec.issue_nonce(), "serverTime": int(time.time() * 1000)},
         headers={"Cache-Control": "no-store"},
@@ -1368,16 +1360,6 @@ async def teacher_ws(ws: WebSocket):
 async def student_ws(ws: WebSocket):
     await ws.accept()
     ip = client_ip(ws.scope.get("client"), ws.headers)
-    if (
-        config["ipAllowlist"].get("enabled")
-        and not ip_allowed(config, ip)
-        and not (config["debug"].get("enabled") and is_loopback(ip))
-    ):
-        await game.send(
-            ws, {"type": "rejected", "reason": "Подключение разрешено только из сети вуза."}
-        )
-        await ws.close()
-        return
     try:
         while True:
             raw = await ws.receive_text()

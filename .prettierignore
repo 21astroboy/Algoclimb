@@ -6,9 +6,6 @@ __pycache__/
 # Сторонний код (не форматируем)
 frontend/vendor/
 
-# Легаси Node-бэкенд — заменён на backend/ (FastAPI), не трогаем
-legacy/
-
 # Python форматирует Ruff, а не Prettier (включая данные/конфиг бэкенда)
 backend/
 
