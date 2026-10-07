@@ -913,8 +913,6 @@
           Algo
           <b>Climb</b>
         </div>
-        <span class="tag" id="dot">подключение…</span>
-        <span class="tag" id="streamTag"></span>
         <span
           class="tag hidden"
           id="testTag"
@@ -1461,12 +1459,10 @@
           `${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`
         );
         ws.onopen = () => {
-          $('dot').textContent = 'в сети';
           reconnectDelay = 1000;
         };
         ws.onclose = () => {
           if (wasRejected) return; // неверный ключ — не переподключаемся
-          $('dot').textContent = 'переподключение…';
           // автоматическое восстановление сессии: состояние целиком на сервере,
           // при возврате связи сервер пришлёт текущий state и мы продолжим с того же места.
           clearTimeout(reconnectTimer);
@@ -2196,7 +2192,6 @@
         if (m.type !== 'state') return;
         state = m;
         TOTAL = m.session.total || TOTAL;
-        $('streamTag').textContent = 'Поток ' + m.session.stream;
         if (m.session.stream != null) setStreamUI(m.session.stream);
         const st = m.session.status;
         $('startBtn').classList.toggle('hidden', st !== 'lobby');

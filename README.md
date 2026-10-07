@@ -1,42 +1,82 @@
 # AlgoClimb
 
-AlgoClimb — самостоятельно размещаемое веб-приложение для синхронных интерактивных опросов
-на лекциях. Весь класс отвечает на один вопрос одновременно: студенты подключаются по
-QR-коду и отвечают с телефонов, а на экране преподавателя в реальном времени отображаются
-лобби, прогресс и лидерборд. По завершении сессии доступен разбор заданий.
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/21astroboy/Algoclimb/actions/workflows/ci.yml/badge.svg)](https://github.com/21astroboy/Algoclimb/actions/workflows/ci.yml)
 
-Приложение не привязано к конкретному предмету. Преподаватель подкладывает **свой банк
-заданий** (JSON) и проводит опросы по программированию, базам данных, алгоритмам, теории
-графов или любой другой дисциплине. Темы, уровни сложности, наборы и разборы задаются прямо
-в банке — интерфейс строит фильтры из того, что в нём есть. В комплект входит небольшой
-демо-банк, чтобы попробовать приложение без собственных данных.
+AlgoClimb is a self-hosted web app for synchronous, interactive in-class quizzes. The whole
+class answers one question at the same time: students join via a QR code and answer from their
+phones, while the teacher's screen shows the lobby, live progress, and a leaderboard in real
+time. When the session ends, students get per-task explanations.
 
-Бэкенд построен на **FastAPI** (один процесс `uvicorn`, состояние сессии хранится в памяти).
-Фронтенд — статические HTML-страницы. История сессий сохраняется в SQLite и переживает
-перезапуски.
+The app is not tied to any subject. The teacher supplies **their own task bank** (JSON) and
+runs quizzes on programming, databases, algorithms, graph theory, or any other discipline.
+Topics, difficulty levels, sets, and explanations are declared right in the bank — the UI
+builds its filters from whatever it finds there. A small demo bank is included so you can try
+the app without your own data.
 
-## Архитектура
+The backend is built on **FastAPI** (a single `uvicorn` process; session state is kept in
+memory). The frontend is static HTML pages. Session history is stored in SQLite and survives
+restarts.
+
+## Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Screenshots](#screenshots)
+- [Project structure](#project-structure)
+- [Session flow](#session-flow)
+- [Task bank](#task-bank)
+- [Quick start (local)](#quick-start-local)
+- [Screens](#screens)
+- [API](#api)
+- [Deployment (VPS)](#deployment-vps)
+- [Grade export](#grade-export)
+- [Configuration](#configuration)
+- [Author and license](#author-and-license)
+
+## Features
+
+- **Subject-agnostic.** Drop in your own JSON task bank and quiz any discipline; the UI builds
+  topic, type, level, and set filters from the bank's contents.
+- **Synchronous play.** The whole class answers the same question at once, with a per-question
+  timer, one attempt per question, and shuffled options each round.
+- **Real-time teacher view.** Live lobby, progress, answered counter, leaderboard, and
+  tab-switch flags over WebSocket.
+- **Resilient connections.** Clients reconnect automatically after a drop and restore their
+  state from the server.
+- **Five question types.** `choice` and `blank` work for any subject; `graph`, `order`, and
+  `sort` are built for algorithms and graph theory.
+- **Scoring with streak bonus.** Points follow `base × difficulty × speed`, with a bonus for
+  streaks of correct answers.
+- **Private answer keys.** The bank with correct answers is mounted from `secrets/` and never
+  ships in the repository or the Docker image.
+- **Persistent history.** Attendance, answers, and results are written to SQLite and survive
+  restarts and rebuilds.
+- **One-command deploy.** `./algoclimb up` auto-detects Docker or Python and starts the app.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph clients["Клиенты"]
-        S["Студенты<br/>браузер телефона"]
-        T["Преподаватель<br/>/teacher"]
-        A["Ключ ответов<br/>/answers"]
+    subgraph clients["Clients"]
+        S["Students<br/>phone browser"]
+        T["Teacher<br/>/teacher"]
+        A["Answer key<br/>/answers"]
     end
 
-    RP["Reverse-proxy<br/>Caddy / nginx<br/>HTTPS + WebSocket"]
+    RP["Reverse proxy<br/>Caddy / nginx<br/>HTTPS + WebSocket"]
 
-    subgraph server["VPS — один воркер uvicorn"]
+    subgraph server["VPS — single uvicorn worker"]
         APP["FastAPI — main.py<br/>WebSocket + HTTP"]
-        BANK["bank.py<br/>загрузка банка задач"]
-        SEC["security.py<br/>ключ, TOTP, nonce"]
-        AN["analytics.py<br/>статистика сессий"]
-        GS["gsheets.py<br/>выгрузка оценок"]
+        BANK["bank.py<br/>task-bank loading"]
+        SEC["security.py<br/>key, TOTP, nonce"]
+        AN["analytics.py<br/>session statistics"]
+        GS["gsheets.py<br/>grade export"]
     end
 
     DB[("SQLite<br/>backend/data/runtime")]
-    SECRETS[/"secrets (монтируется)<br/>task-bank.json<br/>explanations.json<br/>service-account.json"/]
+    SECRETS[/"secrets (mounted)<br/>task-bank.json<br/>explanations.json<br/>service-account.json"/]
     SHEETS["Google Sheets"]
 
     S <-->|WebSocket| RP
@@ -47,124 +87,133 @@ flowchart LR
     APP --> SEC
     APP --> AN
     APP --> GS
-    BANK -.читает.-> SECRETS
-    APP -->|"сессии, ответы,<br/>посещаемость"| DB
+    BANK -.reads.-> SECRETS
+    APP -->|"sessions, answers,<br/>attendance"| DB
     GS --> SHEETS
 ```
 
-Обмен с клиентами идёт по WebSocket; при разрыве соединения страница переподключается и
-восстанавливает состояние с сервера. Банк вопросов с правильными ответами читается из
-примонтированной папки `secrets/` и не входит ни в репозиторий, ни в Docker-образ.
+Clients talk to the server over WebSocket; on a dropped connection the page reconnects and
+restores its state from the server. The question bank with correct answers is read from the
+mounted `secrets/` folder and is not part of the repository or the Docker image.
 
-> **Важно:** воркер должен быть ровно один — состояние сессии хранится в памяти процесса.
-> Запуск с `--workers` не поддерживается.
+> **Important:** there must be exactly one worker — session state lives in the process memory.
+> Running with `--workers` is not supported.
 
-## Структура проекта
+## Screenshots
+
+> Place the images under `docs/` with the names below (PNG or GIF). Until you add them, these
+> links will render as broken image placeholders.
+
+| Teacher screen | Student screen |
+|----------------|----------------|
+| ![Teacher screen](docs/screenshot-teacher.png) | ![Student screen](docs/screenshot-student.png) |
+
+## Project structure
 
 ```
-backend/     FastAPI-приложение
-  main.py      WebSocket-сессия + HTTP-маршруты
-  bank.py      загрузка банка задач (с откатом на демо-банк)
-  db.py        слой SQLite (attendance, answers, results, events, sessions)
-  security.py  ключ преподавателя, TOTP-коды, одноразовые nonce
-  analytics.py статистика по сессиям и задачам
-  gsheets.py   выгрузка оценок в Google Sheets
-  config/      config.example.json — шаблон конфигурации
-  data/        демо-банк + runtime/ (БД SQLite, логи сессий)
+backend/     FastAPI application
+  main.py      WebSocket session + HTTP routes
+  bank.py      task-bank loading (falls back to the demo bank)
+  db.py        SQLite layer (attendance, answers, results, events, sessions)
+  security.py  teacher key, TOTP codes, one-time nonces
+  analytics.py per-session and per-task statistics
+  gsheets.py   grade export to Google Sheets
+  config/      config.example.json — configuration template
+  data/        demo bank + runtime/ (SQLite DB, session logs)
 frontend/    HTML: teacher / student / answers + vendor/ (KaTeX)
-secrets/     приватный банк, разборы, ключ сервисного аккаунта (монтируется)
-tools/       вспомогательные скрипты
+secrets/     private bank, explanations, service-account key (mounted)
+tools/       helper scripts
 ```
 
-## Сценарий сессии
+## Session flow
 
-Модель синхронная: весь класс отвечает на один вопрос одновременно.
+The model is synchronous: the whole class answers one question at the same time.
 
-1. Преподаватель открывает `/teacher` — отображаются QR-код и лобби.
-2. Студенты сканируют QR, вводят ник и выбирают иконку. В этот момент фиксируется
-   посещаемость.
-3. Преподаватель запускает сессию — всем выдаётся первый вопрос.
-4. На каждый вопрос действует таймер. Раунд закрывается, когда ответили все участники или
-   истекло время, после чего выдаётся следующий вопрос. Одна попытка на вопрос.
-5. Очки начисляются по формуле `база × сложность × скорость` с бонусом за серию верных
-   ответов. Неверный или пропущенный ответ — 0 очков. Варианты перемешиваются каждый раунд.
-6. На экране преподавателя отображаются прогресс, лидерборд, счётчик ответивших и отметки
-   об уходе со вкладки.
-7. По завершении показываются итоги, результаты записываются в базу, студентам открывается
-   разбор заданий.
+1. The teacher opens `/teacher` — a QR code and the lobby appear.
+2. Students scan the QR, enter a nickname, and pick an icon. Attendance is recorded at this
+   moment.
+3. The teacher starts the session — everyone receives the first question.
+4. Each question has a timer. A round closes once everyone has answered or the time runs out,
+   then the next question is handed out. One attempt per question.
+5. Points follow `base × difficulty × speed`, with a bonus for streaks of correct answers. A
+   wrong or skipped answer scores 0. Options are shuffled every round.
+6. The teacher's screen shows progress, the leaderboard, the answered counter, and tab-switch
+   flags.
+7. When the session ends, results are shown and written to the database, and students get
+   access to the task explanations.
 
-## Банк задач
+## Task bank
 
-Приложение не привязано к предмету: содержание полностью определяется банком задач —
-JSON-файлом, который готовит преподаватель. Интерфейс строит фильтры по темам, типам,
-уровням и наборам из того, что присутствует в банке.
+The app is not tied to a subject: its content is fully defined by the task bank — a JSON file
+that the teacher prepares. The UI builds filters for topics, types, levels, and sets from
+whatever is present in the bank.
 
-Банк загружается из первого доступного источника в порядке приоритета: путь из переменной
-`TASK_BANK_PATH`, затем `secrets/task-bank.json`, затем `backend/data/task-bank.json`. Если
-ни один не найден, используется демо-банк `backend/data/task-bank.example.json`. Приватный
-банк монтируется из `secrets/` и не входит в репозиторий и Docker-образ.
+The bank is loaded from the first available source, in priority order: the path in the
+`TASK_BANK_PATH` variable, then `secrets/task-bank.json`, then `backend/data/task-bank.json`.
+If none is found, the demo bank `backend/data/task-bank.example.json` is used. The private bank
+is mounted from `secrets/` and is not part of the repository or the Docker image.
 
-Каждая задача — объект со следующими полями:
+Each task is an object with the following fields:
 
-| Поле | Назначение |
-|------|-----------|
-| `id` | уникальный идентификатор задачи |
-| `type` | тип вопроса (см. ниже) |
-| `topic` | тема; произвольная строка, по ней строится фильтр |
-| `level` | уровень сложности `1`–`3`; влияет на очки |
-| `title` | краткое название |
-| `prompt` | текст задания |
-| `hint` | подсказка (необязательно) |
-| `block` | принадлежность к набору заданий (необязательно) |
+| Field | Purpose |
+|-------|---------|
+| `id` | unique task identifier |
+| `type` | question type (see below) |
+| `topic` | topic; an arbitrary string that a filter is built from |
+| `level` | difficulty `1`–`3`; affects scoring |
+| `title` | short title |
+| `prompt` | task text |
+| `hint` | hint (optional) |
+| `block` | membership in a task set (optional) |
 
-Поддерживаются пять типов вопросов. Два из них универсальны и подходят для любого предмета:
+Five question types are supported. Two of them are universal and fit any subject:
 
-- **`choice`** — выбор одного варианта из нескольких.
-- **`blank`** — заполнение пропуска: свободный ввод с допустимыми вариантами ответа либо
-  выбор из выпадающего списка.
+- **`choice`** — pick one option out of several.
+- **`blank`** — fill in a gap: free text with accepted answers, or a pick from a dropdown.
 
-Остальные три специализированы под алгоритмы и теорию графов: **`graph`** (построение
-графа), **`order`** (порядок обхода) и **`sort`** (сортировка). Для опросов по другим
-дисциплинам достаточно `choice` и `blank`.
+The other three are specialized for algorithms and graph theory: **`graph`** (build a graph),
+**`order`** (traversal order), and **`sort`** (sorting). For quizzes in other disciplines,
+`choice` and `blank` are enough.
 
-Разборы заданий хранятся отдельно — в файле `explanations.json` (источник задаётся
-`EXPLANATIONS_PATH`, иначе `secrets/explanations.json` или `backend/data/explanations.json`).
-Это JSON-объект, где ключ — `id` задачи, а значение — текст разбора. Файл необязателен: если
-его нет, разбор просто не показывается. Разбор отображается студентам после завершения
-сессии только для тех задач, которые преподаватель в нём описал.
+Task explanations are stored separately — in an `explanations.json` file (the source is set by
+`EXPLANATIONS_PATH`, otherwise `secrets/explanations.json` or
+`backend/data/explanations.json`). It is a JSON object where the key is a task `id` and the
+value is the explanation text. The file is optional: if it is missing, no explanation is shown.
+An explanation is shown to students after the session ends only for the tasks the teacher
+described in it.
 
-### Пример банка
+### Example bank
 
-Банк — это JSON-массив задач. Двух универсальных типов (`choice` и `blank`) достаточно для
-любого предмета; темы и наборы — произвольные строки, по ним интерфейс сам построит фильтры.
-Пример из двух задач по базам данных:
+A bank is a JSON array of tasks. The two universal types (`choice` and `blank`) are enough for
+any subject; topics and sets are arbitrary strings that the UI turns into filters. A two-task
+example about databases:
 
 ```json
 [
   {
     "id": "sql_join_inner",
     "type": "choice",
-    "topic": "SQL: соединения",
+    "topic": "SQL: joins",
     "level": 1,
     "title": "INNER JOIN",
-    "prompt": "Что вернёт INNER JOIN двух таблиц?",
+    "prompt": "What does an INNER JOIN of two tables return?",
     "options": [
-      "Только строки, где ключ совпал в обеих таблицах",
-      "Все строки левой таблицы",
-      "Все строки обеих таблиц без условия",
-      "Строки, для которых совпадения нет"
+      "Only rows whose key matches in both tables",
+      "All rows from the left table",
+      "All rows from both tables without a condition",
+      "Rows that have no match"
     ],
     "answer": 0
   },
   {
     "id": "sql_group_by",
     "type": "blank",
-    "topic": "SQL: агрегация",
+    "topic": "SQL: aggregation",
     "level": 2,
-    "title": "Подсчёт по городам",
-    "prompt": "Заполните пропуски, чтобы посчитать число пользователей в каждом городе.",
-    "hint": "Агрегатная функция плюс группировка.",
-    "block": "SQL: базовый",
+    "title": "Count per city",
+    "prompt": "Fill in the gaps to count the number of users in each city.",
+    "hint": "An aggregate function plus grouping.",
+    "block": "SQL: basics",
     "template": "SELECT city, ___(*) FROM users ___ BY city;",
     "blanks": [
       { "answer": "COUNT", "alts": ["count"] },
@@ -174,34 +223,34 @@ JSON-файлом, который готовит преподаватель. И�
 ]
 ```
 
-Как это читается:
+How to read it:
 
-- Общие поля каждой задачи — `id`, `type`, `topic`, `level`, `title`, `prompt`; `hint` и
-  `block` необязательны.
-- **`choice`:** `options` — список вариантов, `answer` — индекс правильного (нумерация с
-  нуля).
-- **`blank`:** в `template` каждый пропуск обозначается `___` (три подчёркивания), а массив
-  `blanks` описывает их по порядку. Пропуск со списком `options` становится выпадающим;
-  без `options` это свободный ввод, где `answer` — эталон, а `alts` — дополнительно
-  принимаемые варианты (регистр и лишние пробелы игнорируются). Число `___` должно совпадать
-  с длиной `blanks`.
+- Common fields on every task are `id`, `type`, `topic`, `level`, `title`, `prompt`; `hint` and
+  `block` are optional.
+- **`choice`:** `options` is the list of choices, `answer` is the index of the correct one
+  (zero-based).
+- **`blank`:** in `template`, each gap is marked with `___` (three underscores), and the
+  `blanks` array describes them in order. A gap with an `options` list becomes a dropdown;
+  without `options` it is free text, where `answer` is the reference value and `alts` are
+  additional accepted variants (case and extra whitespace are ignored). The number of `___`
+  must match the length of `blanks`.
 
-Специализированные типы `graph`, `order` и `sort` используют дополнительные поля (вершины,
-рёбра, стартовая вершина, массив и т. п.) — готовые образцы каждого лежат в демо-банке
+The specialized `graph`, `order`, and `sort` types use extra fields (nodes, edges, a start
+node, an array, and so on) — ready samples of each live in the demo bank
 `backend/data/task-bank.example.json`.
 
-Разборы к этим задачам в `explanations.json` подключаются по `id`:
+Explanations for these tasks are wired up in `explanations.json` by `id`:
 
 ```json
 {
-  "sql_join_inner": "INNER JOIN оставляет только пары строк с совпадающим ключом в обеих таблицах.",
-  "sql_group_by": "COUNT(*) считает строки в каждой группе, а GROUP BY city формирует группы по городу."
+  "sql_join_inner": "An INNER JOIN keeps only pairs of rows whose key matches in both tables.",
+  "sql_group_by": "COUNT(*) counts the rows in each group, and GROUP BY city forms the groups by city."
 }
 ```
 
-## Быстрый старт (локально)
+## Quick start (local)
 
-Требуется **Python 3.11+**.
+Requires **Python 3.11+**.
 
 ```bash
 git clone https://github.com/21astroboy/Algoclimb.git algoclimb
@@ -211,95 +260,95 @@ pip install -r requirements.txt
 python -m uvicorn main:app --app-dir backend --host 0.0.0.0 --port 3000 --ws wsproto
 ```
 
-Альтернатива — одна команда, которая сама выберет Docker или Python: `./algoclimb up`.
-В консоль выводятся ключ преподавателя и адреса экранов.
+Alternatively, a single command that picks Docker or Python for you: `./algoclimb up`. The
+teacher key and the screen addresses are printed to the console.
 
-Без приватного банка приложение запускается на демо-банке (`task-bank.example.json`).
+Without a private bank, the app starts on the demo bank (`task-bank.example.json`).
 
-## Экраны
+## Screens
 
-| Роль | Адрес |
-|------|-------|
-| Преподаватель | `PUBLIC_URL/teacher` — вход по ключу |
-| Студенты | `PUBLIC_URL/` — адрес из QR-кода |
-| Ключ ответов | `PUBLIC_URL/answers` — приватная страница с ответами |
+| Role | Address |
+|------|---------|
+| Teacher | `PUBLIC_URL/teacher` — key-based login |
+| Students | `PUBLIC_URL/` — the address from the QR code |
+| Answer key | `PUBLIC_URL/answers` — a private page with the answers |
 
-Страница `/answers` содержит правильные ответы и не предназначена для студентов.
+The `/answers` page contains the correct answers and is not meant for students.
 
 ## API
 
-HTTP- и WebSocket-эндпоинты документированы через OpenAPI. Интерактивная документация
-(Swagger UI) доступна по адресу `PUBLIC_URL/docs`, ReDoc — `PUBLIC_URL/redoc`, схема —
+The HTTP and WebSocket endpoints are documented via OpenAPI. Interactive docs (Swagger UI) are
+available at `PUBLIC_URL/docs`, ReDoc at `PUBLIC_URL/redoc`, and the schema at
 `PUBLIC_URL/openapi.json`.
 
-По умолчанию документация скрыта (ответ 404). Чтобы включить её, задайте `DOCS=1` в `.env`
-и выполните `./algoclimb restart`.
+By default the docs are hidden (a 404 response). To enable them, set `DOCS=1` in `.env` and run
+`./algoclimb restart`.
 
-## Развёртывание на VPS
+## Deployment (VPS)
 
-На сервере требуется **Docker** (рекомендуется) либо **Python 3.11+**. Скрипт `./algoclimb`
-определяет доступную среду автоматически.
+The server needs **Docker** (recommended) or **Python 3.11+**. The `./algoclimb` script detects
+the available environment automatically.
 
 ```bash
-# 1. Получить код
+# 1. Get the code
 git clone https://github.com/21astroboy/Algoclimb.git algoclimb
 cd algoclimb
 
-# 2. Загрузить приватные файлы (банк задач и разборы)
+# 2. Upload the private files (task bank and explanations)
 scp secrets/task-bank.json secrets/explanations.json <user>@<vps>:~/algoclimb/secrets/
 
-# 3. Настроить окружение
+# 3. Configure the environment
 cp .env.example .env
 nano .env
 ```
 
-Минимальная конфигурация в `.env` — публичный адрес, который попадёт в QR-код:
+The minimal configuration in `.env` is the public address that goes into the QR code:
 
 ```
-PUBLIC_URL=https://algoclimb.example.ru   # или http://<ip>:3000
-TEACHER_KEY=<постоянный-ключ>
+PUBLIC_URL=https://algoclimb.example.com   # or http://<ip>:3000
+TEACHER_KEY=<permanent-key>
 ```
 
-Запуск:
+Run:
 
 ```bash
-./algoclimb up        # сборка и запуск в фоне; выводит ключ преподавателя
+./algoclimb up        # build and start in the background; prints the teacher key
 ```
 
-Прочие команды: `logs`, `key`, `status`, `restart`, `down`. Данные в `backend/data/runtime`
-сохраняются между перезапусками и пересборками.
+Other commands: `logs`, `key`, `status`, `restart`, `down`. Data in `backend/data/runtime`
+persists across restarts and rebuilds.
 
-Обновление версии:
+Updating a version:
 
 ```bash
 git pull
 ./algoclimb restart
 ```
 
-Замена файлов в `secrets/` не требует пересборки (они монтируются на лету) — достаточно
-`./algoclimb restart`. После изменения зависимостей (`requirements.txt`) требуется
+Replacing files in `secrets/` does not require a rebuild (they are mounted on the fly) — a
+`./algoclimb restart` is enough. After changing dependencies (`requirements.txt`), run
 `./algoclimb up`.
 
-### HTTPS и домен
+### HTTPS and a domain
 
-Приложение слушает HTTP на `PORT`. Для домена и TLS используйте reverse-proxy с включённым
-проксированием WebSocket (проброс заголовков `Upgrade` и `Connection`). После настройки
-укажите `PUBLIC_URL=https://домен` в `.env` и выполните `./algoclimb restart`.
+The app listens for HTTP on `PORT`. For a domain and TLS, use a reverse proxy with WebSocket
+proxying enabled (forwarding the `Upgrade` and `Connection` headers). After setting it up, put
+`PUBLIC_URL=https://domain` in `.env` and run `./algoclimb restart`.
 
-Caddy проксирует WebSocket без дополнительной настройки:
+Caddy proxies WebSocket with no extra configuration:
 
 ```
-algoclimb.example.ru {
+algoclimb.example.com {
     reverse_proxy 127.0.0.1:3000
 }
 ```
 
-Для nginx необходимо увеличить таймауты проксирования: WebSocket-соединение может
-простаивать между вопросами и в лобби, что приводит к обрыву при стандартном таймауте.
+For nginx, you need to raise the proxy timeouts: a WebSocket connection can sit idle between
+questions and in the lobby, which drops it at the default timeout.
 
 ```nginx
 server {
-    server_name algoclimb.example.ru;
+    server_name algoclimb.example.com;
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -313,48 +362,48 @@ server {
 }
 ```
 
-### Безопасность входа
+### Login security
 
-- `TEACHER_KEY` — ключ доступа к экрану преподавателя.
-- `QR_ROTATION=1` включает сменные одноразовые коды входа (TOTP): код в QR-коде меняется
-  каждые `QR_INTERVAL` секунд, повторный вход по устаревшему коду невозможен.
-- Swagger `/docs` по умолчанию скрыт; включается через `DOCS=1`.
+- `TEACHER_KEY` — the access key for the teacher screen.
+- `QR_ROTATION=1` enables rotating one-time login codes (TOTP): the code in the QR changes
+  every `QR_INTERVAL` seconds, and logging in again with a stale code is not possible.
+- Swagger `/docs` is hidden by default; it is enabled via `DOCS=1`.
 
-## Выгрузка оценок
+## Grade export
 
-По завершении сессии на экране преподавателя доступна выгрузка результатов во внешнюю
-таблицу. Предпросмотр показывает, кому и в какой столбец будут записаны баллы, без изменения
-таблицы; сама выгрузка добавляет новый столбец и не трогает отсутствующих участников.
+When a session ends, the teacher screen offers to export the results to an external
+spreadsheet. A preview shows who gets scored and into which column, without changing the sheet;
+the export itself adds a new column and leaves absent participants untouched.
 
-Интеграция опциональна и по умолчанию отключена. Параметры подключения задаются в
-конфигурации и переменных окружения; детали настройки выходят за рамки этого документа.
+The integration is optional and disabled by default. Connection parameters are set in the
+configuration and environment variables; the setup details are out of scope for this document.
 
-## Конфигурация — `backend/config/config.json`
+## Configuration — `backend/config/config.json`
 
-Рабочий `config.json` не хранится в репозитории; образцом служит `config.example.json`.
-Основные параметры:
+The working `config.json` is not stored in the repository; `config.example.json` serves as a
+template. The main parameters:
 
-- **demo** — выбор `count` случайных задач для демонстрации (`onePerType` — по одной каждого
-  типа). Отключение использует весь банк.
-- **timeLimits** — лимит времени на вопрос по типам заданий.
-- **scoring** — `base`, `minFraction` (минимальная доля очков), `streakStep` / `streakMax`
-  (бонус за серию).
-- **activeTasks** — пустое значение использует весь банк; иначе список идентификаторов задач
-  в заданном порядке.
-- **qrRotation** — режим сменных одноразовых кодов входа.
-- **gsheets** — параметры выгрузки оценок.
+- **demo** — pick `count` random tasks for a demo (`onePerType` — one of each type). Disabling
+  it uses the whole bank.
+- **timeLimits** — the time limit per question, by task type.
+- **scoring** — `base`, `minFraction` (the minimum fraction of points), `streakStep` /
+  `streakMax` (the streak bonus).
+- **activeTasks** — an empty value uses the whole bank; otherwise a list of task identifiers in
+  a given order.
+- **qrRotation** — the rotating one-time login-code mode.
+- **gsheets** — grade-export parameters.
 
-Ряд параметров дублируется переменными окружения (`QR_ROTATION`, `DOCS`, `GSHEETS` и др.);
-полный список описан в `.env.example`.
+A number of parameters are mirrored by environment variables (`QR_ROTATION`, `DOCS`, `GSHEETS`,
+and others); the full list is described in `.env.example`.
 
-## Авторство и лицензия
+## Author and license
 
-Идея, дизайн и разработка AlgoClimb — Kirill ([@21astroboy](https://github.com/21astroboy)).
+Idea, design, and development of AlgoClimb — Kirill ([@21astroboy](https://github.com/21astroboy)).
 Copyright © 2026 Kirill (@21astroboy).
 
-Проект распространяется по лицензии **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-Использование, изменение и распространение разрешены при условии, что производные работы
-также публикуются под AGPL-3.0 с сохранением авторства и текста лицензии. Ключевое отличие
-AGPL от обычной GPL — пункт о сетевом использовании: тот, кто разворачивает изменённую
-версию как сервис (в том числе по сети), обязан предоставить пользователям исходный код
-своей версии. Полный текст — в файле [`LICENSE`](LICENSE).
+The project is distributed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. Use,
+modification, and distribution are permitted provided that derivative works are also published
+under AGPL-3.0, with the authorship and the license text preserved. The key difference between
+AGPL and the regular GPL is the network-use clause: anyone who deploys a modified version as a
+service (including over a network) must provide users with the source code of their version.
+The full text is in the [`LICENSE`](LICENSE) file.
