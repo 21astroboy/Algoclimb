@@ -4,10 +4,14 @@
 #
 #   ./algoclimb up        собрать и запустить в фоне (история в ./data сохраняется)
 #   ./algoclimb down      остановить
-#   ./algoclimb restart   перезапустить
+#   ./algoclimb restart   перезапустить (без пересборки образа)
+#   ./algoclimb deploy    обновить код из git и пересобрать (origin/main)
 #   ./algoclimb logs      смотреть логи (Ctrl+C — выйти)
 #   ./algoclimb key       показать ключ преподавателя
 #   ./algoclimb status    состояние контейнера
+#
+# ВАЖНО: restart НЕ пересобирает образ — код вшит в образ при сборке, поэтому
+# после обновления кода/конфига нужен deploy (pull + rebuild), а не restart.
 #
 # По умолчанию использует Docker Compose. Если Docker нет — переключается на
 # локальный запуск через Python venv (тот же ./data, та же БД).
@@ -57,6 +61,35 @@ up_docker() {
   say "Логи: ./algoclimb logs   ·  Остановить: ./algoclimb down"
 }
 
+GIT_BRANCH="${GIT_BRANCH:-main}"
+
+# Обновить код из git и пересобрать образ (одной командой).
+# Именно это нужно после изменений в коде/конфиге: restart образ НЕ пересобирает.
+deploy() {
+  command -v git >/dev/null 2>&1 || die "git не установлен."
+  [ -d .git ] || die "Это не git-репозиторий (запускайте из папки проекта)."
+  say "Обновление кода из git (origin/${GIT_BRANCH})…"
+  git fetch --quiet origin "$GIT_BRANCH" || die "git fetch не удался."
+  git checkout --quiet "$GIT_BRANCH"
+  git pull --ff-only origin "$GIT_BRANCH" || die "pull не fast-forward — на сервере есть локальные коммиты. Разберитесь вручную."
+  say "Код на коммите: $(git log --oneline -1)"
+  say
+  if [ "$ENGINE" = docker ]; then
+    check_bank
+    mkdir -p backend/data/runtime
+    say "Пересборка и запуск образа (Docker)…"
+    $DC up -d --build
+    sleep 2
+    say
+    key_docker || true
+  else
+    down_local
+    up_local
+  fi
+  say
+  say "Готово: код обновлён, образ пересобран и запущен."
+}
+
 key_docker() {
   local k
   k="$($DC logs algoclimb 2>/dev/null | grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' | tail -1 | sed 's/.*КЛЮЧ ПРЕПОДАВАТЕЛЯ: //')"
@@ -100,8 +133,9 @@ case "$CMD" in
   up)      [ "$ENGINE" = docker ] && up_docker || up_local ;;
   down)    [ "$ENGINE" = docker ] && $DC down || down_local ;;
   restart) [ "$ENGINE" = docker ] && { $DC restart; key_docker; } || { down_local; up_local; } ;;
+  deploy|update) deploy ;;
   logs)    [ "$ENGINE" = docker ] && $DC logs -f --tail=100 || { touch algoclimb.out; tail -f algoclimb.out; } ;;
   key)     [ "$ENGINE" = docker ] && key_docker || { grep -a 'КЛЮЧ ПРЕПОДАВАТЕЛЯ' algoclimb.out | tail -1; } ;;
   status)  [ "$ENGINE" = docker ] && $DC ps || { [ -f algoclimb.pid ] && kill -0 "$(cat algoclimb.pid)" 2>/dev/null && say "работает (PID $(cat algoclimb.pid))" || say "остановлено"; } ;;
-  *)       die "Неизвестная команда: $CMD (up|down|restart|logs|key|status)" ;;
+  *)       die "Неизвестная команда: $CMD (up|down|restart|deploy|logs|key|status)" ;;
 esac
