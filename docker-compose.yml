@@ -12,6 +12,8 @@ services:
       - HOST_IP=${HOST_IP:-}
       # Фиксированный ключ преподавателя (иначе генерируется случайный при старте).
       - TEACHER_KEY=${TEACHER_KEY:-}
+      # Swagger /docs: по умолчанию скрыт (студенты не видят API). DOCS=1 — показать.
+      - DOCS=${DOCS:-}
       # Ротация входных кодов (TOTP): 1 — включить, 0 — выключить.
       - QR_ROTATION=${QR_ROTATION:-}
       - QR_INTERVAL=${QR_INTERVAL:-}

@@ -1114,6 +1114,10 @@ async def lifespan(_app: FastAPI):
     _BG_TASKS.clear()
 
 
+# Swagger (/docs, /redoc, /openapi.json) показываем только в debug-режиме или при
+# явном DOCS=1 — чтобы на реальном занятии студенты не видели описание API.
+_show_docs = config["debug"].get("enabled") or os.environ.get("DOCS") == "1"
+
 app = FastAPI(
     title="AlgoClimb API",
     version="1.0.0",
@@ -1121,6 +1125,9 @@ app = FastAPI(
     openapi_tags=tags_metadata,
     contact={"name": "AlgoClimb"},
     lifespan=lifespan,
+    docs_url="/docs" if _show_docs else None,
+    redoc_url="/redoc" if _show_docs else None,
+    openapi_url="/openapi.json" if _show_docs else None,
 )
 
 
