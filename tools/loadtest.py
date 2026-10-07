@@ -89,9 +89,7 @@ async def student(idx: int, ws_url: str, stats: Stats, joined_evt_cb, done_evt: 
                     payload = _answer_payload(task)
                     sent = time.perf_counter()
                     pending_recv[tid] = sent
-                    await ws.send(
-                        json.dumps({"type": "answer", "taskId": tid, "payload": payload})
-                    )
+                    await ws.send(json.dumps({"type": "answer", "taskId": tid, "payload": payload}))
                     stats.answers_sent += 1
                 elif t == "answered":
                     stats.answers_confirmed += 1
@@ -163,8 +161,12 @@ async def main():
     ap.add_argument("--students", type=int, default=120)
     ap.add_argument("--tasks", type=int, default=5, help="сколько вопросов прогнать")
     ap.add_argument("--spawn-rate", type=int, default=60, help="подключений в секунду")
-    ap.add_argument("--hold", type=float, default=8.0,
-                    help="сколько секунд дать студентам отвечать перед finish")
+    ap.add_argument(
+        "--hold",
+        type=float,
+        default=8.0,
+        help="сколько секунд дать студентам отвечать перед finish",
+    )
     ap.add_argument("--pid", type=int, default=None, help="PID uvicorn для замера CPU/RAM")
     args = ap.parse_args()
 
@@ -202,13 +204,13 @@ async def main():
             break
         await asyncio.sleep(0.3)
     connect_s = time.perf_counter() - t_connect0
-    print(f"  вошло: {stats.joined}/{args.students}  отклонено: {stats.rejected}  за {connect_s:.1f}с")
+    print(
+        f"  вошло: {stats.joined}/{args.students}  отклонено: {stats.rejected}  за {connect_s:.1f}с"
+    )
 
     # 2) стартуем игру в режиме test (БЕЗ записи в БД)
     print("→ Старт игры в режиме test (в БД ничего не пишется) …")
-    await teacher_ws.send(
-        json.dumps({"type": "start", "taskIds": task_ids, "test": True})
-    )
+    await teacher_ws.send(json.dumps({"type": "start", "taskIds": task_ids, "test": True}))
 
     # 3) крутим, пока студенты не доиграют; параллельно снимаем CPU/RAM
     async def monitor():
@@ -265,8 +267,10 @@ async def main():
     print(f"Ответов подтверждено:       {stats.answers_confirmed}")
     if lat:
         print("\nЗадержка ответ→подтверждение (мс):")
-        print(f"  медиана: {statistics.median(lat):.0f}   p90: {pct(90):.0f}   "
-              f"p99: {pct(99):.0f}   макс: {lat[-1]:.0f}")
+        print(
+            f"  медиана: {statistics.median(lat):.0f}   p90: {pct(90):.0f}   "
+            f"p99: {pct(99):.0f}   макс: {lat[-1]:.0f}"
+        )
     if cpu_samples:
         print("\nСерверный процесс (по PID):")
         print(f"  CPU%: средн {statistics.mean(cpu_samples):.0f}  макс {max(cpu_samples):.0f}")

@@ -581,6 +581,7 @@ class Game:
             db.set_session_status(self.session["id"], "finished")
             for i, r in enumerate(ranked):
                 db.record_result(self.session["id"], r["nick"], 0, 1, r["score"], i + 1)
+
         def _sessionend(s):
             place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
             review = []
@@ -634,9 +635,7 @@ class Game:
                             "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
                         },
                     )
-                if config["qrRotation"].get("enabled") and not sec.consume_nonce(
-                    msg.get("nonce")
-                ):
+                if config["qrRotation"].get("enabled") and not sec.consume_nonce(msg.get("nonce")):
                     return await self.send(
                         ws,
                         {
@@ -1077,6 +1076,7 @@ tags_metadata = [
     {"name": "Страницы", "description": "HTML-экраны студента, преподавателя и отладки."},
 ]
 
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Старт: печатаем адреса/ключ и поднимаем фоновые задачи (ротация QR, чистка nonce).
@@ -1183,9 +1183,7 @@ async def api_nonce(request: Request):
     responses={
         200: {
             "description": "XLSX-файл",
-            "content": {
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
-            },
+            "content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}},
         },
         403: {"description": "Нужен ключ преподавателя"},
         500: {"description": "Ошибка экспорта"},
