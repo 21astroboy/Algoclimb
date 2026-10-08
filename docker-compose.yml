@@ -25,8 +25,41 @@ services:
       - TASK_BANK_PATH=${TASK_BANK_PATH:-/app/secrets/task-bank.json}
       - EXPLANATIONS_PATH=${EXPLANATIONS_PATH:-/app/secrets/explanations.json}
     volumes:
-      # База SQLite и кастомные задачи переживают перезапуск и пересборку контейнера.
+      # База SQLite, кастомные задачи и снимок живой сессии переживают перезапуск
+      # и пересборку контейнера (восстановление игры после краха берётся отсюда).
       - ./backend/data/runtime:/app/backend/data/runtime
       # Приватные файлы (банк + разборы) подкладываются сюда — в образ не попадают.
       - ./secrets:/app/secrets:ro
     restart: unless-stopped
+    # Проверка живости: бьём по /healthz внутри контейнера. Если процесс завис
+    # (живой PID, но не отвечает) — контейнер помечается unhealthy.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/healthz', timeout=3).status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      # autoheal перезапускает контейнеры с этой меткой, когда они unhealthy.
+      - autoheal=true
+
+  # Сторож: перезапускает unhealthy-контейнеры (сам Docker этого не делает —
+  # restart:unless-stopped реагирует только на упавший процесс, не на зависший).
+  # Следит лишь за контейнерами с меткой autoheal=true.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: algoclimb-autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=10
+      - AUTOHEAL_START_PERIOD=15
+    volumes:
+      # Нужен доступ к Docker, чтобы перезапускать контейнер.
+      - /var/run/docker.sock:/var/run/docker.sock
