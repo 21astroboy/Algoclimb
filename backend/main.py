@@ -154,6 +154,8 @@ class Game:
         self.round_perm = None
         self.round_answered = set()
         self.intermission = False
+        # Момент (мс) входа в межраундовую паузу — для сторожа зависшей паузы.
+        self.intermission_since = 0
         self.paused = False
         self.pause_remain = 0
         self.qr_svg = None
@@ -272,6 +274,7 @@ class Game:
             if self.paused:
                 return
             if self.intermission:
+                self.intermission_since = int(time.time() * 1000)
                 self._schedule("_reveal", REVEAL_MS, self._advance)
                 return
             remain = self.round_deadline - int(time.time() * 1000)
@@ -530,6 +533,9 @@ class Game:
     async def begin_round(self, idx):
         self.round = idx
         task = self.order[idx]
+        self.intermission = False
+        self.intermission_since = 0
+        print(f"[round] begin {idx + 1}/{len(self.order)} id={task['id']} type={task['type']}")
         self.round_answered = set()
         self.round_perm = (
             shuffle(list(range(len(task["options"])))) if task["type"] == "choice" else None
@@ -568,6 +574,8 @@ class Game:
                 }
                 s["streak"] = 0
         self.intermission = True
+        self.intermission_since = int(time.time() * 1000)
+        print(f"[round] end {self.round + 1}/{len(self.order)} reason={reason}")
 
         def _roundover(s):
             a = s["answers"].get(self.round)
@@ -583,10 +591,31 @@ class Game:
 
     async def _advance(self):
         self.intermission = False
+        self.intermission_since = 0
         if self.round + 1 >= len(self.order):
             await self.finish_game()
         else:
             await self.begin_round(self.round + 1)
+
+    # Сторож зависшей межраундовой паузы. В норме end_round планирует _reveal,
+    # который через REVEAL_MS вызывает _advance и запускает следующий раунд. Если
+    # эта задача по какой-то причине не сработала (отменена, потеряна, не
+    # дождалась lock) — игра навсегда остаётся в intermission: таймер показывает
+    # «—», а Пропустить/Пауза/+время не действуют (они по дизайну выключены на
+    # паузе). Здесь мы замечаем, что пауза длится заметно дольше положенного, и
+    # до-толкаем игру сами. Вызывается из фонового цикла уже под game.lock.
+    async def watchdog_tick(self):
+        if self.session["status"] != "running" or not self.intermission:
+            return
+        if self.round < 0 or not self.intermission_since:
+            return
+        stuck_ms = int(time.time() * 1000) - self.intermission_since
+        if stuck_ms < REVEAL_MS + 5000:
+            return
+        if self._reveal and not self._reveal.done():
+            return  # запланированный переход ещё жив — не вмешиваемся
+        print(f"[watchdog] зависшая пауза {stuck_ms} мс — принудительный переход дальше")
+        await self._advance()
 
     async def maybe_end_round(self):
         if self.paused:
@@ -634,7 +663,16 @@ class Game:
         await self.broadcast_teacher()
 
     async def skip_round(self):
-        if self.session["status"] != "running" or self.round < 0 or self.intermission:
+        if self.session["status"] != "running" or self.round < 0:
+            return
+        # Если мы уже в межраундовой паузе, «Пропустить» означает «не жди
+        # разбор — сразу следующий вопрос». Это же аварийный выход, если пауза
+        # зависла (запланированный переход не сработал): до-толкаем игру вручную.
+        if self.intermission:
+            if self._reveal:
+                self._reveal.cancel()
+                self._reveal = None
+            await self._advance()
             return
         self.paused = False
         if self._timer:
@@ -1208,9 +1246,12 @@ async def lifespan(_app: FastAPI):
             await asyncio.sleep(2)
             try:
                 async with game.lock:
+                    # Сначала расклиниваем зависшую паузу, потом снимаем снимок,
+                    # чтобы на диск попало уже восстановленное состояние.
+                    await game.watchdog_tick()
                     game.save_snapshot()
-            except Exception:
-                pass
+            except Exception as e:
+                print("[snapshot/watchdog] ошибка в фоновом цикле:", e)
 
     # Восстановленную игру нужно «дотолкнуть»: досоздать таймер текущего раунда.
     if _restored_running:
