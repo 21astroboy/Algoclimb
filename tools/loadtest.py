@@ -28,6 +28,7 @@ import asyncio
 import json
 import statistics
 import time
+import urllib.request
 from urllib.parse import urlsplit
 
 try:
@@ -58,14 +59,40 @@ class Stats:
         self.reject_reasons: dict[str, int] = {}
 
 
-async def student(idx: int, ws_url: str, stats: Stats, joined_evt_cb, done_evt: asyncio.Event):
+def fetch_nonce(http_url: str) -> str | None:
+    """GET /api/nonce — одноразовый код входа (нужен при включённой ротации QR)."""
+    try:
+        with urllib.request.urlopen(http_url.rstrip("/") + "/api/nonce", timeout=10) as r:
+            return json.loads(r.read().decode("utf-8")).get("nonce")
+    except Exception:
+        return None
+
+
+async def student(
+    idx: int,
+    ws_url: str,
+    http_url: str,
+    shared: dict,
+    stats: Stats,
+    joined_evt_cb,
+    done_evt: asyncio.Event,
+):
     nick = f"LoadBot{idx:03d}"
     icon = ICONS[idx % len(ICONS)]
     url = f"{ws_url}/?role=student"
     pending_recv: dict[str, float] = {}  # taskId -> время отправки ответа (для latency)
     try:
         async with websockets.connect(url, open_timeout=20, max_queue=64) as ws:
-            await ws.send(json.dumps({"type": "join", "nick": nick, "icon": icon}))
+            join_msg = {"type": "join", "nick": nick, "icon": icon}
+            # Ротация QR включена, если преподаватель прислал token в состоянии.
+            # Тогда боту нужен свежий token (из состояния) и свой одноразовый nonce.
+            token = shared.get("token")
+            if token:
+                join_msg["token"] = token
+                nonce = await asyncio.to_thread(fetch_nonce, http_url)
+                if nonce:
+                    join_msg["nonce"] = nonce
+            await ws.send(json.dumps(join_msg))
             while True:
                 try:
                     raw = await asyncio.wait_for(ws.recv(), timeout=90)
@@ -122,23 +149,53 @@ def _answer_payload(task: dict) -> dict:
 
 
 async def run_teacher(ws_url: str, key: str, want_tasks: int):
-    """Подключается преподавателем, возвращает (ws, список choice-taskIds)."""
+    """Подключается преподавателем, возвращает (ws, choice-taskIds, token|None).
+
+    token != None означает, что на сервере включена ротация QR и вход студентов
+    требует кода. Его боты берут отсюда (и обновляют через teacher_reader)."""
     ws = await websockets.connect(f"{ws_url}/teacher?key={key}", open_timeout=20)
-    catalog = []
+    catalog: list = []
+    token = None
+    seen_state = False
     deadline = time.time() + 10
     while time.time() < deadline:
         raw = await asyncio.wait_for(ws.recv(), timeout=10)
         msg = json.loads(raw)
-        if msg.get("type") == "catalog":
+        tp = msg.get("type")
+        if tp == "catalog":
             catalog = msg.get("items") or []
-        if msg.get("type") == "rejected":
+        elif tp == "state":
+            seen_state = True
+            if msg.get("token"):
+                token = msg["token"]
+        elif tp == "rejected":
             raise SystemExit("Преподаватель отклонён: неверный --key")
-        if catalog:
+        if catalog and seen_state:
             break
     choice_ids = [c["id"] for c in catalog if c.get("type") == "choice"][:want_tasks]
     if not choice_ids:
         choice_ids = [c["id"] for c in catalog][:want_tasks]
-    return ws, choice_ids
+    return ws, choice_ids, token
+
+
+async def teacher_reader(ws, shared: dict, done_evt: asyncio.Event):
+    """Держит соединение преподавателя живым и обновляет свежий token в shared.
+
+    Токен ротируется, поэтому ловим каждый 'state' от сервера (он шлёт его при
+    входе студентов и по таймеру QR) и кладём последний token для новых ботов."""
+    while not done_evt.is_set():
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=2)
+        except TimeoutError:
+            continue
+        except Exception:
+            return
+        try:
+            msg = json.loads(raw)
+        except Exception:
+            continue
+        if msg.get("type") == "state" and msg.get("token"):
+            shared["token"] = msg["token"]
 
 
 def _sample_proc(pid: int | None):
@@ -180,8 +237,13 @@ async def main():
         joined_count["n"] += 1
 
     print(f"→ Преподаватель подключается к {ws_url}/teacher …")
-    teacher_ws, task_ids = await run_teacher(ws_url, args.key, args.tasks)
+    teacher_ws, task_ids, token0 = await run_teacher(ws_url, args.key, args.tasks)
     print(f"  выбрано вопросов (choice): {len(task_ids)} → {task_ids}")
+    shared: dict = {"token": token0}
+    if token0:
+        print("  обнаружена ротация QR — боты берут token из состояния + nonce из /api/nonce")
+    # Фоновый читатель: держит соединение преподавателя и обновляет свежий token.
+    reader = asyncio.create_task(teacher_reader(teacher_ws, shared, done_evt))
 
     proc = _sample_proc(args.pid)
     cpu_samples, mem_samples = [], []
@@ -193,7 +255,9 @@ async def main():
     tasks = []
     t_connect0 = time.perf_counter()
     for i in range(args.students):
-        tasks.append(asyncio.create_task(student(i, ws_url, stats, on_join, done_evt)))
+        tasks.append(
+            asyncio.create_task(student(i, ws_url, args.url, shared, stats, on_join, done_evt))
+        )
         if args.spawn_rate and (i + 1) % args.spawn_rate == 0:
             await asyncio.sleep(1.0)
 
@@ -241,6 +305,7 @@ async def main():
         print("  (часть студентов не прислала sessionend вовремя)")
     done_evt.set()
     mon.cancel()
+    reader.cancel()
     try:
         await teacher_ws.send(json.dumps({"type": "reset"}))
         await teacher_ws.close()
