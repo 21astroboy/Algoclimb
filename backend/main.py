@@ -162,6 +162,9 @@ class Game:
         self.join_url = None
         self._timer = None
         self._reveal = None
+        # Экран преподавателя обновляем «пачками»: на залпе ответов ставим этот
+        # флаг, а фоновый цикл рассылает тяжёлое состояние не чаще раза в окно.
+        self._teacher_dirty = False
         self.custom_specs = []
         self.load_custom_tasks()
 
@@ -473,8 +476,15 @@ class Game:
             "leaderboard": self.leaderboard(),
             "details": self.session_details() if self.order else [],
         }
+        # Любая полная рассылка гасит отложенный флаг — повтор не нужен.
+        self._teacher_dirty = False
         for ws in list(self.teachers):
             await self.send(ws, payload)
+
+    def mark_teacher_dirty(self):
+        # Отложенная рассылка преподавателю: собственно отправку сделает
+        # teacher_flush_loop в пределах окна. Дёшево и схлопывает залпы ответов.
+        self._teacher_dirty = True
 
     async def send_current_task(self, s, ws):
         if self.round < 0 or not self.order[self.round]:
@@ -927,7 +937,11 @@ class Game:
                     "picked": picked,
                 },
             )
-            await self.broadcast_teacher()
+            # Горячий путь: на залпе из 100+ ответов НЕ шлём тяжёлое состояние
+            # на каждый ответ (leaderboard+details — O(студенты×раунды)), а
+            # помечаем экран «грязным». Если раунд закрылся (все ответили) —
+            # end_round разошлёт финальное состояние сразу.
+            self.mark_teacher_dirty()
             await self.maybe_end_round()
             return
 
@@ -1238,6 +1252,19 @@ async def lifespan(_app: FastAPI):
             await asyncio.sleep(60)
             sec.sweep()
 
+    async def teacher_flush_loop():
+        # Схлопываем залпы обновлений экрана преподавателя: если накопился
+        # «грязный» флаг, рассылаем полное состояние не чаще раза в окно. Для
+        # человека счётчик «ответили N/30» дёргается так же, а на залпе из 100+
+        # ответов выходит 1–2 тяжёлые рассылки вместо сотни.
+        while True:
+            await asyncio.sleep(0.3)
+            if not game._teacher_dirty:
+                continue
+            async with game.lock:
+                if game._teacher_dirty:
+                    await game.broadcast_teacher()
+
     async def snapshot_loop():
         # Периодически сохраняем состояние живой сессии на диск. Худший случай при
         # падении — потеря ~2 секунд прогресса. Под game.lock, чтобы снимок был
@@ -1261,6 +1288,7 @@ async def lifespan(_app: FastAPI):
     if config["qrRotation"].get("enabled"):
         _BG_TASKS.add(asyncio.create_task(qr_loop()))
     _BG_TASKS.add(asyncio.create_task(nonce_loop()))
+    _BG_TASKS.add(asyncio.create_task(teacher_flush_loop()))
     _BG_TASKS.add(asyncio.create_task(snapshot_loop()))
 
     yield
