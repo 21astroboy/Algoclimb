@@ -390,17 +390,7 @@
         -webkit-user-select: text;
         user-select: text;
       }
-      /* водяной знак с ником — не мешает игре (pointer-events:none) */
-      #wm {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        pointer-events: none;
-        background-repeat: repeat;
-        display: none;
-      }
     </style>
-    <div id="wm"></div>
     <div class="wrap">
       <div class="logo">
         Algo
@@ -501,22 +491,7 @@
         $('icons').appendChild(d);
       });
 
-      /* антискрин: водяной знак с ником + запрет копирования/ПКМ */
-      function applyWatermark(text) {
-        const safe = String(text).replace(
-          /[<>&'"]/g,
-          (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&#39;', '"': '&quot;' })[c]
-        );
-        const svg =
-          '<svg xmlns="http://www.w3.org/2000/svg" width="520" height="340">' +
-          '<text x="0" y="185" transform="rotate(-28 260 175)" fill="rgba(255,255,255,0.06)" ' +
-          'font-size="20" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700">' +
-          safe +
-          '</text></svg>';
-        const wm = document.getElementById('wm');
-        wm.style.backgroundImage = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
-        wm.style.display = 'block';
-      }
+      /* антискрин: запрет копирования/ПКМ (водяной знак убран) */
       ['contextmenu', 'copy', 'cut', 'dragstart'].forEach((ev) =>
         document.addEventListener(ev, (e) => {
           if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) e.preventDefault();
@@ -611,7 +586,6 @@
           me = m;
           $('meNick').textContent = m.nick;
           $('meIcon').textContent = m.icon;
-          applyWatermark(m.nick + ' ' + (m.icon || ''));
           show(m.status === 'running' ? 'task' : 'lobby');
           return;
         }
