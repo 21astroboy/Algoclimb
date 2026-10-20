@@ -110,6 +110,17 @@ SNAPSHOT_FILE = BASE / "data" / "runtime" / "session-state.json"
 
 
 def time_limit_for(task):
+    # Переопределение на уровне задачи: поле timeLimit (в секундах) в банке
+    # перекрывает глобальный лимит по типу. Нужно, например, для блоков с
+    # длинными условиями (код в вопросе), где 15 с на чтение мало.
+    override = task.get("timeLimit") if task else None
+    if override is not None:
+        try:
+            secs = int(override)
+            if secs > 0:
+                return secs * 1000
+        except (TypeError, ValueError):
+            pass
     quick = task["type"] in ("choice", "blank")
     return (TIME["choice"] if quick else TIME["graph"]) * 1000
 
