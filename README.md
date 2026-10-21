@@ -99,16 +99,16 @@ mounted `secrets/` folder and is not part of the repository or the Docker image.
 > **Important:** there must be exactly one worker — session state lives in the process memory.
 > Running with `--workers` is not supported.
 
+
 ## Screenshots
 
-> Place the images under `docs/` with the names below (PNG or GIF). Until you add them, these
-> links will render as broken image placeholders.
+**Teacher screen**
 
-| Teacher screen | Student screen |
-|----------------|----------------|
-|(<img width="1193" height="904" alt="Снимок экрана — 2026-10-21 в 13 00 11" src="https://github.com/user-attachments/assets/cfa84841-f754-41d1-b4e7-291841663dcc" />
-)(<img width="389" height="277" alt="Снимок экрана — 2026-10-21 в 13 14 43" src="https://github.com/user-attachments/assets/ae552f3e-fc0c-4a6d-8535-68d7b156dce2" />
-) |
+<img alt="Teacher screen" src="https://github.com/user-attachments/assets/cfa84841-f754-41d1-b4e7-291841663dcc" />
+
+**Student screen**
+
+<img width="280" alt="Student screen" src="https://github.com/user-attachments/assets/ae552f3e-fc0c-4a6d-8535-68d7b156dce2" />
 
 ## Project structure
 
