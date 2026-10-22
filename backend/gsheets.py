@@ -212,7 +212,7 @@ def _open_spreadsheet(cfg, stream):
 
     sid = (cfg.get("streams") or {}).get(str(stream))
     if not sid:
-        raise RuntimeError(f"Для потока {stream} не задан id таблицы в gsheets.streams")
+        raise RuntimeError(f"For group {stream} no spreadsheet ID is configured in gsheets.streams")
 
     sa_file = cfg.get("serviceAccountFile") or "secrets/service-account.json"
     sa_path = Path(sa_file)
@@ -220,7 +220,7 @@ def _open_spreadsheet(cfg, stream):
         # относительно корня проекта (backend/..)
         sa_path = Path(__file__).resolve().parent.parent / sa_file
     if not sa_path.exists():
-        raise RuntimeError(f"Не найден ключ сервисного аккаунта: {sa_path}")
+        raise RuntimeError(f"Service-account key not found: {sa_path}")
 
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -237,7 +237,7 @@ def export_grades(cfg, stream, logins, dry_run=True):
     'committed'. Поднимает исключения при проблемах доступа/конфигурации.
     """
     if not cfg or not cfg.get("enabled"):
-        raise RuntimeError("Интеграция с Google Sheets выключена (gsheets.enabled=false)")
+        raise RuntimeError("Google Sheets integration is disabled (gsheets.enabled=false)")
 
     ss = _open_spreadsheet(cfg, stream)
     login_ws = ss.worksheet(cfg.get("loginSheet", "Данные для входа"))

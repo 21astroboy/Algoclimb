@@ -20,6 +20,9 @@ venv
 .DS_Store
 npm-debug.log
 backend/e2e_test.py
+backend/test_*.py
+docs
+tools
 
 # Фронтенд-тулинг и инструменты разработки/CI — в рантайме не нужны
 .github

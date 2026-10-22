@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from pathlib import Path
 
 # Рантайм-данные (БД, логи сессий) — в backend/data/runtime/ (том Docker).
 BASE = Path(__file__).resolve().parent
-DATA_DIR = BASE / "data" / "runtime"
+DATA_DIR = Path(os.environ.get("RUNTIME_DIR") or BASE / "data" / "runtime")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "algoclimb.db"
 

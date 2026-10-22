@@ -59,6 +59,20 @@ class TimerTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.04)
         callback.assert_not_awaited()
 
+    async def test_replacing_timer_cancels_the_previous_deadline(self):
+        game = main.Game()
+        old_callback = AsyncMock()
+        completed = asyncio.Event()
+        new_callback = AsyncMock(side_effect=completed.set)
+        game._schedule("_timer", 10, old_callback)
+        game._schedule("_timer", 50, new_callback)
+        try:
+            await asyncio.wait_for(completed.wait(), timeout=1)
+            old_callback.assert_not_awaited()
+            new_callback.assert_awaited_once()
+        finally:
+            game._cancel_timers()
+
 
 if __name__ == "__main__":
     unittest.main()

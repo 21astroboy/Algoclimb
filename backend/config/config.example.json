@@ -46,8 +46,8 @@
     "loginSheet": "Данные для входа",
     "gradeSheet": "Оценки",
     "streams": {
-      "1": "1aKjabeaI66jFzwdcDzFh4yBGacH_NcyywdgwVuKlwpg",
-      "2": "1pc17iksAi8P9ne1bxLQ7dsmvw27kB9Kn7OX6ipGP5Pw"
+      "1": "YOUR_SPREADSHEET_ID_FOR_GROUP_1",
+      "2": "YOUR_SPREADSHEET_ID_FOR_GROUP_2"
     },
     "login": { "headerRow": 1, "groupCol": "A", "fioCol": "B", "loginCol": "D" },
     "grade": {

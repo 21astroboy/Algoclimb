@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
@@ -399,16 +399,16 @@
 
       <!-- JOIN -->
       <div class="card" id="join">
-        <div class="big center">Вход в сессию</div>
-        <label>Твой ник (выдан преподавателем)</label>
-        <input id="nick" placeholder="например, neo" autocomplete="off" />
+        <div class="big center">Join a session</div>
+        <label>Your nickname (assigned by your teacher)</label>
+        <input id="nick" placeholder="e.g. neo" autocomplete="off" />
         <div id="tokWrap" class="hidden">
-          <label>Код с экрана (QR)</label>
-          <input id="tok" placeholder="6 символов" autocomplete="off" maxlength="7" />
+          <label>On-screen code (QR)</label>
+          <input id="tok" placeholder="6 characters" autocomplete="off" maxlength="7" />
         </div>
-        <label>Иконка</label>
+        <label>Avatar</label>
         <div class="icons" id="icons"></div>
-        <button class="btn" id="joinBtn">Войти в лобби</button>
+        <button class="btn" id="joinBtn">Join lobby</button>
         <div class="err" id="joinErr"></div>
       </div>
 
@@ -416,11 +416,11 @@
       <div class="card center hidden" id="lobby">
         <div class="medal">⛺</div>
         <div class="big">
-          Ты в лобби,
+          You are in the lobby,
           <span id="meNick"></span>
           <span id="meIcon"></span>
         </div>
-        <div style="color: var(--muted)">Ждём, пока преподаватель начнёт восхождение…</div>
+        <div style="color: var(--muted)">Waiting for your teacher to start the climb…</div>
       </div>
 
       <!-- TASK -->
@@ -439,7 +439,7 @@
       <!-- FINISHED -->
       <div class="card center hidden" id="done">
         <div class="medal" id="medal">🏔️</div>
-        <div class="big" id="doneMsg">Готово!</div>
+        <div class="big" id="doneMsg">Done!</div>
         <div style="color: var(--muted)" id="doneSub"></div>
         <div id="review" class="review hidden"></div>
       </div>
@@ -468,7 +468,8 @@
         me = null,
         curTask = null,
         answered = false,
-        locked = false;
+        locked = false,
+        paused = false;
       let limitMs = 0,
         deadline = 0,
         clockOffset = 0,
@@ -526,7 +527,7 @@
         };
         ws.onclose = () => {
           if (me && me.done) return; // игра закончена — переподключаться не нужно
-          if (me) $('fb').innerHTML = '<span class="no">Связь потеряна, восстанавливаю…</span>';
+          if (me) $('fb').innerHTML = '<span class="no">Connection lost. Reconnecting…</span>';
           setTimeout(connectWS, 1000); // авто-переподключение
         };
       }
@@ -548,7 +549,7 @@
       $('joinBtn').onclick = async () => {
         const nick = $('nick').value.trim();
         if (!nick) {
-          $('joinErr').textContent = 'Введи ник';
+          $('joinErr').textContent = 'Enter your nickname';
           return;
         }
         if (!joinNonce) await fetchNonce();
@@ -561,12 +562,12 @@
             ws.send(JSON.stringify(payload));
           } catch (e) {
             pendingJoin = payload;
-            $('joinErr').textContent = 'Нет связи с сервером, переподключаюсь…';
+            $('joinErr').textContent = 'Connection lost. Reconnecting…';
             connectWS();
           }
         } else {
           pendingJoin = payload; // уйдёт автоматически при открытии сокета
-          $('joinErr').textContent = 'Подключаюсь к серверу…';
+          $('joinErr').textContent = 'Connecting to the server…';
           if (!ws || ws.readyState === WebSocket.CLOSED) connectWS();
         }
       };
@@ -575,9 +576,8 @@
         if (m.type === 'rejected') {
           // Код входа берётся из QR автоматически — вручную вводить не нужно.
           // Если код невалиден/протух — просим отсканировать QR заново, а не печатать.
-          if (/код/i.test(m.reason))
-            $('joinErr').textContent =
-              'Отсканируйте QR-код с экрана заново и снова нажмите «Войти».';
+          if (/code/i.test(m.reason))
+            $('joinErr').textContent = 'Scan the on-screen QR code again, then select Join.';
           else $('joinErr').textContent = m.reason;
           fetchNonce(); // выдать свежий одноразовый код для повторной попытки
           return;
@@ -607,6 +607,15 @@
         }
         if (m.type === 'answered') {
           showAnswered(m);
+          return;
+        }
+        if (m.type === 'answerRejected') {
+          if (!curTask || m.taskId !== curTask.id) return;
+          answered = false;
+          if (m.reason === 'paused') onPaused();
+          else if (m.reason === 'expired') lockInputs();
+          else if (!paused && Date.now() + clockOffset < deadline) unlockInputs();
+          $('fb').textContent = m.message;
           return;
         }
         if (m.type === 'roundover') {
@@ -646,7 +655,7 @@
             clearInterval(timerInt);
             if (!answered) {
               lockInputs();
-              $('fb').innerHTML = '<span class="no">Время вышло</span>';
+              $('fb').innerHTML = '<span class="no">Time is up</span>';
             }
           }
         };
@@ -656,13 +665,18 @@
 
       /* ---- пауза/продолжение/+время от преподавателя ---- */
       function onPaused() {
+        paused = true;
         clearInterval(timerInt);
-        if (answered || locked) return;
+        if (answered) return;
+        lockInputs();
         $('timer').textContent = '⏸';
-        $('fb').innerHTML = '<span class="wait">⏸ Пауза — преподаватель приостановил вопрос</span>';
+        $('fb').innerHTML =
+          '<span class="wait">⏸ Paused — your teacher has paused the question</span>';
       }
       function onResumed(m) {
-        if (answered || locked) return;
+        paused = false;
+        if (answered) return;
+        unlockInputs();
         if (typeof m.limit === 'number') limitMs = m.limit;
         deadline = m.deadline;
         clockOffset = (m.serverTime || Date.now()) - Date.now();
@@ -672,11 +686,12 @@
       function onAddTime(m) {
         deadline = m.deadline;
         clockOffset = (m.serverTime || Date.now()) - Date.now();
-        if (!answered && !locked) {
+        if (!answered && !paused) {
+          unlockInputs();
           startTimer();
-          $('fb').innerHTML = '<span class="wait">⏱ Преподаватель добавил время</span>';
+          $('fb').innerHTML = '<span class="wait">⏱ Your teacher added time</span>';
           setTimeout(() => {
-            if (!answered && !locked && /добавил время/.test($('fb').textContent))
+            if (!answered && !locked && /added time/.test($('fb').textContent))
               $('fb').textContent = '';
           }, 1500);
         }
@@ -687,8 +702,9 @@
         curTask = m.task;
         answered = false;
         locked = false;
+        paused = false;
         $('fb').textContent = '';
-        $('myScore').textContent = myScore ? 'очки: ' + myScore : '';
+        $('myScore').textContent = myScore ? 'points: ' + myScore : '';
         limitMs = m.limit;
         deadline = m.deadline;
         clockOffset = (m.serverTime || Date.now()) - Date.now();
@@ -717,6 +733,13 @@
         document.querySelectorAll('.stile,.blankin').forEach((b) => (b.disabled = true));
       }
 
+      function unlockInputs() {
+        locked = false;
+        document
+          .querySelectorAll('.opt,.gbtn,.stile,.blankin')
+          .forEach((b) => (b.disabled = false));
+      }
+
       function renderChoice(t) {
         $('body').innerHTML = t.options
           .map((o, i) => `<button class="opt" data-i="${i}">${esc(o)}</button>`)
@@ -731,7 +754,7 @@
               ws.send(
                 JSON.stringify({ type: 'answer', taskId: t.id, payload: { choice: +b.dataset.i } })
               );
-              $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+              $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
             })
         );
       }
@@ -739,32 +762,32 @@
       function showAnswered(m) {
         answered = true;
         lockInputs();
-        $('myScore').textContent = myScore !== undefined ? 'очки: ' + myScore : '';
+        $('myScore').textContent = myScore !== undefined ? 'points: ' + myScore : '';
         if (curTask && curTask.type === 'choice' && m.picked != null) {
           const b = document.querySelector(`.opt[data-i="${m.picked}"]`);
           if (b) b.classList.add(m.correct ? 'right' : 'wrong');
         }
         if (m.correct) {
           myScore += m.points || 0;
-          $('myScore').textContent = 'очки: ' + myScore;
+          $('myScore').textContent = 'points: ' + myScore;
           const parts = [];
           if (m.speedBonus > 0)
-            parts.push(`<span class="spd">⚡ +${m.speedBonus} за скорость</span>`);
+            parts.push(`<span class="spd">⚡ +${m.speedBonus} for speed</span>`);
           if (m.streakBonus > 0)
-            parts.push(`<span class="stk">🔥 +${m.streakBonus} серия ×${m.streak}</span>`);
+            parts.push(`<span class="stk">🔥 +${m.streakBonus} streak ×${m.streak}</span>`);
           const bonus = parts.length ? `<div class="bonus">${parts.join(' · ')}</div>` : '';
-          $('fb').innerHTML = `<span class="ok">Верно! +${m.points} очк.</span>${bonus}`;
-        } else $('fb').innerHTML = '<span class="no">Неверно — 0 очков за вопрос</span>';
+          $('fb').innerHTML = `<span class="ok">Correct! +${m.points} points</span>${bonus}`;
+        } else $('fb').innerHTML = '<span class="no">Incorrect — 0 points for this question</span>';
       }
 
       function roundOver(m) {
         lockInputs();
         if (!answered) {
-          $('fb').innerHTML = '<span class="no">Время вышло — 0 очков</span>';
+          $('fb').innerHTML = '<span class="no">Time is up — 0 points</span>';
         }
         setTimeout(() => {
           if (!$('done').classList.contains('hidden')) return;
-          $('fb').innerHTML = '<span class="wait">Следующий вопрос…</span>';
+          $('fb').innerHTML = '<span class="wait">Next question…</span>';
         }, 700);
       }
 
@@ -774,13 +797,13 @@
         $('body').innerHTML = `
     ${t.hint ? `<div style="font-size:12px;color:var(--accent);margin-bottom:6px">💡 ${esc(t.hint)}</div>` : ''}
     <div class="toolbar">
-      <button class="gbtn on" data-mode="edge" id="gm-edge">／ Соединить</button>
-      <button class="gbtn" data-mode="del" id="gm-del">✕ Удалить ребро</button>
-      <button class="gbtn" id="gclear">Очистить</button>
-      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+      <button class="gbtn on" data-mode="edge" id="gm-edge">／ Connect</button>
+      <button class="gbtn" data-mode="del" id="gm-del">✕ Delete edge</button>
+      <button class="gbtn" id="gclear">Clear</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Submit</button>
     </div>
     <canvas id="graph"></canvas>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">Соединить: потяни от вершины к вершине — или тапни по двум вершинам. «Удалить»: клик по ребру.</div>`;
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Connect: drag between vertices or tap two vertices. To delete an edge, select Delete and tap it.</div>`;
         const cv = $('graph'),
           ctx = cv.getContext('2d');
         // dragFrom / sel — это ИНДЕКСЫ вершин (не объекты), чтобы пересоздание nodes при resize их не ломало.
@@ -994,7 +1017,7 @@
               payload: { edges: edges.map((ed) => [nodes[ed.a].label, nodes[ed.b].label]) },
             })
           );
-          $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1005,11 +1028,11 @@
         $('body').innerHTML = `
     ${t.hint ? `<div style="font-size:12px;color:var(--accent);margin-bottom:6px">💡 ${esc(t.hint)}</div>` : ''}
     <div class="toolbar">
-      <button class="gbtn" id="gclear">Сбросить выбор</button>
-      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+      <button class="gbtn" id="gclear">Clear selection</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Submit</button>
     </div>
     <canvas id="graph"></canvas>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">Нажимайте на рёбра, чтобы включить/исключить их из остова. Подписаны веса.</div>`;
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Tap edges to include or exclude them from the spanning tree. Weights are shown.</div>`;
         const cv = $('graph'),
           ctx = cv.getContext('2d');
         const labels = t.nodes,
@@ -1147,7 +1170,7 @@
           lockInputs();
           const edges = [...chosen].map((i) => [ref[i][0], ref[i][1]]);
           ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { edges } }));
-          $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1155,13 +1178,13 @@
 
       /* ---- обход графа: клик по вершинам в порядке посещения (BFS/DFS) ---- */
       function renderOrder(t) {
-        const modeName = t.mode === 'bfs' ? 'в ширину (BFS)' : 'в глубину (DFS)';
+        const modeName = t.mode === 'bfs' ? 'breadth-first (BFS)' : 'depth-first (DFS)';
         $('body').innerHTML = `
-    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Обход ${modeName}. Старт: вершина ${esc(t.start)}. Кликайте вершины по порядку посещения.</div>
+    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Traversal ${modeName}. Start vertex: ${esc(t.start)}. Select vertices in visit order.</div>
     <div class="toolbar">
-      <button class="gbtn" id="gundo">↶ Отменить</button>
-      <button class="gbtn" id="gclear">Сбросить</button>
-      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+      <button class="gbtn" id="gundo">↶ Undo</button>
+      <button class="gbtn" id="gclear">Reset</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Submit</button>
     </div>
     <canvas id="graph"></canvas>
     <div id="ordseq" style="font-size:14px;color:#d6f5e2;margin-top:8px;min-height:20px"></div>`;
@@ -1175,8 +1198,8 @@
         let order = []; // order: индексы вершин в порядке кликов
         function seqText() {
           $('ordseq').innerHTML = order.length
-            ? '<b>Порядок:</b> ' + order.map((i) => esc(labels[i])).join(' → ')
-            : '<span style="color:var(--muted)">Пока ничего не выбрано</span>';
+            ? '<b>Order:</b> ' + order.map((i) => esc(labels[i])).join(' → ')
+            : '<span style="color:var(--muted)">Nothing selected yet</span>';
         }
         function resize() {
           const r = cv.getBoundingClientRect();
@@ -1251,7 +1274,7 @@
             } else if (isStart) {
               ctx.fillStyle = '#ff8fb3';
               ctx.font = '700 10px sans-serif';
-              ctx.fillText('старт', n.x, n.y + 27);
+              ctx.fillText('start', n.x, n.y + 27);
             }
           });
         }
@@ -1297,7 +1320,7 @@
               payload: { order: order.map((i) => labels[i]) },
             })
           );
-          $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1307,15 +1330,15 @@
       /* ---- пошаговая сортировка: тапни две плитки, чтобы поменять местами ---- */
       function renderSort(t) {
         const algoName =
-          t.algo === 'bubble' ? 'пузырьком' : t.algo === 'insertion' ? 'вставками' : t.algo || '';
+          t.algo === 'bubble' ? 'bubble' : t.algo === 'insertion' ? 'insertion' : t.algo || '';
         let cur = (t.array || []).slice();
         let sel = -1;
         $('body').innerHTML = `
-    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Сортировка ${esc(algoName)}${t.steps ? ` · выполни ${t.steps} шаг(ов)` : ''}. Тапни две плитки, чтобы поменять их местами.</div>
+    <div style="font-size:12px;color:var(--accent);margin-bottom:6px">Sorting ${esc(algoName)}${t.steps ? ` · complete ${t.steps} step(s)` : ''}. Tap two tiles to swap them.</div>
     <div class="sortrow" id="srow"></div>
     <div class="toolbar">
-      <button class="gbtn" id="greset">↺ Сбросить</button>
-      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+      <button class="gbtn" id="greset">↺ Reset</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Submit</button>
     </div>`;
         const row = $('srow');
         function draw() {
@@ -1354,7 +1377,7 @@
           answered = true;
           lockInputs();
           ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { array: cur } }));
-          $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
         };
       }
 
@@ -1382,7 +1405,7 @@
           html +
           `
     <div class="toolbar">
-      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Отправить</button>
+      <button class="gbtn" id="gsubmit" style="margin-left:auto;border-color:var(--accent);color:var(--accent)">Submit</button>
     </div>`;
         mathify($('body'));
         $('gsubmit').onclick = () => {
@@ -1395,7 +1418,7 @@
           answered = true;
           lockInputs();
           ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { blanks: vals } }));
-          $('fb').innerHTML = '<span class="wait">Ответ принят…</span>';
+          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
         };
       }
 
@@ -1405,10 +1428,10 @@
         show('done');
         const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
         $('medal').textContent = medals[place] || '🏔️';
-        $('doneMsg').textContent = place ? `Ты на ${place}-м месте!` : 'Восхождение завершено!';
-        let sub = `Итого очков: ${score}`;
-        if (correct != null && total != null) sub += ` · верных ответов: ${correct}/${total}`;
-        if (bestStreak > 1) sub += ` · лучшая серия: 🔥${bestStreak}`;
+        $('doneMsg').textContent = place ? `You placed #${place}!` : 'Climb complete!';
+        let sub = `Total points: ${score}`;
+        if (correct != null && total != null) sub += ` · correct answers: ${correct}/${total}`;
+        if (bestStreak > 1) sub += ` · best streak: 🔥${bestStreak}`;
         $('doneSub').textContent = sub;
         renderReview(review);
       }
@@ -1427,16 +1450,16 @@
             let yours = '';
             if (r.type === 'choice') {
               if (r.answered && !r.correct)
-                yours = `<div class="rline"><span class="lbl">Твой ответ:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
+                yours = `<div class="rline"><span class="lbl">Your answer:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
               else if (!r.answered)
-                yours = `<div class="rline"><span class="lbl">Ты не ответил(а)</span></div>`;
+                yours = `<div class="rline"><span class="lbl">You did not answer</span></div>`;
             } else if (r.type === 'sort' || r.type === 'blank') {
               if (r.answered && !r.correct && r.yourAnswer)
-                yours = `<div class="rline"><span class="lbl">Твой ответ:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
+                yours = `<div class="rline"><span class="lbl">Your answer:</span> <span class="yours wrongtxt">${esc(r.yourAnswer)}</span></div>`;
               else if (!r.answered)
-                yours = `<div class="rline"><span class="lbl">Ты не ответил(а)</span></div>`;
+                yours = `<div class="rline"><span class="lbl">You did not answer</span></div>`;
             }
-            const corr = `<div class="rline"><span class="lbl">Правильно:</span> <span class="corr">${esc(r.correctAnswer || '')}</span></div>`;
+            const corr = `<div class="rline"><span class="lbl">Correct answer:</span> <span class="corr">${esc(r.correctAnswer || '')}</span></div>`;
             const exp = r.explain ? `<div class="explain">💡 ${esc(r.explain)}</div>` : '';
             return `<div class="rq ${cls}">
       <div class="rhead"><span class="badge">${badge}</span><span>${i + 1}. ${esc(r.title || r.prompt)}</span></div>
@@ -1444,7 +1467,7 @@
     </div>`;
           })
           .join('');
-        box.innerHTML = `<h3>Разбор вопросов</h3>${rows}`;
+        box.innerHTML = `<h3>Question review</h3>${rows}`;
         mathify(box);
         box.classList.remove('hidden');
       }
@@ -1453,8 +1476,8 @@
         clearInterval(timerInt);
         show('done');
         $('medal').textContent = '🚫';
-        $('doneMsg').textContent = 'Вас удалил преподаватель';
-        $('doneSub').textContent = 'Сессия для вас завершена.';
+        $('doneMsg').textContent = 'You were removed by your teacher';
+        $('doneSub').textContent = 'Your session has ended.';
       }
 
       function esc(s) {
