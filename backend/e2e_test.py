@@ -1,148 +1,264 @@
-"""Сквозной тест игрового цикла FastAPI-бэкенда через реальные WebSocket-соединения."""
+"""Run real HTTP/WebSocket tests against an isolated server and a public task bank.
+
+Usage: python -m e2e_test (from backend/). Never connects to the deployed server.
+"""
 
 import asyncio
 import json
+import os
+import socket
+import sqlite3
+import subprocess
 import sys
+import tempfile
+import time
+import unittest
+import urllib.error
+import urllib.request
+from pathlib import Path
 
 import websockets
 
-import bank
-
-BASE = "ws://127.0.0.1:8099"
-KEY = "TESTKEY99"
-
-CHOICE_ID = "asd_bst_search"  # lvl1, answer index 0
-GRAPH_ID = "gb_matrix"  # lvl2, requiredEdges
-
-results = {"ok": [], "fail": []}
+BASE_DIR = Path(__file__).resolve().parent
+KEY = "LOCAL-E2E-ONLY"
 
 
-def check(name, cond):
-    (results["ok"] if cond else results["fail"]).append(name)
-    print(("  PASS " if cond else "  FAIL ") + name)
-
-
-async def recv_until(ws, typ, timeout=8):
-    """Читать сообщения, пока не встретится нужный тип; вернуть его (и копить прочее)."""
-    got = []
-    while True:
-        raw = await asyncio.wait_for(ws.recv(), timeout)
-        m = json.loads(raw)
-        got.append(m)
-        if m.get("type") == typ:
-            return m, got
-
-
-async def drain(ws, seconds=0.4):
-    out = []
-    try:
+async def receive(ws, kind, predicate=lambda _: True, timeout=5):
+    async def read():
         while True:
-            raw = await asyncio.wait_for(ws.recv(), seconds)
-            out.append(json.loads(raw))
-    except asyncio.TimeoutError:  # noqa: UP041 — портативно для 3.10 и 3.11+
-        return out
+            msg = json.loads(await ws.recv())
+            if msg.get("type") == kind and predicate(msg):
+                return msg
+
+    return await asyncio.wait_for(read(), timeout)
 
 
-def correct_choice_index(pub_options):
-    t = bank.BY_ID[CHOICE_ID]
-    correct_text = t["options"][t["answer"]]
-    return pub_options.index(correct_text)
+async def send(ws, kind, **fields):
+    await ws.send(json.dumps({"type": kind, **fields}))
 
 
-async def main():
-    # --- teacher ---
-    teacher = await websockets.connect(f"{BASE}/teacher?role=teacher&key={KEY}")
-    init = await drain(teacher, 1.0)
-    types = {m["type"] for m in init}
-    check("teacher receives answerkey", "answerkey" in types)
-    check("teacher receives catalog", "catalog" in types)
-    check("teacher receives state", "state" in types)
+class SessionTests(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory(prefix="algoclimb-e2e-")
+        cls.root = Path(cls.temp.name)
+        cls.tasks = json.loads((BASE_DIR / "data/task-bank.example.json").read_text())
+        cls.tasks.append(
+            {
+                "id": "test_blank",
+                "type": "blank",
+                "topic": "tests",
+                "level": 1,
+                "title": "Unicode: проверка",
+                "prompt": "Стек: ___",
+                "template": "Стек: ___",
+                "blanks": [{"answer": "LIFO"}],
+            }
+        )
+        (cls.root / "bank.json").write_text(json.dumps(cls.tasks))
+        cfg = json.loads((BASE_DIR / "config/config.example.json").read_text())
+        cfg.update(
+            timeLimits={"choice": 1.5, "graph": 1.5},
+            revealMs=60,
+            paramize={"enabled": False},
+            debug={"enabled": False},
+        )
+        (cls.root / "config.json").write_text(json.dumps(cfg))
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            cls.port = sock.getsockname()[1]
+        cls.url = f"ws://127.0.0.1:{cls.port}"
+        env = {
+            **os.environ,
+            "TEACHER_KEY": KEY,
+            "QR_ROTATION": "0",
+            "DEBUG": "0",
+            "GSHEETS": "0",
+            "CONFIG_PATH": str(cls.root / "config.json"),
+            "TASK_BANK_PATH": str(cls.root / "bank.json"),
+            "RUNTIME_DIR": str(cls.root / "runtime"),
+            "EXPLANATIONS_PATH": str(cls.root / "no-explanations.json"),
+        }
+        cls.log = (cls.root / "server.log").open("w+")
+        cls.process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(cls.port),
+                "--ws",
+                "wsproto",
+            ],
+            cwd=BASE_DIR,
+            env=env,
+            stdout=cls.log,
+            stderr=subprocess.STDOUT,
+        )
+        try:
+            for _ in range(100):
+                if cls.process.poll() is not None:
+                    break
+                try:
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{cls.port}/healthz", timeout=0.2
+                    ):
+                        return
+                except (urllib.error.URLError, TimeoutError):
+                    time.sleep(0.05)
+            cls.log.seek(0)
+            raise RuntimeError("Test server did not start: " + cls.log.read())
+        except BaseException:
+            cls.tearDownClass()
+            raise
 
-    # --- two students join (debug/localhost -> без токена) ---
-    st1 = await websockets.connect(f"{BASE}/?role=student")
-    await st1.send(json.dumps({"type": "join", "nick": "Alice", "icon": "🦊"}))
-    j1, _ = await recv_until(st1, "joined")
-    check("student1 joined", j1.get("nick") == "Alice" and j1.get("status") == "lobby")
+    @classmethod
+    def tearDownClass(cls):
+        cls.process.terminate()
+        try:
+            cls.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            cls.process.kill()
+            cls.process.wait()
+        cls.log.close()
+        cls.temp.cleanup()
 
-    st2 = await websockets.connect(f"{BASE}/?role=student")
-    await st2.send(json.dumps({"type": "join", "nick": "Bob", "icon": "🐼"}))
-    j2, _ = await recv_until(st2, "joined")
-    check("student2 joined", j2.get("nick") == "Bob")
+    async def asyncSetUp(self):
+        self.connections = []
+        self.teacher = await self.connect("/teacher?key=" + KEY)
+        await receive(self.teacher, "state")
+        await send(self.teacher, "reset")
+        await receive(self.teacher, "state", lambda m: m["session"]["status"] == "lobby")
 
-    await drain(teacher, 0.5)
+    async def asyncTearDown(self):
+        await send(self.teacher, "reset")
+        await receive(self.teacher, "state", lambda m: m["session"]["status"] == "lobby")
+        for ws in self.connections:
+            await ws.close()
 
-    # --- start a real (non-test) session with our 2 known tasks ---
-    await teacher.send(
-        json.dumps({"type": "start", "taskIds": [CHOICE_ID, GRAPH_ID], "test": False})
-    )
+    async def connect(self, path="/"):
+        ws = await websockets.connect(self.url + path)
+        self.connections.append(ws)
+        return ws
 
-    # both students should get task #0 (choice)
-    t1, _ = await recv_until(st1, "task")
-    await recv_until(st2, "task")
-    check("round0 is choice task", t1["task"]["type"] == "choice" and t1["task"]["id"] == CHOICE_ID)
-    check("round0 total==2", t1["total"] == 2)
+    async def join(self, nick="Alice"):
+        ws = await self.connect()
+        await send(ws, "join", nick=nick, icon="🦊")
+        msg = await receive(ws, "joined")
+        self.assertEqual(msg["nick"], nick)
+        return ws
 
-    # Alice answers correctly, Bob answers wrong
-    ci = correct_choice_index(t1["task"]["options"])
-    wrong = 1 - ci if len(t1["task"]["options"]) > 1 else ci
-    await st1.send(json.dumps({"type": "answer", "taskId": CHOICE_ID, "payload": {"choice": ci}}))
-    a1, _ = await recv_until(st1, "answered")
-    check("Alice choice correct", a1["correct"] is True and a1["points"] > 0)
-    check("Alice basePoints=40 (100*1*0.4)", a1["basePoints"] == 40)
-    check("Alice streak=1", a1["streak"] == 1)
+    async def start(self, student, ids, practice=True):
+        await send(self.teacher, "start", taskIds=ids, test=practice)
+        return (await receive(student, "task"))["task"]
 
-    await st2.send(
-        json.dumps({"type": "answer", "taskId": CHOICE_ID, "payload": {"choice": wrong}})
-    )
-    a2, _ = await recv_until(st2, "answered")
-    check("Bob choice wrong", a2["correct"] is False and a2["points"] == 0)
+    def correct(self, task):
+        source = next(t for t in self.tasks if t["id"] == task["id"])
+        kind = task["type"]
+        if kind == "choice":
+            return {"choice": task["options"].index(source["options"][source["answer"]])}
+        if kind == "graph":
+            return {"edges": source["requiredEdges"]}
+        if kind == "order":
+            return {"order": ["A", "B", "C", "D", "E"]}
+        if kind == "sort":
+            return {"array": source["expected"]}
+        return {"blanks": ["LIFO"]}
 
-    # both answered -> round should end, then reveal -> round1 begins
-    r1, _ = await recv_until(st1, "roundover")
-    check("Alice roundover correct", r1["correct"] is True)
+    async def test_lifecycle_reconnect_and_persistence(self):
+        student = await self.join()
+        ids = ["demo_stack", "demo_triangle", "demo_bfs", "demo_bubble", "test_blank"]
+        task = await self.start(student, ids, practice=False)
+        self.assertNotIn("answer", task)
+        self.assertTrue(any("Стек" in t["title"] for t in self.tasks))
+        for idx, task_id in enumerate(ids):
+            self.assertEqual(task["id"], task_id)
+            if idx == 1:
+                await student.close()
+                student = await self.join()
+                restored = await receive(student, "task")
+                self.assertEqual(restored["index"], idx)
+            await send(student, "answer", taskId=task_id, payload=self.correct(task))
+            answer = await receive(student, "answered")
+            self.assertTrue(answer["correct"], task_id)
+            self.assertGreater(answer["points"], 0)
+            if idx < len(ids) - 1:
+                task = (await receive(student, "task"))["task"]
+        end = await receive(student, "sessionend")
+        self.assertEqual(end["correct"], len(ids))
+        self.assertEqual(len(end["review"]), len(ids))
+        self.assertIn("Стек", end["review"][0]["title"])
+        with sqlite3.connect(self.root / "runtime/algoclimb.db") as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM answers").fetchone()[0], len(ids))
+            self.assertEqual(conn.execute("SELECT count(*) FROM results").fetchone()[0], 1)
 
-    # round1 (graph) task arrives after reveal
-    t1b, _ = await recv_until(st1, "task", timeout=6)
-    await recv_until(st2, "task", timeout=6)
-    check("round1 is graph task", t1b["task"]["type"] == "graph" and t1b["task"]["id"] == GRAPH_ID)
+    async def test_pause_invalid_payload_retry_and_duplicate(self):
+        student = await self.join()
+        task = await self.start(student, ["demo_stack", "demo_triangle"])
+        await send(self.teacher, "pause")
+        await receive(student, "paused")
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        self.assertEqual((await receive(student, "answerRejected"))["reason"], "paused")
+        await send(self.teacher, "resume")
+        await receive(student, "resumed")
+        for payload in (None, [], {"choice": -1}, {"choice": 100}, {"choice": True}):
+            await send(student, "answer", taskId=task["id"], payload=payload)
+            self.assertEqual(
+                (await receive(student, "answerRejected"))["reason"], "invalid_payload"
+            )
+        await student.send("[]")
+        await student.send("null")
+        await student.send("{not json")
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        answer = await receive(student, "answered")
+        self.assertEqual(answer["streak"], 1)
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        graph = (await receive(student, "task"))["task"]
+        for edges in ([["A"]], [[{}, "B"]], [["unknown", "A"]]):
+            await send(student, "answer", taskId=graph["id"], payload={"edges": edges})
+            self.assertEqual(
+                (await receive(student, "answerRejected"))["reason"], "invalid_payload"
+            )
+        await send(student, "answer", taskId=graph["id"], payload=self.correct(graph))
+        self.assertTrue((await receive(student, "answered"))["correct"])
+        end = await receive(student, "sessionend")
+        self.assertEqual(end["correct"], 2)
 
-    # both answer graph correctly
-    edges = bank.answer_edges(bank.BY_ID[GRAPH_ID])["edges"]
-    await st1.send(json.dumps({"type": "answer", "taskId": GRAPH_ID, "payload": {"edges": edges}}))
-    a1b, _ = await recv_until(st1, "answered")
-    check("Alice graph correct", a1b["correct"] is True)
-    check("Alice streak=2 -> streakBonus=25", a1b["streak"] == 2 and a1b["streakBonus"] == 25)
-    check("Alice graph basePoints=80 (lvl2)", a1b["basePoints"] == 80)
+    async def test_deadline_and_automatic_finish(self):
+        student = await self.join()
+        task = await self.start(student, ["demo_stack"])
+        # Pause freezes remaining time; resume supplies the actual server deadline.
+        await send(self.teacher, "pause")
+        await receive(student, "paused")
+        await send(self.teacher, "resume")
+        timing = await receive(student, "resumed")
+        delay = (timing["deadline"] - timing["serverTime"]) / 1000 + 0.04
+        await asyncio.sleep(delay)
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        rejected = await receive(student, "answerRejected")
+        self.assertEqual(rejected["reason"], "expired")
+        end = await receive(student, "sessionend")
+        self.assertEqual(end["score"], 0)
+        self.assertFalse(end["review"][0]["answered"])
 
-    await st2.send(json.dumps({"type": "answer", "taskId": GRAPH_ID, "payload": {"edges": edges}}))
-    a2b, _ = await recv_until(st2, "answered")
-    check("Bob graph correct", a2b["correct"] is True)
-    check(
-        "Bob streak reset then =1 -> no streakBonus", a2b["streak"] == 1 and a2b["streakBonus"] == 0
-    )
+    async def test_teacher_key_is_required(self):
+        intruder = await self.connect("/teacher?key=incorrect")
+        self.assertEqual((await receive(intruder, "rejected"))["type"], "rejected")
 
-    # session end
-    end1, _ = await recv_until(st1, "sessionend", timeout=6)
-    end2, _ = await recv_until(st2, "sessionend", timeout=6)
-    check("Alice place=1 (higher score)", end1["place"] == 1)
-    check("Alice score>Bob score", end1["score"] > end2["score"])
-    check("Alice correct==2", end1["correct"] == 2)
-    check("Bob correct==1", end2["correct"] == 1)
-    check("review has 2 entries with explanations", len(end1["review"]) == 2)
-    check("review carries correctAnswer", bool(end1["review"][0]["correctAnswer"]))
-
-    # teacher final state
-    tfin = await drain(teacher, 1.0)
-    states = [m for m in tfin if m["type"] == "state"]
-    check("teacher final state finished", states and states[-1]["session"]["status"] == "finished")
-
-    await st1.close()
-    await st2.close()
-    await teacher.close()
+    async def test_added_time_replaces_the_original_deadline(self):
+        student = await self.join()
+        task = await self.start(student, ["demo_stack"])
+        await send(self.teacher, "addTime", ms=2000)
+        await receive(student, "addtime")
+        # The original round timeout would have fired at 1.9s (including grace).
+        await asyncio.sleep(2.05)
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        self.assertTrue((await receive(student, "answered"))["correct"])
+        self.assertEqual((await receive(student, "sessionend"))["correct"], 1)
 
 
-asyncio.run(main())
-print("\nRESULT:", len(results["ok"]), "passed,", len(results["fail"]), "failed")
-if results["fail"]:
-    print("FAILED:", results["fail"])
-    sys.exit(1)
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

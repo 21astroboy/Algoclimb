@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AlgoClimb — ключ ответов (для преподавателя)</title>
+    <title>AlgoClimb — answer key (teachers only)</title>
     <style>
       :root {
         --bg: #08111f;
@@ -244,17 +244,17 @@
     </style>
     <div class="loginback hidden" id="loginBox">
       <form class="loginCard" id="keyForm" autocomplete="off">
-        <h2>🔒 Вход преподавателя</h2>
-        <p>Введите ключ доступа из терминала сервера. Студентам он не виден.</p>
+        <h2>🔒 Teacher sign-in</h2>
+        <p>Enter the access key from the server terminal. Keep it private.</p>
         <input
           type="password"
           id="keyInput"
           inputmode="latin"
-          placeholder="КЛЮЧ"
+          placeholder="KEY"
           autocomplete="off"
           autofocus />
         <div class="loginErr" id="loginErr"></div>
-        <button type="submit">Войти</button>
+        <button type="submit">Sign in</button>
       </form>
     </div>
     <div class="wrap">
@@ -263,20 +263,20 @@
           Algo
           <b>Climb</b>
         </div>
-        <span class="tag">ключ ответов</span>
-        <span class="tag" id="dot">подключение…</span>
-        <span class="warn">Только для преподавателя — не показывайте студентам этот экран.</span>
+        <span class="tag">answer key</span>
+        <span class="tag" id="dot">connecting…</span>
+        <span class="warn">Teachers only — do not share this screen with students.</span>
       </header>
 
       <div class="now hidden" id="now">
-        <div class="lab">Текущий вопрос</div>
+        <div class="lab">Current question</div>
         <div class="q" id="nowQ"></div>
         <div class="a" id="nowA"></div>
       </div>
 
-      <input type="search" id="q" placeholder="Поиск по названию, условию или ответу…" />
+      <input type="search" id="q" placeholder="Search titles, questions or answers…" />
       <div class="filters" id="filters">
-        <button class="chip on" data-kind="all" data-val="all">Все</button>
+        <button class="chip on" data-kind="all" data-val="all">All</button>
       </div>
       <div class="count" id="count"></div>
       <div id="list"></div>
@@ -291,13 +291,13 @@
         query = '';
       // Темы и типы задаёт сам банк. Для демо-банка — красивые подписи,
       // для любого другого предмета подпись = значение из банка.
-      const TOPIC_LABELS = { asd: 'АиСД', graphs: 'Графы', py: 'Python' };
+      const TOPIC_LABELS = { asd: 'DSA', graphs: 'Graphs', py: 'Python' };
       const TYPE_LABELS = {
-        choice: 'Выбор',
-        graph: 'Построение',
-        order: 'Обход',
-        sort: 'Сортировка',
-        blank: 'Пропуски',
+        choice: 'Choice',
+        graph: 'Build graph',
+        order: 'Traversal',
+        sort: 'Sorting',
+        blank: 'Fill blanks',
       };
       const topicLabel = (t) => TOPIC_LABELS[t] || t || '';
       function uniqSorted(vals) {
@@ -307,7 +307,7 @@
         const topics = uniqSorted(items.map((it) => it.topic));
         const types = uniqSorted(items.map((it) => it.type));
         const html = [
-          `<button class="chip${fKind === 'all' ? ' on' : ''}" data-kind="all" data-val="all">Все</button>`,
+          `<button class="chip${fKind === 'all' ? ' on' : ''}" data-kind="all" data-val="all">All</button>`,
         ];
         topics.forEach((t) =>
           html.push(
@@ -331,8 +331,8 @@
         ws = new WebSocket(
           `${proto}://${location.host}/teacher?role=teacher&key=${encodeURIComponent(key)}`
         );
-        ws.onopen = () => ($('dot').textContent = 'в сети');
-        ws.onclose = () => ($('dot').textContent = 'нет связи');
+        ws.onopen = () => ($('dot').textContent = 'online');
+        ws.onclose = () => ($('dot').textContent = 'offline');
         ws.onmessage = (e) => {
           const m = JSON.parse(e.data);
           if (m.type === 'rejected') {
@@ -359,7 +359,7 @@
         try {
           localStorage.removeItem(KEY_STORE);
         } catch {}
-        showLogin(reason || 'Доступ запрещён');
+        showLogin(reason || 'Access denied');
       }
       function showLogin(err) {
         $('loginBox').classList.remove('hidden');
@@ -410,28 +410,28 @@
       }
       function render() {
         const list = items.filter(matches);
-        $('count').textContent = `Показано ${list.length} из ${items.length} задач`;
+        $('count').textContent = `Showing ${list.length} of ${items.length} questions`;
         $('list').innerHTML =
           list
             .map((it) => {
               const tp =
                 {
-                  graph: '<span class="badge g">построение</span>',
-                  order: '<span class="badge g">обход</span>',
-                  sort: '<span class="badge g">сортировка</span>',
-                  blank: '<span class="badge g">пропуски</span>',
-                }[it.type] || '<span class="badge">выбор</span>';
+                  graph: '<span class="badge g">graph</span>',
+                  order: '<span class="badge g">traversal</span>',
+                  sort: '<span class="badge g">sorting</span>',
+                  blank: '<span class="badge g">blanks</span>',
+                }[it.type] || '<span class="badge">choice</span>';
               const to = it.topic
                 ? '<span class="badge">' + esc(topicLabel(it.topic)) + '</span>'
                 : '';
               return `<div class="item ${it.id === curId ? 'cur' : ''}" data-id="${it.id}">
       <div class="top"><span class="ttl">${esc(it.title)}</span> ${tp} ${to}
-        <span class="badge">ур. ${it.level}</span></div>
+        <span class="badge">Lv. ${it.level}</span></div>
       <div class="pr">${esc(it.prompt)}</div>
-      <div class="ans"><b>Ответ:</b> ${esc(it.answer)}</div>
+      <div class="ans"><b>Answer:</b> ${esc(it.answer)}</div>
     </div>`;
             })
-            .join('') || '<div class="muted">Ничего не найдено.</div>';
+            .join('') || '<div class="muted">No results found.</div>';
         mathify($('list'));
       }
       function markCurrent() {
@@ -444,11 +444,11 @@
           $('now').classList.remove('hidden');
           $('nowQ').textContent =
             (m.currentTitle ? m.currentTitle + ' — ' : '') +
-            'вопрос ' +
+            'question ' +
             (m.round + 1) +
             '/' +
             m.roundTotal;
-          $('nowA').innerHTML = '<b style="color:var(--green)">Ответ:</b> ' + esc(m.currentAnswer);
+          $('nowA').innerHTML = '<b style="color:var(--green)">Answer:</b> ' + esc(m.currentAnswer);
           mathify($('now'));
         } else $('now').classList.add('hidden');
       }

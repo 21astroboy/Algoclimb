@@ -1,14 +1,16 @@
 {
   "name": "algoclimb",
   "version": "0.1.0",
-  "description": "Интерактивное приложение для лекций: лобби, интерактивные графы, гора прогресса, посещаемость",
+  "description": "Live classroom quizzes with interactive graphs, progress and attendance",
   "type": "commonjs",
   "scripts": {
     "lint:js": "eslint \"frontend/**/*.html\"",
     "lint:js:fix": "eslint \"frontend/**/*.html\" --fix",
     "format": "prettier --write \"frontend/**/*.html\"",
     "format:check": "prettier --check \"frontend/**/*.html\"",
-    "lint": "npm run lint:js && npm run format:check"
+    "lint": "npm run lint:js && npm run lint:scripts && npm run format:check",
+    "lint:scripts": "node tools/check_frontend.cjs",
+    "screenshots": "node tools/capture_screenshots.cjs"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
@@ -18,6 +20,7 @@
     "@html-eslint/eslint-plugin": "^0.66.1",
     "@html-eslint/parser": "^0.66.1",
     "eslint": "^9.39.5",
+    "playwright": "^1.62.1",
     "prettier": "^3.9.8"
   },
   "engines": {

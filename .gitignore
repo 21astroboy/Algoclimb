@@ -36,5 +36,7 @@ venv/
 
 # Runtime / деплой
 .env
+.env.*
+!.env.example
 algoclimb.pid
 algoclimb.out

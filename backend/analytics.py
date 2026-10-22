@@ -116,22 +116,22 @@ def analytics_sheets(stream, ac):
     def ms(v):
         return "" if v is None else round(v / 1000, 1)
 
-    topic_name = {"asd": "АиСД", "graphs": "Графы"}
-    type_name = {"choice": "выбор", "graph": "построение"}
+    topic_name = {"asd": "DSA", "graphs": "Graphs"}
+    type_name = {"choice": "choice", "graph": "graph"}
 
     students = [
         [
-            "Логин",
-            "Сессий",
-            "Ответов",
-            "Верных",
-            "Точность %",
-            "Ср. балл",
-            "Лучшее место",
-            "Уходы со вкладки",
-            "Быстрые ответы",
-            "Индекс подозр.",
-            "Подозрит.",
+            "Login",
+            "Sessions",
+            "Answers",
+            "Correct",
+            "Accuracy %",
+            "Avg. score",
+            "Best rank",
+            "Tab switches",
+            "Fast answers",
+            "Activity indicator",
+            "Flagged",
         ]
     ]
     for s in d["students"]:
@@ -147,21 +147,21 @@ def analytics_sheets(stream, ac):
                 s["tabLeaves"] or 0,
                 s["fastAnswers"] or 0,
                 s["suspicion"] or 0,
-                "да" if s["suspect"] else "",
+                "yes" if s["suspect"] else "",
             ]
         )
 
     tasks = [
         [
             "ID",
-            "Задача",
-            "Тема",
-            "Тип",
-            "Сложность",
-            "Попыток",
-            "Верных",
-            "Точность %",
-            "Ср. время, с",
+            "Question",
+            "Topic",
+            "Type",
+            "Difficulty",
+            "Attempts",
+            "Correct",
+            "Accuracy %",
+            "Avg. time, s",
         ]
     ]
     for t in d["tasks"]:
@@ -182,14 +182,14 @@ def analytics_sheets(stream, ac):
     sessions = [
         [
             "#",
-            "Дата",
-            "Поток",
-            "Статус",
-            "Участников",
-            "Ответов",
-            "Верных",
-            "Точность %",
-            "Ср. балл",
+            "Date",
+            "Group",
+            "Status",
+            "Participants",
+            "Answers",
+            "Correct",
+            "Accuracy %",
+            "Avg. score",
         ]
     ]
     for s in d["sessions"]:
@@ -209,13 +209,13 @@ def analytics_sheets(stream, ac):
 
     cols = sorted(d["sessions"], key=lambda c: c["id"])
     header = (
-        ["Логин"]
+        ["Login"]
         + [
             f"#{c['id']} {c['date'] or ''}"
-            + (f" (п{c['stream']})" if c["stream"] is not None else "")
+            + (f" (group {c['stream']})" if c["stream"] is not None else "")
             for c in cols
         ]
-        + ["Всего"]
+        + ["Total"]
     )
     att = [header]
     for a in d["attendance"]:
@@ -223,10 +223,10 @@ def analytics_sheets(stream, ac):
         att.append([a["nick"]] + ["✓" if c["id"] in sset else "" for c in cols] + [len(sset)])
 
     return [
-        {"name": "Логины", "rows": students},
-        {"name": "Задачи", "rows": tasks},
-        {"name": "Сессии", "rows": sessions},
-        {"name": "Посещаемость", "rows": att},
+        {"name": "Students", "rows": students},
+        {"name": "Questions", "rows": tasks},
+        {"name": "Sessions", "rows": sessions},
+        {"name": "Attendance", "rows": att},
     ]
 
 
