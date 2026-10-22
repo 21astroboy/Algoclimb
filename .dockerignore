@@ -2,6 +2,9 @@
 # Приватный банк и разборы В ОБРАЗ НЕ ПОПАДАЮТ: они монтируются на лету из ./secrets
 # (см. docker-compose.yml, TASK_BANK_PATH/EXPLANATIONS_PATH).
 secrets
+.env
+.env.*
+backend/config/config.json
 backend/data/task-bank.json
 backend/data/explanations.json
 

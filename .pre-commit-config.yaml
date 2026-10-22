@@ -20,7 +20,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (типы)
-        files: ^server_py/
+        files: ^backend/
         args: [--config-file=pyproject.toml]
 
   # ---------- Общая гигиена файлов ----------
@@ -42,11 +42,11 @@ repos:
         name: prettier (формат фронтенда)
         entry: npx prettier --write
         language: system
-        files: ^public/.*\.html$
-        exclude: ^public/vendor/
+        files: ^frontend/.*\.html$
+        exclude: ^frontend/vendor/
       - id: eslint
         name: eslint (линт фронтенда)
         entry: npx eslint
         language: system
-        files: ^public/.*\.html$
-        exclude: ^public/vendor/
+        files: ^frontend/.*\.html$
+        exclude: ^frontend/vendor/
