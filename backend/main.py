@@ -545,6 +545,10 @@ class Game:
             except asyncio.CancelledError:
                 return
             async with self.lock:
+                # The callback may cancel or replace timers. Detach this task
+                # first so end_round/finish_game cannot cancel their own caller.
+                if getattr(self, attr) is asyncio.current_task():
+                    setattr(self, attr, None)
                 await coro_factory()
 
         task = asyncio.create_task(run())

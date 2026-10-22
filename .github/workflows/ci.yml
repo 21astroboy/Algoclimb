@@ -43,6 +43,10 @@ jobs:
         working-directory: backend
         run: python -m smoke_test
 
+      - name: Timer regression tests
+        working-directory: backend
+        run: python -m unittest test_timers
+
   # ─────────────────────────────── Frontend (public/) ────────────────────
   frontend:
     name: Frontend — ESLint, Prettier
