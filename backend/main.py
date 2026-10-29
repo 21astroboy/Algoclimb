@@ -31,6 +31,7 @@ import db
 import gsheets
 from analytics import analytics_sheets, stats_data
 from security import Security, is_loopback
+from validation import valid_answer
 
 BASE = Path(__file__).resolve().parent  # backend/
 PROJECT = BASE.parent  # корень проекта
@@ -101,12 +102,12 @@ for _ep in _explanations_candidates():
     except Exception:
         EXPLAIN = {}
 
-CUSTOM_FILE = BASE / "data" / "runtime" / "custom-tasks.json"
+CUSTOM_FILE = db.DATA_DIR / "custom-tasks.json"
 # Снимок состояния живой сессии (ростер, очки, текущий вопрос, фаза). Лежит в
 # примонтированном runtime/ — переживает краш/перезапуск/пересборку контейнера.
 # Пишется периодически во время игры; при старте процесс восстанавливает сессию,
 # чтобы падение посреди пары не обнуляло занятие в пустое лобби.
-SNAPSHOT_FILE = BASE / "data" / "runtime" / "session-state.json"
+SNAPSHOT_FILE = db.DATA_DIR / "session-state.json"
 
 
 def time_limit_for(task):
@@ -465,6 +466,7 @@ class Game:
                 "total": len(self.order),
             },
             "test": bool(self.session["test"]),
+            "gradesExportEnabled": bool(config["gsheets"].get("enabled")),
             "round": self.round,
             "roundTotal": len(self.order),
             "currentType": task["type"] if task else None,
@@ -539,12 +541,21 @@ class Game:
         self._reveal = None
 
     def _schedule(self, attr, delay_ms, coro_factory):
+        previous = getattr(self, attr)
+        if previous and previous is not asyncio.current_task():
+            previous.cancel()
+
         async def run():
             try:
                 await asyncio.sleep(delay_ms / 1000)
             except asyncio.CancelledError:
                 return
             async with self.lock:
+                # The callback may cancel or replace timers. Detach this task
+                # first so end_round/finish_game cannot cancel their own caller.
+                if getattr(self, attr) is not asyncio.current_task():
+                    return
+                setattr(self, attr, None)
                 await coro_factory()
 
         task = asyncio.create_task(run())
@@ -769,9 +780,15 @@ class Game:
     # ---------- обработка сообщений студента ----------
     async def handle_student(self, ws, msg, ip):
         if msg.get("type") == "join":
+            if not isinstance(msg.get("nick"), str) or (
+                msg.get("icon") is not None and not isinstance(msg["icon"], str)
+            ):
+                return await self.send(
+                    ws, {"type": "rejected", "reason": "Please enter a valid nickname and icon."}
+                )
             nick = (msg.get("nick") or "").strip()[:24]
             if not nick:
-                return await self.send(ws, {"type": "rejected", "reason": "Пустой ник."})
+                return await self.send(ws, {"type": "rejected", "reason": "Enter your nickname."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)
             existing = self.by_nick.get(nick)
             # Переподключение уже допущенного ника НЕ требует свежего кода входа.
@@ -786,7 +803,7 @@ class Game:
                         ws,
                         {
                             "type": "rejected",
-                            "reason": "Неверный или устаревший код. Отсканируйте свежий QR.",
+                            "reason": "Invalid or expired code. Scan the current QR code.",
                         },
                     )
                 if config["qrRotation"].get("enabled") and not sec.consume_nonce(msg.get("nonce")):
@@ -794,24 +811,25 @@ class Game:
                         ws,
                         {
                             "type": "rejected",
-                            "reason": "Сессия входа устарела. Обновите страницу и войдите снова.",
+                            "reason": "Your sign-in session expired. Refresh the page and join again.",
                         },
                     )
             if existing:
                 if existing["kicked"]:
                     return await self.send(
-                        ws, {"type": "rejected", "reason": "Вас удалили из сессии."}
+                        ws,
+                        {"type": "rejected", "reason": "You have been removed from this session."},
                     )
                 s = existing
                 self.students[ws] = s
             else:
                 if self.session["status"] != "lobby":
                     return await self.send(
-                        ws, {"type": "rejected", "reason": "Сессия уже началась."}
+                        ws, {"type": "rejected", "reason": "The session has already started."}
                     )
                 s = {
                     "nick": nick,
-                    "icon": msg.get("icon") or "👾",
+                    "icon": (msg.get("icon") or "👾")[:32],
                     "ip": ip,
                     "joinedAt": int(time.time() * 1000),
                     "score": 0,
@@ -857,14 +875,31 @@ class Game:
                 return
             if s["nick"] in self.round_answered:
                 return
-            self.round_answered.add(s["nick"])
-
-            payload = msg.get("payload") or {}
-            picked = payload.get("choice") if isinstance(payload.get("choice"), int) else None
+            now = int(time.time() * 1000)
+            reason = "paused" if self.paused else "expired" if now >= self.round_deadline else None
+            payload = msg.get("payload")
+            if reason is None and not valid_answer(task, payload):
+                reason = "invalid_payload"
+            if reason:
+                messages = {
+                    "paused": "The question is paused. Try again after it resumes.",
+                    "expired": "Time is up. This answer was not accepted.",
+                    "invalid_payload": "Invalid answer format. Please try again.",
+                }
+                return await self.send(
+                    ws,
+                    {
+                        "type": "answerRejected",
+                        "taskId": task["id"],
+                        "reason": reason,
+                        "message": messages[reason],
+                    },
+                )
+            picked = payload.get("choice") if task["type"] == "choice" else None
             if task["type"] == "choice" and self.round_perm and picked is not None:
                 payload = {"choice": self.round_perm[picked]}
             correct = bool(bank.run_check(task, payload))
-            now = int(time.time() * 1000)
+            self.round_answered.add(s["nick"])
             limit = time_limit_for(task)
             frac = max(0, min(1, (self.round_deadline - now) / limit))
             points = base_points = speed_bonus = streak_bonus = 0
@@ -891,10 +926,10 @@ class Game:
             elif ty == "graph":
                 ans_text = (
                     ", ".join(f"{e[0]}–{e[1]}" for e in (raw_payload.get("edges") or []))
-                    or "(пусто)"
+                    or "(empty)"
                 )
             elif ty == "order":
-                ans_text = " → ".join(str(x) for x in (raw_payload.get("order") or [])) or "(пусто)"
+                ans_text = " → ".join(str(x) for x in (raw_payload.get("order") or [])) or "(empty)"
             elif ty == "sort":
                 ans_text = "[" + ", ".join(str(x) for x in (raw_payload.get("array") or [])) + "]"
             elif ty == "blank":
@@ -903,7 +938,7 @@ class Game:
                         "∅" if (v == "" or v is None) else str(v)
                         for v in (raw_payload.get("blanks") or [])
                     )
-                    or "(пусто)"
+                    or "(empty)"
                 )
             else:
                 ans_text = ""
@@ -1011,7 +1046,7 @@ class Game:
                     {
                         "type": "taskAdded",
                         "ok": False,
-                        "error": "Некорректная задача: проверьте обязательные поля.",
+                        "error": "Invalid question. Check the required fields.",
                     },
                 )
             if task["id"] in bank.BY_ID:
@@ -1020,7 +1055,7 @@ class Game:
                     {
                         "type": "taskAdded",
                         "ok": False,
-                        "error": "Задача с таким кодом уже существует.",
+                        "error": "A question with this ID already exists.",
                     },
                 )
             bank.TASKS.append(task)
@@ -1042,7 +1077,7 @@ class Game:
                     {
                         "type": "taskAdded",
                         "ok": False,
-                        "error": "Удалять можно только собственные задачи.",
+                        "error": "Only custom questions can be deleted.",
                     },
                 )
             bank.TASKS[:] = [x for x in bank.TASKS if x["id"] != tid]
@@ -1136,14 +1171,14 @@ class Game:
                     {
                         "type": "gradesExport",
                         "ok": False,
-                        "error": "Выгрузка в Google Sheets выключена (gsheets.enabled).",
+                        "error": "Google Sheets export is disabled (gsheets.enabled).",
                     },
                 )
             logins = [s["nick"] for s in self.by_nick.values() if not s["kicked"]]
             if not logins:
                 return await self.send(
                     ws,
-                    {"type": "gradesExport", "ok": False, "error": "Нет участников для выгрузки."},
+                    {"type": "gradesExport", "ok": False, "error": "No participants to export."},
                 )
             dry = msg.get("dryRun", True) is not False  # по умолчанию «предпросмотр»
             try:
@@ -1183,59 +1218,44 @@ _BG_TASKS: set[asyncio.Task] = set()
 
 # ================================================================ FastAPI
 API_DESCRIPTION = """
-**AlgoClimb** — соревновательная викторина по алгоритмам (в духе Kahoot).
-Сервер на FastAPI, состояние игры — в памяти одного процесса (asyncio.Lock),
-поэтому запускать **только один воркер** uvicorn.
+**AlgoClimb** runs one shared classroom session in a single FastAPI process.
+Use **one Uvicorn worker**. HTTP endpoints are listed below; live events use WebSockets.
 
-Эта страница (`/docs`) описывает HTTP-ручки. Сама игра общается по **WebSocket** —
-их Swagger не рисует, поэтому протокол описан ниже.
+### Screens
+- `/`: student screen, with questions in the bank's original language.
+- `/teacher`: teacher controls, protected by a private access key.
+- `/answers`: private teacher answer key.
+- `/debug`: local testing launcher.
 
----
+### Teacher WebSocket
+Connect to `ws(s)://<host>/teacher?key=<TEACHER_KEY>`.
+The server sends `answerkey`, `catalog`, `taskTemplates` and `state`.
+Commands include `start` (optional `taskIds` and `test`), `pause`, `resume`,
+`addTime` (`ms`), `skip`, `finish`, `reset`, `getStats` and `setStream`.
 
-### Роли и экраны
-| Адрес | Кто | Что |
-|-------|-----|-----|
-| `GET /` | студент | экран игрока (`student.html`) |
-| `GET /teacher` | преподаватель | пульт управления (`teacher.html`), вход по ключу |
-| `GET /answers` | преподаватель | ключ ответов по банку |
-| `GET /debug` | — | лаунчер со ссылками (удобно тестить с одной машины) |
+### Student WebSocket
+Connect to `ws(s)://<host>/`. Send `join` with `nick` and `icon`.
+When QR rotation is enabled, initial entry also needs the QR `token` and a fresh
+`nonce` from `/api/nonce`. Existing nickname reconnection keeps its current behavior.
+The server sends `joined` or `rejected`, then `task`, `answered`, `roundover`,
+`paused`, `resumed`, `addtime` and `sessionend` events as the session progresses.
 
-### Ключ преподавателя
-Защищает пульт, ключ ответов и экспорт. Печатается в терминале при старте
-(или задаётся `TEACHER_KEY` / `teacherKey` в конфиге). Студенты его не видят.
+Submit an answer using `type: "answer"`, `taskId` and a type-specific `payload`:
+- choice: `{"choice": 0}` (index in the shuffled public options)
+- graph: `{"edges": [["A", "B"]]}`
+- order: `{"order": ["A", "B"]}`
+- sort: `{"array": [1, 2, 3]}`
+- blank: `{"blanks": ["answer"]}`
 
----
-
-### WebSocket преподавателя — `ws(s)://<host>/teacher?key=<TEACHER_KEY>`
-После подключения сервер шлёт `answerkey`, `catalog`, `taskTemplates`, затем `state`.
-Команды от преподавателя (JSON-текст):
-
-```jsonc
-{"type":"start", "taskIds":["c1_...","c2_..."], "test":false} // test:true — НЕ писать в БД
-{"type":"next"}        // следующий вопрос
-{"type":"pause"}       // пауза / снятие паузы
-{"type":"reset"}       // сброс в лобби
-{"type":"kick", "nick":"Вася"}   // удалить игрока
-```
-
-### WebSocket студента — `ws(s)://<host>/?role=student`
-```jsonc
-// 1) вход
-{"type":"join", "nick":"Вася", "icon":"🦊", "token":"ABC123", "nonce":"<из /api/nonce>"}
-// 2) сервер отвечает одним из: joined | rejected
-// 3) во время игры сервер шлёт: task | answered | roundover | paused | sessionend
-// 4) ответ на вопрос
-{"type":"answer", "taskId":"c1_...", "payload":{"choice":0}}   // payload зависит от типа задачи
-```
-
-В **debug**-режиме (`DEBUG=1`) вход с localhost не требует `token`/`nonce`.
-При включённой ротации QR нужен свежий `token` (из QR) и одноразовый `nonce` (из `/api/nonce`).
+`answerRejected` includes `taskId`, a `reason` (`paused`, `expired`, or
+`invalid_payload`) and an English `message`. It does not consume the attempt.
+A valid but incorrect answer does consume the attempt. Duplicate submissions are ignored.
 """
 
 tags_metadata = [
-    {"name": "Вход и доступ", "description": "Выдача одноразовых nonce, проверка доступа."},
-    {"name": "Экспорт", "description": "Выгрузка аналитики (нужен ключ преподавателя)."},
-    {"name": "Страницы", "description": "HTML-экраны студента, преподавателя и отладки."},
+    {"name": "Access", "description": "One-time sign-in nonces and access checks."},
+    {"name": "Export", "description": "Analytics exports (teacher key required)."},
+    {"name": "Pages", "description": "Student, teacher and debug screens."},
 ]
 
 
@@ -1348,15 +1368,15 @@ async def healthz():
 # ---------------------------------------------------------------- HTTP-маршруты
 @app.get(
     "/api/nonce",
-    tags=["Вход и доступ"],
-    summary="Выдать одноразовый nonce для входа студента",
+    tags=["Access"],
+    summary="Issue a one-time student sign-in nonce",
     description=(
         "Возвращает свежий `nonce` (живёт ~2 минуты, сгорает после первого входа) и "
-        "`serverTime` для синхронизации таймеров. Экран студента дёргает это перед `join`."
+        "`serverTime` для синхронизации таймеров. Student screen дёргает это перед `join`."
     ),
     responses={
         200: {
-            "description": "Nonce выдан",
+            "description": "Nonce issued",
             "content": {
                 "application/json": {
                     "example": {"nonce": "x7Kq9fLp2mAb", "serverTime": 1738000000000}
@@ -1374,32 +1394,32 @@ async def api_nonce(request: Request):
 
 @app.get(
     "/export/analytics.xlsx",
-    tags=["Экспорт"],
-    summary="Выгрузить аналитику в Excel (.xlsx)",
+    tags=["Export"],
+    summary="Export analytics to Excel (.xlsx)",
     description=(
-        "Отдаёт файл аналитики за занятие. Нужен `key` — ключ преподавателя. "
-        "Необязательный `stream` фильтрует по номеру потока."
+        "Download session analytics. Requires the teacher key. "
+        "The optional stream parameter filters by class group."
     ),
     responses={
         200: {
-            "description": "XLSX-файл",
+            "description": "XLSX file",
             "content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}},
         },
-        403: {"description": "Нужен ключ преподавателя"},
-        500: {"description": "Ошибка экспорта"},
+        403: {"description": "Teacher access key required"},
+        500: {"description": "Export failed"},
     },
 )
 async def export_xlsx(
-    key: str = Query("", description="Ключ преподавателя"),
-    stream: str | None = Query(None, description="Номер потока (необязательно)"),
+    key: str = Query("", description="Teacher access key"),
+    stream: str | None = Query(None, description="Class group (optional)"),
 ):
     if key.strip() != TEACHER_KEY:
-        return PlainTextResponse("Нужен ключ преподавателя", status_code=403)
+        return PlainTextResponse("Teacher access key required", status_code=403)
     try:
         from analytics import build_xlsx
 
         buf = build_xlsx(analytics_sheets(stream, AC))
-        fname = f"algoclimb-аналитика-{time.strftime('%Y-%m-%d')}.xlsx"
+        fname = f"algoclimb-analytics-{time.strftime('%Y-%m-%d')}.xlsx"
         from urllib.parse import quote
 
         return Response(
@@ -1408,17 +1428,17 @@ async def export_xlsx(
             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(fname)}"},
         )
     except Exception as e:
-        return PlainTextResponse("Ошибка экспорта: " + str(e), status_code=500)
+        return PlainTextResponse("Export failed: " + str(e), status_code=500)
 
 
 @app.get(
     "/debug",
     response_class=HTMLResponse,
-    tags=["Страницы"],
-    summary="Лаунчер отладки",
+    tags=["Pages"],
+    summary="Debug launcher",
     description=(
-        "HTML со ссылками на экраны студента/преподавателя/ключа ответов. "
-        "При `DEBUG=1` и заходе с localhost показывает ключ преподавателя."
+        "Links to student, teacher and answer-key screens. "
+        "With DEBUG=1, localhost visitors can see the teacher key."
     ),
 )
 async def debug_page(request: Request):
@@ -1426,21 +1446,21 @@ async def debug_page(request: Request):
     show_key = bool(config["debug"].get("enabled") and is_loopback(ip))
     on = config["debug"].get("enabled")
     key_block = (
-        f'<div class="key"><span class="lab">Ключ преподавателя</span><code id="k">{TEACHER_KEY}</code>'
-        "<button onclick=\"navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('k').textContent)\">копировать</button></div>"
+        f'<div class="key"><span class="lab">Teacher access key</span><code id="k">{TEACHER_KEY}</code>'
+        "<button onclick=\"navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('k').textContent)\">copy</button></div>"
         if (on and show_key)
-        else '<p class="muted">Ключ преподавателя показывается только при включённом debug и заходе с этой машины. Его печатает терминал сервера.</p>'
+        else '<p class="muted">The teacher key is shown only in debug mode on this machine. Find it in the server terminal.</p>'
     )
     off_warn = (
         ""
         if on
         else (
-            '<div class="warn">Режим отладки <b>выключен</b>. Запустите <code>DEBUG=1</code>, '
-            "чтобы заходить студентом с localhost без кода.</div>"
+            '<div class="warn">Debug mode is <b>off</b>. Set <code>DEBUG=1</code>, '
+            "to join as a student from localhost without a code.</div>"
         )
     )
     html = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>AlgoClimb — отладка</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>AlgoClimb — debug</title>
 <style>
   :root{{--bg:#08111f;--panel:#102544;--panel2:#0c1c34;--line:#1d3a63;--accent:#ffd23f;--blue:#5aa9ff;--text:#e8eef7;--muted:#8195b4}}
   *{{box-sizing:border-box}}body{{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
@@ -1464,13 +1484,13 @@ async def debug_page(request: Request):
   .hint{{margin-top:18px;font-size:13px;color:var(--muted);line-height:1.5}}
   code{{background:#0a1830;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#bfe0ff}}
 </style></head><body><div class="wrap">
-  <div class="logo">Algo<b>Climb</b> · отладка</div>
-  <div class="tag">Открывай экраны на этой машине по разным адресам. Ссылки открываются в новой вкладке.</div>
+  <div class="logo">Algo<b>Climb</b> · debug</div>
+  <div class="tag">Open each screen on this machine. Links open in a new tab.</div>
   {off_warn}
   <div class="grid">
-    <a class="card" href="/teacher" target="_blank"><div class="h">🎛 Преподаватель</div><div class="d">Управление игрой, старт, аналитика, ключ ответов. Вход по ключу.</div></a>
-    <a class="card" href="/" target="_blank"><div class="h">🧑‍🎓 Студент</div><div class="d">Экран игрока. В debug заходит с localhost без кода.</div></a>
-    <a class="card wide" href="/answers" target="_blank"><div class="h">🔑 Ключ ответов</div><div class="d">Правильные ответы по банку (для преподавателя).</div></a>
+    <a class="card" href="/teacher" target="_blank"><div class="h">🎛 Teacher</div><div class="d">Session controls, analytics and the answer key. Access key required.</div></a>
+    <a class="card" href="/" target="_blank"><div class="h">🧑‍🎓 Student</div><div class="d">Student screen. Localhost access requires no code in debug mode.</div></a>
+    <a class="card wide" href="/answers" target="_blank"><div class="h">🔑 Answer key</div><div class="d">Question bank answers (teachers only).</div></a>
   </div>
   {key_block}
 </div></body></html>"""
@@ -1501,9 +1521,9 @@ def _serve(rel):
 
 @app.get(
     "/",
-    tags=["Страницы"],
-    summary="Экран студента",
-    description="HTML экрана игрока (`student.html`). Дальше общение идёт по WebSocket `/`.",
+    tags=["Pages"],
+    summary="Student screen",
+    description="Student screen (`student.html`); communicates over WebSocket `/`.",
 )
 async def root_page():
     return _serve("student.html")
@@ -1511,9 +1531,9 @@ async def root_page():
 
 @app.get(
     "/teacher",
-    tags=["Страницы"],
-    summary="Пульт преподавателя",
-    description="HTML пульта (`teacher.html`). Управление идёт по WebSocket `/teacher?key=...`.",
+    tags=["Pages"],
+    summary="Teacher dashboard",
+    description="Teacher dashboard (`teacher.html`); controls use WebSocket `/teacher?key=...`.",
 )
 async def teacher_page():
     return _serve("teacher.html")
@@ -1521,9 +1541,9 @@ async def teacher_page():
 
 @app.get(
     "/answers",
-    tags=["Страницы"],
-    summary="Ключ ответов",
-    description="HTML со списком правильных ответов по банку задач (`answers.html`).",
+    tags=["Pages"],
+    summary="Answer key",
+    description="Question bank answer key (`answers.html`).",
 )
 async def answers_page():
     return _serve("answers.html")
@@ -1540,7 +1560,7 @@ async def teacher_ws(ws: WebSocket):
     await ws.accept()
     key = (ws.query_params.get("key") or "").strip()
     if key != TEACHER_KEY:
-        await game.send(ws, {"type": "rejected", "reason": "Неверный ключ преподавателя."})
+        await game.send(ws, {"type": "rejected", "reason": "Invalid teacher access key."})
         await ws.close()
         return
     game.teachers.add(ws)
@@ -1555,6 +1575,8 @@ async def teacher_ws(ws: WebSocket):
             try:
                 msg = json.loads(raw)
             except Exception:
+                continue
+            if not isinstance(msg, dict):
                 continue
             async with game.lock:
                 await game.handle_teacher(ws, msg)
@@ -1574,6 +1596,8 @@ async def student_ws(ws: WebSocket):
             try:
                 msg = json.loads(raw)
             except Exception:
+                continue
+            if not isinstance(msg, dict):
                 continue
             async with game.lock:
                 await game.handle_student(ws, msg, ip)

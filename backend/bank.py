@@ -557,19 +557,19 @@ def paramize_task(t):
 
 # ---------------------------------------------------------------- конструктор задач (интерфейс преподавателя)
 GRAPH_TEMPLATES = {
-    "tree": ("Любое дерево (n−1 ребро, связно)", "anyTree"),
-    "cycle": ("Цикл через все вершины", "anyCycle"),
-    "path": ("Простой путь через все вершины", "anyPath"),
-    "complete": ("Полный граф (все пары соединены)", "anyComplete"),
-    "star": ("Звезда (один центр)", "anyStar"),
-    "bipartite": ("Полный двудольный граф", "anyCompleteBipartite"),
-    "binarytree": ("Двоичное дерево (степени ≤ 3)", "anyBinaryTree"),
+    "tree": ("Any tree (connected, n−1 edges)", "anyTree"),
+    "cycle": ("Cycle through all vertices", "anyCycle"),
+    "path": ("Simple path through all vertices", "anyPath"),
+    "complete": ("Complete graph (all pairs connected)", "anyComplete"),
+    "star": ("Star (one central vertex)", "anyStar"),
+    "bipartite": ("Complete bipartite graph", "anyCompleteBipartite"),
+    "binarytree": ("Binary tree (degrees ≤ 3)", "anyBinaryTree"),
 }
 
 
 def graph_template_list():
     out = [{"key": k, "label": v[0]} for k, v in GRAPH_TEMPLATES.items()]
-    out.append({"key": "exact", "label": "Точный граф (по списку рёбер)"})
+    out.append({"key": "exact", "label": "Exact graph (specified edges)"})
     return out
 
 

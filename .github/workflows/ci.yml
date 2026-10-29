@@ -14,7 +14,7 @@ concurrency:
 jobs:
   # ─────────────────────────────── Python (FastAPI-бэкенд) ───────────────
   python:
-    name: Python — Ruff, mypy, smoke
+    name: Python — Ruff, mypy, unit, E2E
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +43,14 @@ jobs:
         working-directory: backend
         run: python -m smoke_test
 
+      - name: Timer and answer regression tests
+        working-directory: backend
+        run: python -m unittest test_timers test_answers
+
+      - name: Isolated HTTP and WebSocket E2E
+        working-directory: backend
+        run: python -m e2e_test
+
   # ─────────────────────────────── Frontend (public/) ────────────────────
   frontend:
     name: Frontend — ESLint, Prettier
@@ -60,6 +68,9 @@ jobs:
 
       - name: ESLint
         run: npm run lint:js
+
+      - name: Inline JavaScript syntax
+        run: npm run lint:scripts
 
       - name: Prettier (проверка формата)
         run: npm run format:check

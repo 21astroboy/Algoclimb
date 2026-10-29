@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AlgoClimb — экран преподавателя</title>
+    <title>AlgoClimb — teacher dashboard</title>
     <style>
       :root {
         --bg: #08111f;
@@ -892,19 +892,17 @@
     </style>
     <div class="loginback hidden" id="loginBox">
       <form class="loginCard" id="keyForm" autocomplete="off">
-        <h2>🔒 Вход преподавателя</h2>
-        <p>
-          Введите ключ доступа. Он показан в терминале при запуске сервера. Студентам он не виден.
-        </p>
+        <h2>🔒 Teacher sign-in</h2>
+        <p>Enter the access key printed in the server terminal. Keep it private.</p>
         <input
           type="password"
           id="keyInput"
           inputmode="latin"
-          placeholder="КЛЮЧ"
+          placeholder="KEY"
           autocomplete="off"
           autofocus />
         <div class="loginErr" id="loginErr"></div>
-        <button type="submit" class="btn primary">Войти</button>
+        <button type="submit" class="btn primary">Sign in</button>
       </form>
     </div>
     <div class="wrap">
@@ -917,7 +915,7 @@
           class="tag hidden"
           id="testTag"
           style="background: #3a2a16; color: #ffd9a0; border-color: #6b4b2b">
-          🧪 тестовая сессия — без записи
+          🧪 practice session — results are not saved
         </span>
         <div class="row" style="margin-left: auto" id="controls">
           <a
@@ -926,21 +924,21 @@
             href="/answers"
             target="_blank"
             rel="noopener"
-            title="Приватный ключ ответов в отдельной вкладке">
-            🔑 Ключ ответов
+            title="Open the private answer key in a separate tab">
+            🔑 Answer key
           </a>
-          <button class="btn ghost" id="statsBtn" title="История сессий и статистика по задачам">
-            📊 Аналитика
+          <button class="btn ghost" id="statsBtn" title="Session history and question statistics">
+            📊 Analytics
           </button>
           <button
             class="btn ghost hidden"
             id="testBtn"
-            title="Тестовый прогон — результаты НЕ пишутся в базу. Удобно для проверки и репетиции.">
-            🧪 Тест: выкл
+            title="Practice session — results are not saved. Use it to try out questions.">
+            🧪 Practice: off
           </button>
-          <button class="btn primary hidden" id="startBtn">▶ Старт</button>
-          <button class="btn danger hidden" id="finishBtn">■ Завершить</button>
-          <button class="btn ghost" id="resetBtn">Сброс</button>
+          <button class="btn primary hidden" id="startBtn">▶ Start</button>
+          <button class="btn danger hidden" id="finishBtn">■ Finish</button>
+          <button class="btn ghost" id="resetBtn">Reset</button>
         </div>
       </header>
 
@@ -949,12 +947,12 @@
         <div class="lobby-grid">
           <div class="card">
             <div class="row spread">
-              <h2 class="s">Лобби</h2>
+              <h2 class="s">Lobby</h2>
               <div class="row" style="gap: 14px">
                 <div
                   class="streamPick"
-                  title="Номер потока для этой сессии — попадёт в записи посещаемости">
-                  <span class="muted">Поток</span>
+                  title="Class group for this session — included in attendance records">
+                  <span class="muted">Group</span>
                   <div class="seg" id="streamSeg">
                     <button type="button" class="seg-btn" data-stream="1">1</button>
                     <button type="button" class="seg-btn" data-stream="2">2</button>
@@ -963,16 +961,16 @@
                 </div>
                 <div class="row">
                   <span class="counter" id="cnt">0</span>
-                  <span class="muted">в лобби</span>
+                  <span class="muted">in lobby</span>
                 </div>
               </div>
             </div>
             <div class="roster" id="roster"></div>
           </div>
           <div class="card joinbox">
-            <h2 class="s">Вход для студентов</h2>
+            <h2 class="s">Student access</h2>
             <div class="qr" id="qr"></div>
-            <div class="muted" style="font-size: 12px">Открыть на телефоне:</div>
+            <div class="muted" style="font-size: 12px">Open on your phone:</div>
             <div class="url" id="url">—</div>
             <div class="token hidden" id="token"></div>
           </div>
@@ -980,40 +978,40 @@
 
         <div class="card builder">
           <div class="row spread">
-            <h2 class="s">Конструктор сессии</h2>
+            <h2 class="s">Session builder</h2>
             <span class="muted" style="font-size: 13px">
-              Выбрано:
+              Selected:
               <span class="selcount" id="selCount">0</span>
-              · если ничего не выбрать, сессия соберётся по config
+              · leave empty to use the session configuration
             </span>
           </div>
           <div class="bar">
-            <input type="search" id="catSearch" placeholder="Поиск по названию или условию…" />
-            <button class="chip on" data-f="topic" data-v="all">Все темы</button>
-            <button class="chip on" data-f="type" data-v="all">Все типы</button>
-            <button class="chip" data-f="type" data-v="choice">Выбор</button>
-            <button class="chip" data-f="type" data-v="graph">Построение</button>
-            <button class="chip" data-f="type" data-v="order">Обход</button>
-            <button class="chip" data-f="type" data-v="sort">Сортировка</button>
-            <button class="chip" data-f="type" data-v="blank">Пропуски</button>
-            <button class="chip on" data-f="level" data-v="all">Все ур.</button>
-            <button class="chip" data-f="level" data-v="1">ур.1</button>
-            <button class="chip" data-f="level" data-v="2">ур.2</button>
-            <button class="chip" data-f="level" data-v="3">ур.3</button>
+            <input type="search" id="catSearch" placeholder="Search titles or questions…" />
+            <button class="chip on" data-f="topic" data-v="all">All topics</button>
+            <button class="chip on" data-f="type" data-v="all">All types</button>
+            <button class="chip" data-f="type" data-v="choice">Choice</button>
+            <button class="chip" data-f="type" data-v="graph">Build graph</button>
+            <button class="chip" data-f="type" data-v="order">Traversal</button>
+            <button class="chip" data-f="type" data-v="sort">Sorting</button>
+            <button class="chip" data-f="type" data-v="blank">Fill blanks</button>
+            <button class="chip on" data-f="level" data-v="all">All levels</button>
+            <button class="chip" data-f="level" data-v="1">Lv.1</button>
+            <button class="chip" data-f="level" data-v="2">Lv.2</button>
+            <button class="chip" data-f="level" data-v="3">Lv.3</button>
           </div>
           <div class="bar" id="blockBar">
-            <span class="muted" style="align-self: center">Готовые наборы:</span>
-            <button class="chip on" data-f="block" data-v="all">Все задачи</button>
+            <span class="muted" style="align-self: center">Question sets:</span>
+            <button class="chip on" data-f="block" data-v="all">All questions</button>
           </div>
           <div class="bar">
-            <button class="btn ghost" id="catAll">Выбрать видимые</button>
-            <button class="btn ghost" id="catNone">Снять все</button>
-            <button class="btn ghost" id="catRand">🎲 Случайно 10 из видимых</button>
+            <button class="btn ghost" id="catAll">Select visible</button>
+            <button class="btn ghost" id="catNone">Clear selection</button>
+            <button class="btn ghost" id="catRand">🎲 Pick 10 at random</button>
             <button
               class="btn ghost"
               id="openMaker"
               style="border-color: var(--accent); color: var(--accent)">
-              ➕ Создать задачу
+              ➕ Create question
             </button>
             <span class="muted" id="catCount" style="font-size: 12px; margin-left: auto"></span>
           </div>
@@ -1025,36 +1023,36 @@
       <div class="modal hidden" id="makerModal">
         <div class="modalcard" style="max-width: 640px">
           <div class="row spread">
-            <h2 class="s">Создать свою задачу</h2>
+            <h2 class="s">Create a custom question</h2>
             <button class="x" id="makerClose">✕</button>
           </div>
           <div class="bar" style="margin-top: 8px">
-            <button class="chip on mk-kind" data-k="choice">Выбор ответа</button>
-            <button class="chip mk-kind" data-k="graph">Построение графа</button>
-            <button class="chip mk-kind" data-k="order">Обход (BFS/DFS)</button>
-            <button class="chip mk-kind" data-k="sort">Сортировка</button>
-            <button class="chip mk-kind" data-k="blank">Пропуски</button>
+            <button class="chip on mk-kind" data-k="choice">Multiple choice</button>
+            <button class="chip mk-kind" data-k="graph">Build a graph</button>
+            <button class="chip mk-kind" data-k="order">Traversal (BFS/DFS)</button>
+            <button class="chip mk-kind" data-k="sort">Sorting</button>
+            <button class="chip mk-kind" data-k="blank">Fill blanks</button>
           </div>
           <div class="mkgrid">
             <label>
-              Название
-              <input id="mkTitle" placeholder="Краткий заголовок" />
+              Title
+              <input id="mkTitle" placeholder="Short title" />
             </label>
             <label>
-              Условие
+              Question
               <textarea
                 id="mkPrompt"
                 rows="2"
-                placeholder="Текст вопроса (можно LaTeX: $O(n\\log n)$)"></textarea>
+                placeholder="Question text (supports LaTeX: $O(n\\log n)$)"></textarea>
             </label>
             <div class="row" style="gap: 10px">
               <label style="flex: 1">
-                Тема
-                <input id="mkTopic" list="mkTopicList" placeholder="например: SQL: JOIN" />
+                Topic
+                <input id="mkTopic" list="mkTopicList" placeholder="e.g. SQL: JOIN" />
                 <datalist id="mkTopicList"></datalist>
               </label>
               <label style="flex: 1">
-                Уровень
+                Level
                 <select id="mkLevel">
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -1066,28 +1064,28 @@
             <!-- CHOICE -->
             <div id="mkChoice" class="mksec">
               <div class="muted" style="font-size: 12px; margin-bottom: 4px">
-                Варианты ответа (отметьте правильный):
+                Answer options (select the correct one):
               </div>
               <div id="mkOpts"></div>
-              <button class="btn ghost" id="mkAddOpt" style="margin-top: 6px">+ вариант</button>
+              <button class="btn ghost" id="mkAddOpt" style="margin-top: 6px">+ option</button>
             </div>
 
             <!-- GRAPH -->
             <div id="mkGraph" class="mksec hidden">
               <label>
-                Вершины (через запятую)
+                Vertices (comma-separated)
                 <input id="mkGNodes" placeholder="A, B, C, D" />
               </label>
               <label>
-                Шаблон проверки
+                Validation rule
                 <select id="mkGTemplate"></select>
               </label>
               <label id="mkGExactWrap" class="hidden">
-                Рёбра точного графа (через запятую, формат A-B)
+                Exact graph edges (comma-separated, e.g. A-B)
                 <input id="mkGEdges" placeholder="A-B, B-C, C-D" />
               </label>
               <label>
-                Подсказка (необязательно, видна только вам)
+                Hint (optional, visible only to you)
                 <input id="mkGHint" placeholder="" />
               </label>
             </div>
@@ -1095,23 +1093,23 @@
             <!-- ORDER -->
             <div id="mkOrder" class="mksec hidden">
               <label>
-                Вершины (через запятую)
+                Vertices (comma-separated)
                 <input id="mkONodes" placeholder="A, B, C, D, E" />
               </label>
               <label>
-                Рёбра (через запятую, формат A-B)
+                Edges (comma-separated, e.g. A-B)
                 <input id="mkOEdges" placeholder="A-B, A-C, B-D" />
               </label>
               <div class="row" style="gap: 10px">
                 <label style="flex: 1">
-                  Старт
+                  Start
                   <input id="mkOStart" placeholder="A" />
                 </label>
                 <label style="flex: 1">
-                  Режим
+                  Mode
                   <select id="mkOMode">
-                    <option value="bfs">Обход в ширину (BFS)</option>
-                    <option value="dfs">Обход в глубину (DFS)</option>
+                    <option value="bfs">Breadth-first search (BFS)</option>
+                    <option value="dfs">Depth-first search (DFS)</option>
                   </select>
                 </label>
               </div>
@@ -1120,48 +1118,48 @@
             <!-- SORT -->
             <div id="mkSort" class="mksec hidden">
               <label>
-                Массив (числа через запятую)
+                Array (comma-separated numbers)
                 <input id="mkSArr" placeholder="5, 2, 8, 1, 9, 3" />
               </label>
               <div class="row" style="gap: 10px">
                 <label style="flex: 1">
-                  Алгоритм
+                  Algorithm
                   <select id="mkSAlgo">
-                    <option value="bubble">Пузырьком</option>
-                    <option value="insertion">Вставками</option>
+                    <option value="bubble">Bubble sort</option>
+                    <option value="insertion">Insertion sort</option>
                   </select>
                 </label>
                 <label style="flex: 1">
-                  Число шагов
+                  Number of steps
                   <input id="mkSSteps" type="number" min="1" max="20" value="1" />
                 </label>
               </div>
               <div class="muted" style="font-size: 12px">
-                Ожидаемый результат вычисляется автоматически: состояние массива после указанного
-                числа шагов выбранного алгоритма.
+                The expected result is calculated automatically: the array after the specified
+                number of steps of the selected algorithm.
               </div>
             </div>
 
             <!-- BLANK -->
             <div id="mkBlank" class="mksec hidden">
               <label>
-                Шаблон (отмечайте пропуски тремя подчёркиваниями ___)
+                Template (mark each blank with three underscores ___)
                 <textarea
                   id="mkBTemplate"
                   rows="3"
-                  placeholder="Бинарный поиск работает за ___ и требует ___ массива."></textarea>
+                  placeholder="Binary search takes ___ and requires a ___ sorted array."></textarea>
               </label>
               <div class="muted" style="font-size: 12px; margin-bottom: 4px">
-                Ответы по порядку — по одному на каждый ___. Через | можно задать синонимы. Для
-                выбора из списка перечислите варианты через ; (правильным считается первый).
+                Answers in order — one per ___. Use | to accept alternative answers. For a dropdown,
+                separate options with ; (the first option is correct).
               </div>
               <div id="mkBlanks"></div>
-              <button class="btn ghost" id="mkAddBlank" style="margin-top: 6px">+ пропуск</button>
+              <button class="btn ghost" id="mkAddBlank" style="margin-top: 6px">+ blank</button>
             </div>
           </div>
           <div class="row spread" style="margin-top: 12px">
             <span id="mkMsg" style="font-size: 13px; min-height: 18px"></span>
-            <button class="btn primary" id="mkSubmit">Сохранить задачу</button>
+            <button class="btn primary" id="mkSubmit">Save question</button>
           </div>
         </div>
       </div>
@@ -1170,25 +1168,23 @@
       <section id="gameView" class="hidden">
         <div class="card" style="margin-bottom: 16px">
           <div class="roundbar">
-            <span class="qnum" id="qnum">Вопрос 1/5</span>
+            <span class="qnum" id="qnum">Question 1/5</span>
             <span class="tag" id="qtype"></span>
             <div class="tbar"><i id="tfill"></i></div>
-            <span class="answered" id="answered">0/0 ответили</span>
+            <span class="answered" id="answered">0/0 answered</span>
             <span class="bigtimer" id="timer">00:00</span>
-            <button class="btn ghost" id="pauseBtn" title="Приостановить/продолжить вопрос">
-              ⏸ Пауза
+            <button class="btn ghost" id="pauseBtn" title="Pause or resume the question">
+              ⏸ Pause
             </button>
-            <button class="btn ghost" id="addTimeBtn" title="Добавить 15 секунд к таймеру">
-              +15с
+            <button class="btn ghost" id="addTimeBtn" title="Add 15 seconds to the timer">
+              +15s
             </button>
-            <button class="btn ghost" id="skipBtn" title="Пропустить текущий вопрос">
-              ⏭ Пропустить
-            </button>
+            <button class="btn ghost" id="skipBtn" title="Skip the current question">⏭ Skip</button>
             <button
               class="btn ghost"
               id="ansToggle"
-              title="Внимание: ответ появится и на проекторе">
-              👁 Показать ответ
+              title="Warning: the answer will also appear on the projector">
+              👁 Show answer
             </button>
           </div>
           <div class="anspanel hidden" id="ansPanel"></div>
@@ -1196,10 +1192,10 @@
         <div class="mt-grid">
           <div class="card" style="padding: 0"><div class="mtn" id="mountain"></div></div>
           <div class="card">
-            <h2 class="s">Лидерборд</h2>
+            <h2 class="s">Leaderboard</h2>
             <div class="lb" id="lb"></div>
             <div style="font-size: 12px; color: var(--muted); margin-top: 10px">
-              Очки — за скорость и сложность вопроса. Неверный ответ — 0.
+              Earn points for speed and question difficulty. Incorrect answers score 0.
             </div>
           </div>
         </div>
@@ -1209,33 +1205,33 @@
       <section id="resultsView" class="hidden">
         <div class="card" id="gradesCard" style="display: none; margin-bottom: 16px">
           <div class="row spread">
-            <h2 class="s">Выгрузка в Google Sheets</h2>
+            <h2 class="s">Export to Google Sheets</h2>
             <div class="row">
               <button
                 class="btn ghost"
                 id="gradesPreviewBtn"
-                title="Показать, что будет записано, ничего не меняя">
-                👁 Предпросмотр
+                title="Preview the export without changing the spreadsheet">
+                👁 Preview
               </button>
               <button
                 class="btn primary"
                 id="gradesCommitBtn"
-                title="Записать баллы на лист «Оценки»">
-                ⬆ Выгрузить в Оценки
+                title="Write points to the Grades sheet">
+                ⬆ Export grades
               </button>
             </div>
           </div>
           <div id="gradesReport" class="muted" style="margin-top: 10px; font-size: 13px">
-            Участникам будет записано 2 балла в новый столбец «Algoclimb №n» на листе «Оценки».
-            Начните с предпросмотра.
+            Participants receive 2 points in a new “Algoclimb №n” column on the configured grades
+            sheet. Start with a preview.
           </div>
         </div>
         <div class="card">
           <div class="row spread">
-            <h2 class="s">Итоги сессии</h2>
+            <h2 class="s">Session results</h2>
             <div class="row">
-              <button class="btn ghost" id="expSummary">⬇ Итоги (CSV)</button>
-              <button class="btn ghost" id="expDetail">⬇ Разбор по вопросам (CSV)</button>
+              <button class="btn ghost" id="expSummary">⬇ Summary (CSV)</button>
+              <button class="btn ghost" id="expDetail">⬇ Question breakdown (CSV)</button>
               <span class="muted" id="resMeta"></span>
             </div>
           </div>
@@ -1244,32 +1240,32 @@
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Участник</th>
-                  <th>Очки</th>
-                  <th>Верных</th>
-                  <th>Ответы по вопросам</th>
-                  <th>Уходы</th>
+                  <th>Participant</th>
+                  <th>Points</th>
+                  <th>Correct</th>
+                  <th>Answers by question</th>
+                  <th>Tab switches</th>
                 </tr>
               </thead>
               <tbody id="resBody"></tbody>
             </table>
           </div>
           <div style="font-size: 12px; color: var(--muted); margin-top: 10px">
-            Кружки:
+            Indicators:
             <span class="ansdot ok"></span>
-            верно ·
+            correct ·
             <span class="ansdot no"></span>
-            неверно ·
+            incorrect ·
             <span class="ansdot skip"></span>
-            нет ответа
+            no answer
           </div>
         </div>
 
         <div class="card" style="margin-top: 16px">
           <div class="row spread">
-            <h2 class="s">Разбор по вопросам</h2>
+            <h2 class="s">Question breakdown</h2>
             <span class="muted" style="font-size: 12px">
-              Нажмите на вопрос — увидите правильный ответ и ответы каждого студента
+              Select a question to see its correct answer and each student's response
             </span>
           </div>
           <div class="qbtns" id="qbtns"></div>
@@ -1279,7 +1275,7 @@
 
     <div class="modal hidden" id="detailModal">
       <div class="modalcard">
-        <button class="x" id="detailClose">✕ Закрыть</button>
+        <button class="x" id="detailClose">✕ Close</button>
         <div class="qttl" id="dTitle"></div>
         <div class="qpr" id="dPrompt"></div>
         <div class="corr" id="dCorr"></div>
@@ -1288,13 +1284,11 @@
           <table class="dtable">
             <thead>
               <tr>
-                <th>Участник</th>
-                <th>Ответ</th>
-                <th>Верно</th>
-                <th id="dTimeSort" style="cursor: pointer" title="Сортировать по времени">
-                  Время ▲
-                </th>
-                <th>Очки</th>
+                <th>Participant</th>
+                <th>Answer</th>
+                <th>Correct</th>
+                <th id="dTimeSort" style="cursor: pointer" title="Sort by response time">Time ▲</th>
+                <th>Points</th>
               </tr>
             </thead>
             <tbody id="dBody"></tbody>
@@ -1305,31 +1299,31 @@
     <!-- АНАЛИТИКА -->
     <div class="modal hidden" id="statsModal">
       <div class="modalcard statscard">
-        <button class="x" id="statsClose">✕ Закрыть</button>
-        <div class="qttl">📊 Аналитика</div>
+        <button class="x" id="statsClose">✕ Close</button>
+        <div class="qttl">📊 Analytics</div>
         <div class="statstabs">
-          <button class="chip on" id="tabSessions">История сессий</button>
-          <button class="chip" id="tabTasks">Статистика по задачам</button>
-          <button class="chip" id="tabStudents">По логинам</button>
-          <button class="chip" id="tabAttend">Посещаемость</button>
+          <button class="chip on" id="tabSessions">Session history</button>
+          <button class="chip" id="tabTasks">Question statistics</button>
+          <button class="chip" id="tabStudents">By student</button>
+          <button class="chip" id="tabAttend">Attendance</button>
           <button
             class="btn ghost"
             id="statsExcel"
-            title="Скачать всю аналитику в Excel (.xlsx)"
+            title="Download all analytics as Excel (.xlsx)"
             style="margin-left: auto; padding: 6px 12px; font-size: 13px">
             ⬇ Excel
           </button>
           <button
             class="btn ghost"
             id="statsWipe"
-            title="Удалить ВСЕ сессии, ответы и статистику из базы (безвозвратно)"
+            title="Permanently delete all sessions, answers and statistics"
             style="padding: 6px 12px; font-size: 13px; color: #ff6b6b; border-color: #6b2b2b">
-            🗑 Очистить
+            🗑 Clear
           </button>
         </div>
         <div class="statstabs" style="margin-top: -6px">
-          <span class="muted" style="font-size: 13px">Поток:</span>
-          <button class="chip on" data-statstream="all">Все</button>
+          <span class="muted" style="font-size: 13px">Group:</span>
+          <button class="chip on" data-statstream="all">All</button>
           <button class="chip" data-statstream="1">1</button>
           <button class="chip" data-statstream="2">2</button>
           <button class="chip" data-statstream="3">3</button>
@@ -1342,13 +1336,13 @@
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Дата</th>
-                  <th>Поток</th>
-                  <th>Статус</th>
-                  <th>Участ.</th>
-                  <th>Ответов</th>
-                  <th>Точность</th>
-                  <th>Ср. балл</th>
+                  <th>Date</th>
+                  <th>Group</th>
+                  <th>Status</th>
+                  <th>Students</th>
+                  <th>Answers</th>
+                  <th>Accuracy</th>
+                  <th>Avg. score</th>
                 </tr>
               </thead>
               <tbody id="statsSessBody"></tbody>
@@ -1358,25 +1352,29 @@
 
         <div id="statsTasks" class="hidden">
           <div class="row" style="gap: 8px; margin-bottom: 8px">
-            <input type="search" id="statsTaskSearch" placeholder="Поиск задачи…" style="flex: 1" />
-            <button class="chip on" id="taskSortHard" title="Сначала самые проваленные">
-              Сложные сверху
+            <input
+              type="search"
+              id="statsTaskSearch"
+              placeholder="Search questions…"
+              style="flex: 1" />
+            <button class="chip on" id="taskSortHard" title="Lowest accuracy first">
+              Hardest first
             </button>
-            <button class="chip" id="taskSortPop" title="Сначала самые частые">
-              Частые сверху
+            <button class="chip" id="taskSortPop" title="Most attempted first">
+              Most attempted
             </button>
           </div>
           <div style="overflow: auto">
             <table class="dtable">
               <thead>
                 <tr>
-                  <th>Задача</th>
-                  <th>Тема</th>
-                  <th>Тип</th>
-                  <th>Попыток</th>
-                  <th>Верных</th>
-                  <th>Точность</th>
-                  <th>Ср. время</th>
+                  <th>Question</th>
+                  <th>Topic</th>
+                  <th>Type</th>
+                  <th>Attempts</th>
+                  <th>Correct</th>
+                  <th>Accuracy</th>
+                  <th>Avg. time</th>
                 </tr>
               </thead>
               <tbody id="statsTaskBody"></tbody>
@@ -1386,28 +1384,31 @@
 
         <div id="statsStudents" class="hidden">
           <div class="row" style="gap: 8px; margin-bottom: 8px">
-            <input type="search" id="statsStudSearch" placeholder="Поиск логина…" style="flex: 1" />
-            <button class="chip on" id="studSortAcc" title="Сначала слабые по точности">
-              Слабые сверху
+            <input
+              type="search"
+              id="statsStudSearch"
+              placeholder="Search logins…"
+              style="flex: 1" />
+            <button class="chip on" id="studSortAcc" title="Lowest accuracy first">
+              Lowest accuracy
             </button>
-            <button class="chip" id="studSortScore" title="Сначала с большим средним баллом">
-              По баллу
+            <button class="chip" id="studSortScore" title="Highest average score first">
+              By score
             </button>
           </div>
           <div style="overflow: auto">
             <table class="dtable">
               <thead>
                 <tr>
-                  <th>Логин</th>
-                  <th>Сессий</th>
-                  <th>Ответов</th>
-                  <th>Верных</th>
-                  <th>Точность</th>
-                  <th>Ср. балл</th>
-                  <th>Лучш. место</th>
-                  <th
-                    title="Индекс подозрительности: уходы со вкладки + 2×аномально быстрые ответы">
-                    ⚠ риск
+                  <th>Login</th>
+                  <th>Sessions</th>
+                  <th>Answers</th>
+                  <th>Correct</th>
+                  <th>Accuracy</th>
+                  <th>Avg. score</th>
+                  <th>Best rank</th>
+                  <th title="Activity indicator: tab switches + 2×unusually fast answers">
+                    ⚠ activity
                   </th>
                 </tr>
               </thead>
@@ -1488,7 +1489,7 @@
         try {
           localStorage.removeItem(KEY_STORE);
         } catch {}
-        showLogin(reason || 'Доступ запрещён');
+        showLogin(reason || 'Access denied');
       }
       function showLogin(err) {
         $('loginBox').classList.remove('hidden');
@@ -1517,7 +1518,7 @@
       function updateTestBtn() {
         const b = $('testBtn');
         if (!b) return;
-        b.textContent = '🧪 Тест: ' + (testMode ? 'ВКЛ' : 'выкл');
+        b.textContent = '🧪 Practice: ' + (testMode ? 'ON' : 'off');
         b.classList.toggle('primary', testMode);
         b.classList.toggle('ghost', !testMode);
       }
@@ -1528,12 +1529,12 @@
       $('startBtn').onclick = () => {
         const ids = [...SELECTED];
         if (ids.length) ws.send(JSON.stringify({ type: 'start', taskIds: ids, test: testMode }));
-        else if (confirm('Ни одной задачи не выбрано. Запустить сессию по настройкам config?'))
+        else if (confirm('No questions selected. Start a session using the settings in config?'))
           ws.send(JSON.stringify({ type: 'start', test: testMode }));
       };
       $('finishBtn').onclick = () => ws.send(JSON.stringify({ type: 'finish' }));
       $('resetBtn').onclick = () => {
-        if (confirm('Сбросить сессию и лобби?')) ws.send(JSON.stringify({ type: 'reset' }));
+        if (confirm('Reset the session and lobby?')) ws.send(JSON.stringify({ type: 'reset' }));
       };
       // Выгрузка баллов в Google Sheets: сперва предпросмотр (dryRun), затем запись.
       function setGradesBusy(busy) {
@@ -1543,14 +1544,14 @@
       $('gradesPreviewBtn').onclick = () => {
         if (!(ws && ws.readyState === 1)) return;
         setGradesBusy(true);
-        $('gradesReport').textContent = 'Проверяю таблицу…';
+        $('gradesReport').textContent = 'Checking the spreadsheet…';
         ws.send(JSON.stringify({ type: 'exportGrades', dryRun: true }));
       };
       $('gradesCommitBtn').onclick = () => {
         if (!(ws && ws.readyState === 1)) return;
-        if (!confirm('Записать баллы участникам на лист «Оценки»?')) return;
+        if (!confirm('Write participant points to the Grades sheet?')) return;
         setGradesBusy(true);
-        $('gradesReport').textContent = 'Записываю в таблицу…';
+        $('gradesReport').textContent = 'Writing to the spreadsheet…';
         ws.send(JSON.stringify({ type: 'exportGrades', dryRun: false }));
       };
       // Управление раундом на лету: пауза/продолжение, +время, пропуск.
@@ -1562,11 +1563,11 @@
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'addTime', ms: 15000 }));
       };
       $('skipBtn').onclick = () => {
-        if (ws && ws.readyState === 1 && confirm('Пропустить текущий вопрос?'))
+        if (ws && ws.readyState === 1 && confirm('Skip the current question?'))
           ws.send(JSON.stringify({ type: 'skip' }));
       };
       function kick(nick) {
-        if (confirm('Выкинуть ' + nick + ' из сессии?'))
+        if (confirm('Remove ' + nick + ' from the session?'))
           ws.send(JSON.stringify({ type: 'kick', nick }));
       }
       // Смена потока из лобби — сегментированный выбор 1/2/3.
@@ -1592,8 +1593,8 @@
         catQ = '';
       // Темы и наборы определяются самим банком задач. Для демо-банка оставляем
       // красивые подписи, для любого другого предмета подпись = значение из банка.
-      const TOPIC_LABELS = { asd: 'АиСД', graphs: 'Графы', py: 'Python' };
-      const BLOCK_LABELS = { comb1: 'Комбинаторика: Блок 1', oop1: 'Основы ООП: Блок 1' };
+      const TOPIC_LABELS = { asd: 'DSA', graphs: 'Graphs', py: 'Python' };
+      const BLOCK_LABELS = { comb1: 'Combinatorics: Set 1', oop1: 'OOP fundamentals: Set 1' };
       const topicLabel = (t) => TOPIC_LABELS[t] || t || '';
       const blockLabel = (b) => BLOCK_LABELS[b] || b || '';
       function uniqSorted(vals) {
@@ -1654,26 +1655,26 @@
       }
       function renderCat() {
         const list = visibleCat();
-        $('catCount').textContent = 'Показано ' + list.length + ' из ' + CATALOG.length;
+        $('catCount').textContent = 'Showing ' + list.length + ' of ' + CATALOG.length;
         $('catList').innerHTML =
           list
             .map((it) => {
               const tpMap = {
-                graph: '<span class="bdg g">построение</span>',
-                order: '<span class="bdg g">обход</span>',
-                sort: '<span class="bdg g">сортировка</span>',
-                blank: '<span class="bdg g">пропуски</span>',
-                choice: '<span class="bdg">выбор</span>',
+                graph: '<span class="bdg g">graph</span>',
+                order: '<span class="bdg g">traversal</span>',
+                sort: '<span class="bdg g">sorting</span>',
+                blank: '<span class="bdg g">blanks</span>',
+                choice: '<span class="bdg">choice</span>',
               };
               const tp = tpMap[it.type] || tpMap.choice;
               const to = it.topic
                 ? '<span class="bdg">' + esc(topicLabel(it.topic)) + '</span>'
                 : '';
-              const cust = it.custom ? '<span class="bdg cust">своя</span>' : '';
+              const cust = it.custom ? '<span class="bdg cust">custom</span>' : '';
               const del = it.custom
                 ? '<button type="button" class="delx" data-del="' +
                   esc(it.id) +
-                  '" title="Удалить свою задачу">✕</button>'
+                  '" title="Delete custom question">✕</button>'
                 : '';
               return (
                 '<label class="catrow"><input type="checkbox" data-id="' +
@@ -1687,7 +1688,7 @@
                 tp +
                 ' ' +
                 to +
-                '<span class="bdg">ур.' +
+                '<span class="bdg">Lv.' +
                 it.level +
                 '</span>' +
                 cust +
@@ -1695,7 +1696,7 @@
                 '</span></label>'
               );
             })
-            .join('') || '<div class="muted" style="padding:14px">Ничего не найдено.</div>';
+            .join('') || '<div class="muted" style="padding:14px">No results found.</div>';
         mathify($('catList'));
         $('selCount').textContent = SELECTED.size;
       }
@@ -1747,7 +1748,7 @@
         e.preventDefault();
         e.stopPropagation();
         const id = b.dataset.del;
-        if (confirm('Удалить свою задачу безвозвратно?')) {
+        if (confirm('Permanently delete this custom question?')) {
           SELECTED.delete(id);
           if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'deleteTask', id }));
         }
@@ -1800,10 +1801,10 @@
           '"' +
           (i === 0 ? ' checked' : '') +
           '>' +
-          '<input type="text" class="mkOptText" placeholder="Вариант ответа" value="' +
+          '<input type="text" class="mkOptText" placeholder="Answer option" value="' +
           esc(text || '') +
           '">' +
-          '<button type="button" class="btn ghost mkDelOpt" title="Удалить">✕</button>';
+          '<button type="button" class="btn ghost mkDelOpt" title="Delete">✕</button>';
         $('mkOpts').appendChild(row);
       }
       $('mkAddOpt').onclick = () => addOpt('');
@@ -1811,7 +1812,7 @@
         const d = e.target.closest('.mkDelOpt');
         if (!d) return;
         if ($('mkOpts').children.length <= 2) {
-          mkErr('Нужно минимум 2 варианта');
+          mkErr('Enter at least 2 options');
           return;
         }
         const row = d.closest('.mkopt');
@@ -1828,19 +1829,19 @@
         const row = document.createElement('div');
         row.className = 'mkopt';
         row.innerHTML =
-          '<span class="muted" style="flex:none;width:78px">Пропуск ' +
+          '<span class="muted" style="flex:none;width:78px">Blank ' +
           n +
           '</span>' +
-          '<input type="text" class="mkBlankText" placeholder="ответ (или вар-ты через ;)" value="' +
+          '<input type="text" class="mkBlankText" placeholder="answer (or options- separated by ;)" value="' +
           esc(ans || '') +
           '">' +
-          '<button type="button" class="btn ghost mkDelBlank" title="Удалить">✕</button>';
+          '<button type="button" class="btn ghost mkDelBlank" title="Delete">✕</button>';
         $('mkBlanks').appendChild(row);
       }
       function renumberBlanks() {
         [...$('mkBlanks').children].forEach((r, i) => {
           const s = r.querySelector('.muted');
-          if (s) s.textContent = 'Пропуск ' + (i + 1);
+          if (s) s.textContent = 'Blank ' + (i + 1);
         });
       }
       $('mkAddBlank').onclick = () => addBlank('');
@@ -1848,7 +1849,7 @@
         const d = e.target.closest('.mkDelBlank');
         if (!d) return;
         if ($('mkBlanks').children.length <= 1) {
-          mkErr('Нужен хотя бы один пропуск');
+          mkErr('Add at least one blank');
           return;
         }
         d.closest('.mkopt').remove();
@@ -1885,7 +1886,7 @@
         $('mkLevel').value = '1';
         $('mkOpts').innerHTML = '';
         mkOptN = 0;
-        addOpt('Правильный вариант');
+        addOpt('Correct option');
         addOpt('');
         addOpt('');
         $('mkGNodes').value = '';
@@ -1930,22 +1931,22 @@
         const topic = $('mkTopic').value,
           level = +$('mkLevel').value;
         if (!title) {
-          mkErr('Введите название');
+          mkErr('Enter a title');
           return;
         }
         if (!prompt) {
-          mkErr('Введите условие');
+          mkErr('Enter the question text');
           return;
         }
         const task = { kind: mkKind, title, prompt, topic, level };
         if (mkKind === 'choice') {
           const opts = [...$('mkOpts').querySelectorAll('.mkOptText')].map((i) => i.value.trim());
           if (opts.some((o) => !o)) {
-            mkErr('Заполните все варианты или удалите пустые');
+            mkErr('Complete all options or remove empty ones');
             return;
           }
           if (opts.length < 2) {
-            mkErr('Нужно минимум 2 варианта');
+            mkErr('Enter at least 2 options');
             return;
           }
           const r = $('mkOpts').querySelector('input[type=radio]:checked');
@@ -1954,7 +1955,7 @@
         } else if (mkKind === 'graph') {
           const nodes = parseNodes($('mkGNodes').value);
           if (nodes.length < 2) {
-            mkErr('Укажите минимум 2 вершины');
+            mkErr('Enter at least 2 vertices');
             return;
           }
           task.nodes = nodes;
@@ -1963,7 +1964,7 @@
           if (task.template === 'exact') {
             const edges = parseEdges($('mkGEdges').value);
             if (!edges.length) {
-              mkErr('Укажите рёбра точного графа (A-B)');
+              mkErr('Enter exact graph edges (A-B)');
               return;
             }
             task.requiredEdges = edges;
@@ -1973,20 +1974,20 @@
             edges = parseEdges($('mkOEdges').value);
           const start = $('mkOStart').value.trim();
           if (nodes.length < 2) {
-            mkErr('Укажите минимум 2 вершины');
+            mkErr('Enter at least 2 vertices');
             return;
           }
           if (!edges.length) {
-            mkErr('Укажите рёбра (A-B)');
+            mkErr('Enter edges (A-B)');
             return;
           }
           if (!start || !nodes.includes(start)) {
-            mkErr('Старт должен быть одной из вершин');
+            mkErr('The start must be one of the vertices');
             return;
           }
           const bad = edges.find((e) => !nodes.includes(e[0]) || !nodes.includes(e[1]));
           if (bad) {
-            mkErr('Ребро ссылается на несуществующую вершину: ' + bad.join('-'));
+            mkErr('An edge refers to an unknown vertex: ' + bad.join('-'));
             return;
           }
           task.nodes = nodes;
@@ -1999,12 +2000,12 @@
             .map((x) => x.trim())
             .filter(Boolean);
           if (arr.length < 3) {
-            mkErr('Укажите минимум 3 элемента массива');
+            mkErr('Enter at least 3 array elements');
             return;
           }
           const steps = +$('mkSSteps').value;
           if (!(steps >= 1 && steps <= 20)) {
-            mkErr('Число шагов — от 1 до 20');
+            mkErr('The step count must be between 1 and 20');
             return;
           }
           task.array = arr;
@@ -2014,18 +2015,18 @@
           const template = $('mkBTemplate').value;
           const marks = (template.match(/___/g) || []).length;
           if (marks < 1) {
-            mkErr('В шаблоне нет пропусков (используйте ___)');
+            mkErr('No blanks in the template (use ___)');
             return;
           }
           const rows = [...$('mkBlanks').querySelectorAll('.mkBlankText')].map((i) =>
             i.value.trim()
           );
           if (rows.length !== marks) {
-            mkErr('Пропусков в шаблоне: ' + marks + ', а полей ответа: ' + rows.length);
+            mkErr('Blanks in the template: ' + marks + ', answer fields: ' + rows.length);
             return;
           }
           if (rows.some((r) => !r)) {
-            mkErr('Заполните ответ для каждого пропуска');
+            mkErr('Enter an answer for each blank');
             return;
           }
           const blanks = rows.map((r) => {
@@ -2050,16 +2051,16 @@
         }
         if (ws && ws.readyState === 1) {
           $('mkSubmit').disabled = true;
-          mkOk('Сохранение…');
+          mkOk('Saving…');
           ws.send(JSON.stringify({ type: 'addTask', task }));
-        } else mkErr('Нет связи с сервером');
+        } else mkErr('No server connection');
       };
       function onTaskAdded(m) {
         $('mkSubmit').disabled = false;
         if (m.ok) {
-          mkOk('Задача добавлена ✓');
+          mkOk('Question added ✓');
           setTimeout(closeMaker, 600);
-        } else mkErr(m.error || 'Не удалось добавить задачу');
+        } else mkErr(m.error || 'Could not add the question');
       }
 
       /* ---------- экспорт итогов в CSV (открывается в Excel) ---------- */
@@ -2096,14 +2097,22 @@
         if (!state || !state.leaderboard) return;
         const tot = state.roundTotal || state.session.total || 0;
         const rows = [
-          ['Место', 'Участник', 'Очки', 'Верных', 'Всего вопросов', '% верных', 'Уходы со вкладки'],
+          [
+            'Rank',
+            'Participant',
+            'Points',
+            'Correct',
+            'Total questions',
+            '% correct',
+            'Tab switches',
+          ],
         ];
         state.leaderboard.forEach((r) => {
           const pct = tot ? Math.round((100 * r.correct) / tot) : 0;
           rows.push([r.rank, r.nick, r.score, r.correct, tot, pct + '%', r.tabLeaves || 0]);
         });
         downloadCsv(
-          'algoclimb-итоги-поток' + (state.session.stream || '') + '-' + stamp() + '.csv',
+          'algoclimb-summary-group' + (state.session.stream || '') + '-' + stamp() + '.csv',
           rows
         );
       };
@@ -2112,14 +2121,14 @@
         if (!d || !d.length) return;
         const rows = [
           [
-            'Вопрос №',
-            'Задача',
-            'Правильный ответ',
-            'Участник',
-            'Ответ студента',
-            'Верно',
-            'Время, с',
-            'Очки',
+            'Question #',
+            'Question',
+            'Correct answer',
+            'Participant',
+            'Student answer',
+            'Correct',
+            'Time, s',
+            'Points',
           ],
         ];
         d.forEach((q) => {
@@ -2129,15 +2138,15 @@
               q.title,
               q.correctAnswer,
               r.nick,
-              r.answered ? r.answer || '' : '(нет ответа)',
-              r.answered ? (r.correct ? 'да' : 'нет') : '',
+              r.answered ? r.answer || '' : '(no answer)',
+              r.answered ? (r.correct ? 'yes' : 'no') : '',
               r.ms != null ? (r.ms / 1000).toFixed(1) : '',
               r.points || 0,
             ]);
           });
         });
         downloadCsv(
-          'algoclimb-разбор-поток' + (state.session.stream || '') + '-' + stamp() + '.csv',
+          'algoclimb-review-group' + (state.session.stream || '') + '-' + stamp() + '.csv',
           rows
         );
       };
@@ -2149,10 +2158,10 @@
       };
       function updateAnswerPanel() {
         const a = state && state.currentAnswer;
-        $('ansToggle').textContent = showAnswer ? '🙈 Скрыть ответ' : '👁 Показать ответ';
+        $('ansToggle').textContent = showAnswer ? '🙈 Hide answer' : '👁 Show answer';
         if (showAnswer && a) {
           $('ansPanel').classList.remove('hidden');
-          $('ansPanel').innerHTML = '<b>Ответ:</b> ' + esc(a);
+          $('ansPanel').innerHTML = '<b>Answer:</b> ' + esc(a);
           mathify($('ansPanel'));
         } else $('ansPanel').classList.add('hidden');
       }
@@ -2182,7 +2191,7 @@
           return;
         }
         if (m.type === 'wiped') {
-          if (!m.ok) alert('Не удалось очистить: ' + (m.error || ''));
+          if (!m.ok) alert('Could not clear data: ' + (m.error || ''));
           return;
         }
         if (m.type === 'gradesExport') {
@@ -2217,26 +2226,25 @@
               (s) =>
                 `<div class="pill"><div class="ava">${s.icon}</div><div>${esc(s.nick)}</div></div>`
             )
-            .join('') || '<div class="muted">Пока никто не зашёл…</div>';
+            .join('') || '<div class="muted">No students have joined yet…</div>';
         const url = m.joinUrl || `http://${location.host}/`;
         $('url').textContent = url;
         if (m.qrSvg) $('qr').innerHTML = m.qrSvg;
         else
           $('qr').innerHTML =
-            '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:8px;text-align:center;color:#08111f;font-size:13px;line-height:1.4">QR недоступен —<br>откройте адрес ниже вручную</div>';
+            '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:8px;text-align:center;color:#08111f;font-size:13px;line-height:1.4">QR unavailable —<br>open the link below manually</div>';
         if (m.token) {
           $('token').classList.remove('hidden');
-          $('token').textContent = 'Код: ' + m.token;
+          $('token').textContent = 'Code: ' + m.token;
         } else $('token').classList.add('hidden');
       }
 
       function renderGame(m) {
-        $('qnum').textContent = `Вопрос ${m.round + 1}/${m.roundTotal}`;
+        $('qnum').textContent = `Question ${m.round + 1}/${m.roundTotal}`;
         $('qtype').textContent =
-          { graph: 'построение', order: 'обход', sort: 'сортировка', blank: 'пропуски' }[
-            m.currentType
-          ] || 'выбор';
-        $('answered').textContent = `${m.answeredCount}/${m.activeCount} ответили`;
+          { graph: 'graph', order: 'traversal', sort: 'sorting', blank: 'blanks' }[m.currentType] ||
+          'choice';
+        $('answered').textContent = `${m.answeredCount}/${m.activeCount} answered`;
         deadline = m.deadline;
         clockOffset = (m.serverTime || Date.now()) - Date.now();
         limitMs =
@@ -2244,7 +2252,7 @@
             ? m.limit
             : (m.currentType === 'choice' || m.currentType === 'blank' ? 10 : 25) * 1000;
         const paused = !!m.paused;
-        $('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза';
+        $('pauseBtn').textContent = paused ? '▶ Resume' : '⏸ Pause';
         $('pauseBtn').classList.toggle('on', paused);
         $('pauseBtn').disabled = !!m.intermission;
         $('addTimeBtn').disabled = !!m.intermission;
@@ -2271,7 +2279,8 @@
         const tick = () => {
           const left = deadline - (Date.now() + clockOffset);
           const s = Math.max(0, Math.ceil(left / 1000));
-          $('timer').textContent = `00:${String(s).padStart(2, '0')}`;
+          $('timer').textContent =
+            `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
           const frac = Math.max(0, Math.min(1, left / limitMs));
           $('tfill').style.width = frac * 100 + '%';
           const low = left <= 3000;
@@ -2292,30 +2301,30 @@
               const off = r.connected ? '' : 'off';
               const leave =
                 r.tabLeaves > 0
-                  ? `<span class="leave" title="уходов со вкладки">⚠ ${r.tabLeaves}</span>`
+                  ? `<span class="leave" title="tab switches">⚠ ${r.tabLeaves}</span>`
                   : '';
               const fast =
                 r.fastAnswers > 0
-                  ? `<span class="leave" title="аномально быстрые верные ответы" style="background:#3a2e16;border-color:#6b5a2b;color:#ffd98a">⚡ ${r.fastAnswers}</span>`
+                  ? `<span class="leave" title="unusually fast correct answers" style="background:#3a2e16;border-color:#6b5a2b;color:#ffd98a">⚡ ${r.fastAnswers}</span>`
                   : '';
               const pend =
                 running && r.answeredThisRound
-                  ? '<span class="ansdot ok" title="ответил"></span>'
+                  ? '<span class="ansdot ok" title="answered"></span>'
                   : running
-                    ? '<span class="ansdot skip" title="ждём"></span>'
+                    ? '<span class="ansdot skip" title="waiting"></span>'
                     : '';
               const kbtn = running
                 ? `<button class="kick" onclick="kick('${esc(r.nick)}')">✕</button>`
                 : '';
               return `<div class="lbrow ${cls} ${off}">
-      <div class="lbrank">${r.rank}</div>
-      <div class="ava">${r.icon}</div>
-      <div class="nick">${esc(r.nick)}</div>
-      ${pend} ${leave} ${fast}
-      <div class="pts">${r.score}</div>
-      ${kbtn}</div>`;
+          <div class="lbrank">${r.rank}</div>
+          <div class="ava">${r.icon}</div>
+          <div class="nick">${esc(r.nick)}</div>
+          ${pend} ${leave} ${fast}
+          <div class="pts">${r.score}</div>
+          ${kbtn}</div>`;
             })
-            .join('') || '<div class="muted">Нет участников</div>';
+            .join('') || '<div class="muted">No participants</div>';
       }
 
       /* ---------- mountain ---------- */
@@ -2350,18 +2359,18 @@
           badges += `<div class="stage-badge" style="left:${(p[0] / w) * 100}%;top:${(p[1] / h) * 100}%;transform:translate(-120%,-30%)">${faces} ${arr.length}</div>`;
         });
         $('mountain').innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" style="position:absolute;inset:0;width:100%;height:100%">
-      <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#1b4a7a"/><stop offset="1" stop-color="#0a1d36"/></linearGradient></defs>
-      <rect width="${w}" height="${h}" fill="url(#sky)"/>
-      <path d="M0,412 C140,398 260,424 380,406 S560,398 560,410 L560,440 L0,440 Z" fill="none" stroke="#ffd23f" stroke-width="4"/>
-      <path d="${path}" fill="none" stroke="#cfe0ff" stroke-width="3" stroke-dasharray="2 6" opacity=".55"/>
-      ${squares}
-      <text x="${pts[0][0]}" y="${pts[0][1] + 34}" font-family="Arial" font-weight="800" font-size="15" fill="#ffd23f" text-anchor="middle">СТАРТ</text>
-      <line x1="${pts[TOTAL][0]}" y1="${pts[TOTAL][1] - 12}" x2="${pts[TOTAL][0]}" y2="${pts[TOTAL][1] - 44}" stroke="#fff" stroke-width="2.5"/>
-      <path d="M${pts[TOTAL][0]},${pts[TOTAL][1] - 44} L${pts[TOTAL][0] + 24},${pts[TOTAL][1] - 36} L${pts[TOTAL][0]},${pts[TOTAL][1] - 28} Z" fill="#ffd23f"/>
-      <text x="${pts[TOTAL][0] - 6}" y="${pts[TOTAL][1] - 50}" font-family="Arial" font-weight="800" font-size="14" fill="#fff" text-anchor="end">ФИНИШ</text>
-    </svg>${badges}`;
+        <svg viewBox="0 0 ${w} ${h}" style="position:absolute;inset:0;width:100%;height:100%">
+          <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1b4a7a"/><stop offset="1" stop-color="#0a1d36"/></linearGradient></defs>
+          <rect width="${w}" height="${h}" fill="url(#sky)"/>
+          <path d="M0,412 C140,398 260,424 380,406 S560,398 560,410 L560,440 L0,440 Z" fill="none" stroke="#ffd23f" stroke-width="4"/>
+          <path d="${path}" fill="none" stroke="#cfe0ff" stroke-width="3" stroke-dasharray="2 6" opacity=".55"/>
+          ${squares}
+          <text x="${pts[0][0]}" y="${pts[0][1] + 34}" font-family="Arial" font-weight="800" font-size="15" fill="#ffd23f" text-anchor="middle">START</text>
+          <line x1="${pts[TOTAL][0]}" y1="${pts[TOTAL][1] - 12}" x2="${pts[TOTAL][0]}" y2="${pts[TOTAL][1] - 44}" stroke="#fff" stroke-width="2.5"/>
+          <path d="M${pts[TOTAL][0]},${pts[TOTAL][1] - 44} L${pts[TOTAL][0] + 24},${pts[TOTAL][1] - 36} L${pts[TOTAL][0]},${pts[TOTAL][1] - 28} Z" fill="#ffd23f"/>
+          <text x="${pts[TOTAL][0] - 14}" y="${pts[TOTAL][1] - 18}" font-family="Arial" font-weight="800" font-size="14" fill="#fff" text-anchor="end">FINISH</text>
+        </svg>${badges}`;
       }
 
       /* ---------- results ---------- */
@@ -2370,39 +2379,39 @@
         $('gradesCommitBtn').disabled = false;
         const box = $('gradesReport');
         if (!m.ok) {
-          box.innerHTML = `<span style="color:var(--bad,#e23)">Ошибка: ${esc(m.error || 'неизвестно')}</span>`;
+          box.innerHTML = `<span style="color:var(--bad,#e23)">Error: ${esc(m.error || 'unknown')}</span>`;
           return;
         }
         const r = m.report || {};
         const nMatched = (r.matched || []).length;
         const unmatched = r.unmatched || [];
         const head = m.dryRun
-          ? `Предпросмотр: столбец <b>${esc(r.column)}</b>, заголовок «<b>${esc(r.header)}</b>». Будет записано ${r.points} балла — участников: <b>${nMatched}</b>.`
-          : `✅ Записано: столбец <b>${esc(r.column)}</b> «<b>${esc(r.header)}</b>», баллов проставлено: <b>${nMatched}</b>.`;
+          ? `Preview: column <b>${esc(r.column)}</b>, heading “<b>${esc(r.header)}</b>». Will write ${r.points} points — participants: <b>${nMatched}</b>.`
+          : `✅ Saved: column <b>${esc(r.column)}</b> «<b>${esc(r.header)}</b>», participants updated: <b>${nMatched}</b>.`;
         let warn = '';
         if (unmatched.length) {
           const items = unmatched
             .map((u) => {
               const why =
                 u.reason === 'no_login_in_sheet'
-                  ? 'нет логина в «Данные для входа»'
-                  : 'не найдена строка в «Оценки»';
+                  ? 'login not found in the login sheet'
+                  : 'row not found in the Grades sheet';
               return `<li>${esc(u.login)}${u.fio ? ' (' + esc(u.fio) + ')' : ''} — ${why}</li>`;
             })
             .join('');
-          warn = `<div style="margin-top:8px;color:var(--warn,#c80)">Не сопоставлены (${unmatched.length}):<ul style="margin:4px 0 0 18px">${items}</ul></div>`;
+          warn = `<div style="margin-top:8px;color:var(--warn,#c80)">Unmatched (${unmatched.length}):<ul style="margin:4px 0 0 18px">${items}</ul></div>`;
         }
-        const tableName = r.spreadsheetTitle ? ` · таблица «${esc(r.spreadsheetTitle)}»` : '';
-        box.innerHTML = `<div>${head} Поток ${esc(String(r.stream))}${tableName}.</div>${warn}`;
+        const tableName = r.spreadsheetTitle ? ` · spreadsheet “${esc(r.spreadsheetTitle)}»` : '';
+        box.innerHTML = `<div>${head} Group ${esc(String(r.stream))}${tableName}.</div>${warn}`;
       }
 
       function renderResults(m) {
         clearInterval(timerInt);
         // Карточка выгрузки в Google Sheets — на реальных сессиях (не тест).
-        $('gradesCard').style.display = m.test ? 'none' : '';
+        $('gradesCard').style.display = m.test || !m.gradesExportEnabled ? 'none' : '';
         const rows = m.leaderboard;
         const totalQ = m.roundTotal || TOTAL;
-        $('resMeta').textContent = `${rows.length} участников · ${totalQ} вопросов`;
+        $('resMeta').textContent = `${rows.length} participants · ${totalQ} questions`;
         $('resBody').innerHTML =
           rows
             .map((r) => {
@@ -2416,14 +2425,14 @@
                   ? `<span class="leave">⚠ ${r.tabLeaves}</span>`
                   : '<span class="muted">0</span>';
               return `<tr class="${r.rank === 1 ? 'top1' : ''}">
-      <td><b style="color:${r.rank === 1 ? '#ffd23f' : 'var(--muted)'}">${r.rank}</b></td>
-      <td>${r.icon} ${esc(r.nick)}</td>
-      <td class="pts">${r.score}</td>
-      <td>${r.correct}/${totalQ}</td>
-      <td>${circles}</td>
-      <td>${leave}</td></tr>`;
+          <td><b style="color:${r.rank === 1 ? '#ffd23f' : 'var(--muted)'}">${r.rank}</b></td>
+          <td>${r.icon} ${esc(r.nick)}</td>
+          <td class="pts">${r.score}</td>
+          <td>${r.correct}/${totalQ}</td>
+          <td>${circles}</td>
+          <td>${leave}</td></tr>`;
             })
-            .join('') || '<tr><td colspan="6" class="muted">Нет данных</td></tr>';
+            .join('') || '<tr><td colspan="6" class="muted">No data</td></tr>';
         renderQBtns(m.details || []);
       }
 
@@ -2437,16 +2446,16 @@
             .map((d) => {
               const ans = d.responses.filter((r) => r.answered);
               const ok = ans.filter((r) => r.correct).length;
-              return `<button class="qbtn" onclick="openDetail(${d.index})">В${d.index + 1}
-      <span class="mini">${ok}/${d.responses.length}</span></button>`;
+              return `<button class="qbtn" onclick="openDetail(${d.index})">Q${d.index + 1}
+          <span class="mini">${ok}/${d.responses.length}</span></button>`;
             })
-            .join('') || '<div class="muted">Нет данных по вопросам</div>';
+            .join('') || '<div class="muted">No question data</div>';
       }
       function fmtMs(ms) {
-        return ms == null ? '—' : (ms / 1000).toFixed(1) + ' с';
+        return ms == null ? '—' : (ms / 1000).toFixed(1) + ' s';
       }
       function parseEdges(text) {
-        if (!text || text === '(пусто)') return [];
+        if (!text || text === '(empty)') return [];
         return text
           .split(',')
           .map((s) => s.trim())
@@ -2507,11 +2516,11 @@
       function openDetail(i) {
         const d = DETAILS[i];
         if (!d) return;
-        $('dTitle').textContent = `Вопрос ${i + 1}: ${d.title || ''}`;
+        $('dTitle').textContent = `Question ${i + 1}: ${d.title || ''}`;
         mathify($('dTitle'));
         $('dPrompt').textContent = d.prompt || '';
         mathify($('dPrompt'));
-        let corr = `<b>Правильный ответ:</b> ${esc(d.correctAnswer || '')}`;
+        let corr = `<b>Correct answer:</b> ${esc(d.correctAnswer || '')}`;
         if (d.type === 'order' && d.answerGraph && d.answerGraph.edges) {
           corr += `<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes || d.nodes, d.answerGraph.edges, { size: 200, color: '#5aa9ff' })}</div>`;
         }
@@ -2519,7 +2528,7 @@
           if (d.answerGraph && d.answerGraph.edges) {
             corr += `<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes || d.nodes, d.answerGraph.edges, { size: 200, color: '#3ddc84', weighted: d.answerGraph.weighted })}</div>`;
           } else if (d.nodes) {
-            corr += `<div style="margin-top:6px;color:#8195b4;font-size:12px">Подходит любой такой граф на вершинах: ${d.nodes.map(esc).join(', ')}</div>`;
+            corr += `<div style="margin-top:6px;color:#8195b4;font-size:12px">Any matching graph on these vertices is accepted: ${d.nodes.map(esc).join(', ')}</div>`;
           }
         }
         $('dCorr').innerHTML = corr;
@@ -2530,10 +2539,10 @@
         const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
         const fast = times.length ? Math.min(...times) : null;
         $('dAgg').innerHTML =
-          `Ответили: <b>${ans.length}/${d.responses.length}</b>` +
-          ` · Верно: <b>${ok}</b> (${ans.length ? Math.round((ok / ans.length) * 100) : 0}%)` +
-          ` · Среднее время: <b>${fmtMs(avg)}</b>` +
-          ` · Быстрейший: <b>${fmtMs(fast)}</b>`;
+          `Answered: <b>${ans.length}/${d.responses.length}</b>` +
+          ` · Correct: <b>${ok}</b> (${ans.length ? Math.round((ok / ans.length) * 100) : 0}%)` +
+          ` · Average time: <b>${fmtMs(avg)}</b>` +
+          ` · Fastest: <b>${fmtMs(fast)}</b>`;
         $('detailModal').dataset.idx = i;
         renderDBody();
         $('detailModal').classList.remove('hidden');
@@ -2547,15 +2556,15 @@
             bv = b.answered ? b.ms : Infinity;
           return dSortAsc ? av - bv : bv - av;
         });
-        $('dTimeSort').textContent = 'Время ' + (dSortAsc ? '▲' : '▼');
+        $('dTimeSort').textContent = 'Time ' + (dSortAsc ? '▲' : '▼');
         $('dBody').innerHTML =
           rows
             .map((r) => {
               const verdict = !r.answered
-                ? '<span class="t-skip">— нет ответа</span>'
+                ? '<span class="t-skip">— no answer</span>'
                 : r.correct
-                  ? '<span class="t-ok">✓ верно</span>'
-                  : '<span class="t-no">✕ неверно</span>';
+                  ? '<span class="t-ok">✓ correct</span>'
+                  : '<span class="t-no">✕ incorrect</span>';
               let ans;
               if (!r.answered) ans = '<span class="t-skip">—</span>';
               else if (d.type === 'graph') {
@@ -2565,16 +2574,16 @@
                     size: 130,
                     color: r.correct ? '#3ddc84' : '#ff6b6b',
                   }) +
-                  `<div style="font-size:11px;color:#8195b4;margin-top:2px">${esc(r.answer || '(пусто)')}</div>`;
+                  `<div style="font-size:11px;color:#8195b4;margin-top:2px">${esc(r.answer || '(empty)')}</div>`;
               } else ans = esc(r.answer || '');
               return `<tr>
-      <td>${r.icon || ''} ${esc(r.nick)}</td>
-      <td class="ans">${ans}</td>
-      <td>${verdict}</td>
-      <td>${fmtMs(r.ms)}</td>
-      <td class="pts">${r.points || 0}</td></tr>`;
+          <td>${r.icon || ''} ${esc(r.nick)}</td>
+          <td class="ans">${ans}</td>
+          <td>${verdict}</td>
+          <td>${fmtMs(r.ms)}</td>
+          <td class="pts">${r.points || 0}</td></tr>`;
             })
-            .join('') || '<tr><td colspan="5" class="muted">Нет участников</td></tr>';
+            .join('') || '<tr><td colspan="5" class="muted">No participants</td></tr>';
       }
       $('detailClose').onclick = () => $('detailModal').classList.add('hidden');
       $('detailModal').onclick = (e) => {
@@ -2605,10 +2614,10 @@
           .forEach((x) => x.classList.toggle('on', x.dataset.statstream === statStream));
       }
       function requestStats() {
-        $('statsMeta').textContent = 'Загрузка…';
+        $('statsMeta').textContent = 'Loading…';
         const stream = statStream === 'all' ? null : Number(statStream);
         if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'getStats', stream }));
-        else $('statsMeta').textContent = 'Нет связи с сервером';
+        else $('statsMeta').textContent = 'No server connection';
       }
       function openStats() {
         $('statsModal').classList.remove('hidden');
@@ -2629,7 +2638,7 @@
       $('tabAttend').onclick = () => switchStatsTab('attend');
       $('statsExcel').onclick = () => {
         if (!lastKey) {
-          alert('Нет ключа доступа');
+          alert('No access key');
           return;
         }
         let u = '/export/analytics.xlsx?key=' + encodeURIComponent(lastKey);
@@ -2638,16 +2647,16 @@
       };
       $('statsWipe').onclick = () => {
         if (!ws || ws.readyState !== 1) {
-          alert('Нет связи с сервером');
+          alert('No server connection');
           return;
         }
         if (
           !confirm(
-            'Удалить ВСЕ данные о сессиях, ответах, посещаемости и статистике?\n\nЭто безвозвратно. Банк задач не затрагивается.'
+            'Delete ALL sessions, answers, attendance and statistics?\n\nThis cannot be undone. The question bank will be kept.'
           )
         )
           return;
-        if (!confirm('Точно очистить базу? Отменить будет нельзя.')) return;
+        if (!confirm('Permanently clear the database? This cannot be undone.')) return;
         ws.send(JSON.stringify({ type: 'wipeData' }));
       };
       document.querySelectorAll('[data-statstream]').forEach(
@@ -2707,13 +2716,13 @@
         return `<span class="accbar ${accClass(p)}" style="width:${Math.max(2, p * 0.6)}px"></span>${p}%`;
       }
       function fmtMs(ms) {
-        return ms == null ? '—' : (ms / 1000).toFixed(1) + 'с';
+        return ms == null ? '—' : (ms / 1000).toFixed(1) + 's';
       }
       function onStats(m) {
         STATS = m;
-        const be = m.backend === 'sqlite' ? 'SQLite' : 'журнал';
+        const be = m.backend === 'sqlite' ? 'SQLite' : 'log';
         $('statsMeta').textContent =
-          `Сессий: ${(m.sessions || []).length} · задач: ${(m.tasks || []).length} · логинов: ${(m.students || []).length} · хранилище: ${be}`;
+          `Sessions: ${(m.sessions || []).length} · questions: ${(m.tasks || []).length} · logins: ${(m.students || []).length} · storage: ${be}`;
         renderSessionStats();
         renderTaskStats();
         renderStudentStats();
@@ -2730,24 +2739,24 @@
         // колонки = сессии (данные уже отфильтрованы по потоку на сервере); сортируем по id
         let cols = sessions.map((s) => s.id).sort((a, b) => a - b);
         if (!att.length || !cols.length) {
-          $('attHead').innerHTML = '<th>Логин</th>';
+          $('attHead').innerHTML = '<th>Login</th>';
           $('attBody').innerHTML =
-            '<tr><td class="stat-empty">Нет данных о посещаемости' +
-            (statStream !== 'all' ? ' для этого потока' : '') +
+            '<tr><td class="stat-empty">No attendance data' +
+            (statStream !== 'all' ? ' for this group' : '') +
             '</td></tr>';
           $('attMeta').textContent = '';
           return;
         }
         const colSet = new Set(cols);
-        const head = ['<th>Логин</th>']
+        const head = ['<th>Login</th>']
           .concat(
             cols.map((id) => {
               const mm = meta[id] || {};
               const d = (mm.date || '#' + id).slice(5, 16);
-              return `<th title="Сессия ${id}${mm.stream != null ? ', поток ' + mm.stream : ''}">${esc(d || '#' + id)}</th>`;
+              return `<th title="Session ${id}${mm.stream != null ? ', group ' + mm.stream : ''}">${esc(d || '#' + id)}</th>`;
             })
           )
-          .concat('<th>Всего</th>');
+          .concat('<th>Total</th>');
         $('attHead').innerHTML = head.join('');
         // строки = логины, у которых есть посещение в видимых колонках
         const rows = att
@@ -2769,26 +2778,26 @@
                 .join('');
               return `<tr><td class="ans">${r.icon || ''} ${esc(r.nick)}</td>${cells}<td style="font-weight:800">${r.count}</td></tr>`;
             })
-            .join('') || '<tr><td class="stat-empty">Нет посещений</td></tr>';
-        $('attMeta').textContent = `Студентов: ${rows.length} · занятий: ${cols.length}`;
+            .join('') || '<tr><td class="stat-empty">No attendance</td></tr>';
+        $('attMeta').textContent = `Students: ${rows.length} · sessions: ${cols.length}`;
       }
       function renderSessionStats() {
         const rows = (STATS && STATS.sessions) || [];
         if (!rows.length) {
           $('statsSessBody').innerHTML =
-            '<tr><td colspan="8" class="stat-empty">Пока нет проведённых сессий</td></tr>';
+            '<tr><td colspan="8" class="stat-empty">No completed sessions yet</td></tr>';
           return;
         }
         $('statsSessBody').innerHTML = rows
           .map((s) => {
             const st =
-              s.status === 'finished' ? 'завершена' : s.status === 'running' ? 'идёт' : 'лобби';
+              s.status === 'finished' ? 'finished' : s.status === 'running' ? 'running' : 'lobby';
             const avg = s.avgScore != null ? s.avgScore : '—';
             return `<tr>
-      <td>${s.id}</td><td>${esc(s.date || '')}</td><td>${s.stream != null ? esc(String(s.stream)) : '—'}</td>
-      <td>${st}</td><td>${s.students}</td><td>${s.answers}</td>
-      <td>${s.answers ? accCell(s.accuracy) : '—'}</td><td>${avg}</td>
-    </tr>`;
+          <td>${s.id}</td><td>${esc(s.date || '')}</td><td>${s.stream != null ? esc(String(s.stream)) : '—'}</td>
+          <td>${st}</td><td>${s.students}</td><td>${s.answers}</td>
+          <td>${s.answers ? accCell(s.accuracy) : '—'}</td><td>${avg}</td>
+        </tr>`;
           })
           .join('');
       }
@@ -2805,26 +2814,26 @@
         );
         if (!rows.length) {
           $('statsTaskBody').innerHTML =
-            '<tr><td colspan="7" class="stat-empty">Нет данных по задачам</td></tr>';
+            '<tr><td colspan="7" class="stat-empty">No question data</td></tr>';
           return;
         }
-        const topic = { asd: 'АиСД', graphs: 'Графы' },
+        const topic = { asd: 'DSA', graphs: 'Graphs' },
           type = {
-            choice: 'выбор',
-            graph: 'построение',
-            order: 'обход',
-            sort: 'сортировка',
-            blank: 'пропуски',
+            choice: 'choice',
+            graph: 'graph',
+            order: 'traversal',
+            sort: 'sorting',
+            blank: 'blanks',
           };
         $('statsTaskBody').innerHTML = rows
           .map(
             (t) => `<tr>
-    <td class="ans">${esc(t.title || t.id)}</td>
-    <td>${topic[t.topic] || esc(t.topic || '')}</td>
-    <td>${type[t.type] || esc(t.type || '')}</td>
-    <td>${t.attempts}</td><td>${t.correct}</td>
-    <td>${accCell(t.accuracy)}</td><td>${fmtMs(t.avgMs)}</td>
-  </tr>`
+        <td class="ans">${esc(t.title || t.id)}</td>
+        <td>${topic[t.topic] || esc(t.topic || '')}</td>
+        <td>${type[t.type] || esc(t.type || '')}</td>
+        <td>${t.attempts}</td><td>${t.correct}</td>
+        <td>${accCell(t.accuracy)}</td><td>${fmtMs(t.avgMs)}</td>
+      </tr>`
           )
           .join('');
         mathify($('statsTaskBody'));
@@ -2839,7 +2848,7 @@
         );
         if (!rows.length) {
           $('statsStudBody').innerHTML =
-            '<tr><td colspan="8" class="stat-empty">Пока нет данных по логинам</td></tr>';
+            '<tr><td colspan="8" class="stat-empty">No student data yet</td></tr>';
           return;
         }
         $('statsStudBody').innerHTML = rows
@@ -2847,20 +2856,20 @@
             const sel = openStud === s.nick ? ' class="rowsel"' : '';
             const susc =
               s.suspicion != null ? s.suspicion : (s.tabLeaves || 0) + 2 * (s.fastAnswers || 0);
-            const tip = `уходов: ${s.tabLeaves || 0}, быстрых ответов: ${s.fastAnswers || 0}`;
+            const tip = `switches: ${s.tabLeaves || 0}, fast answers: ${s.fastAnswers || 0}`;
             const risk = s.suspect
-              ? `<span class="leave" title="${tip}">⚠ риск ${susc}</span>`
+              ? `<span class="leave" title="${tip}">⚠ activity ${susc}</span>`
               : susc
                 ? `<span class="muted" title="${tip}">${susc}</span>`
                 : '—';
             return `<tr data-nick="${esc(s.nick)}"${sel} style="cursor:pointer">
-      <td class="ans">${s.icon || ''} ${esc(s.nick)}</td>
-      <td>${s.sessions}</td><td>${s.answers}</td><td>${s.correct}</td>
-      <td>${s.answers ? accCell(s.accuracy) : '—'}</td>
-      <td>${s.avgScore != null ? s.avgScore : '—'}</td>
-      <td>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</td>
-      <td>${risk}</td>
-    </tr>`;
+          <td class="ans">${s.icon || ''} ${esc(s.nick)}</td>
+          <td>${s.sessions}</td><td>${s.answers}</td><td>${s.correct}</td>
+          <td>${s.answers ? accCell(s.accuracy) : '—'}</td>
+          <td>${s.avgScore != null ? s.avgScore : '—'}</td>
+          <td>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</td>
+          <td>${risk}</td>
+        </tr>`;
           })
           .join('');
         $('statsStudBody')
@@ -2891,7 +2900,7 @@
             `<text x="${x.toFixed(1)}" y="${(y - 6).toFixed(1)}" font-size="9" fill="#cdd9ee" text-anchor="middle">${p.v}</text>`;
         });
         return (
-          `<div style="margin-top:12px"><div class="muted" style="font-size:12px;margin-bottom:4px">Динамика точности по занятиям</div>` +
+          `<div style="margin-top:12px"><div class="muted" style="font-size:12px;margin-bottom:4px">Accuracy across sessions</div>` +
           `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="max-width:100%;height:auto">` +
           `<line x1="${pad}" y1="${Y(50)}" x2="${w - pad}" y2="${Y(50)}" stroke="#1d3a63" stroke-dasharray="3 4"/>` +
           `<path d="${line}" fill="none" stroke="#3ddc84" stroke-width="2"/>${dots}</svg></div>`
@@ -2914,7 +2923,7 @@
         }
         const box = $('studDetail');
         box.classList.remove('hidden');
-        const topic = { asd: 'АиСД', graphs: 'Графы' };
+        const topic = { asd: 'DSA', graphs: 'Graphs' };
         const byTopic = (s.topics || [])
           .map(
             (t) =>
@@ -2928,38 +2937,38 @@
           (s.sessionRows || [])
             .map(
               (r) => `<tr>
-    <td>${r.sessionId}</td><td>${esc(r.date || '')}</td><td>${r.stream != null ? esc(String(r.stream)) : '—'}</td>
-    <td>${r.answers}</td><td>${r.correct}</td>
-    <td>${r.answers ? accCell(r.accuracy) : '—'}</td>
-    <td>${r.score != null ? Math.round(r.score) : '—'}</td>
-    <td>${r.place != null ? '#' + r.place : '—'}</td>
-  </tr>`
+        <td>${r.sessionId}</td><td>${esc(r.date || '')}</td><td>${r.stream != null ? esc(String(r.stream)) : '—'}</td>
+        <td>${r.answers}</td><td>${r.correct}</td>
+        <td>${r.answers ? accCell(r.accuracy) : '—'}</td>
+        <td>${r.score != null ? Math.round(r.score) : '—'}</td>
+        <td>${r.place != null ? '#' + r.place : '—'}</td>
+      </tr>`
             )
-            .join('') || '<tr><td colspan="8" class="muted">Нет сессий</td></tr>';
+            .join('') || '<tr><td colspan="8" class="muted">No sessions</td></tr>';
         box.innerHTML = `
-    <div class="row spread" style="margin-bottom:6px">
-      <div class="qttl" style="font-size:16px">${s.icon || ''} ${esc(s.nick)}</div>
-      <button class="chip" id="studDetClose">✕</button>
-    </div>
-    <div class="studsum">
-      <span>Сессий: <b>${s.sessions}</b></span>
-      <span>Ответов: <b>${s.answers}</b></span>
-      <span>Точность: <b>${s.answers ? s.accuracy + '%' : '—'}</b></span>
-      <span>Ср. балл: <b>${s.avgScore != null ? s.avgScore : '—'}</b></span>
-      <span>Ср. время: <b>${fmtMs(s.avgMs)}</b></span>
-      <span>Лучш. место: <b>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</b></span>
-      <span>⚠ уходов: <b>${s.tabLeaves || 0}</b></span>
-      <span>⚡ быстрых: <b>${s.fastAnswers || 0}</b></span>
-      <span>Риск: <b style="color:${s.suspect ? 'var(--red)' : 'inherit'}">${susc}${s.suspect ? ' ⚠' : ''}</b></span>
-    </div>
-    ${accSparkline(ordered)}
-    ${byTopic ? `<div class="chiprow">${byTopic}</div>` : ''}
-    <div style="overflow:auto;margin-top:8px">
-      <table class="dtable">
-        <thead><tr><th>#</th><th>Дата</th><th>Поток</th><th>Ответов</th><th>Верных</th><th>Точность</th><th>Балл</th><th>Место</th></tr></thead>
-        <tbody>${sess}</tbody>
-      </table>
-    </div>`;
+        <div class="row spread" style="margin-bottom:6px">
+          <div class="qttl" style="font-size:16px">${s.icon || ''} ${esc(s.nick)}</div>
+          <button class="chip" id="studDetClose">✕</button>
+        </div>
+        <div class="studsum">
+          <span>Sessions: <b>${s.sessions}</b></span>
+          <span>Answers: <b>${s.answers}</b></span>
+          <span>Accuracy: <b>${s.answers ? s.accuracy + '%' : '—'}</b></span>
+          <span>Avg. score: <b>${s.avgScore != null ? s.avgScore : '—'}</b></span>
+          <span>Avg. time: <b>${fmtMs(s.avgMs)}</b></span>
+          <span>Best rank: <b>${s.bestPlace != null ? '#' + s.bestPlace : '—'}</b></span>
+          <span>⚠ switches: <b>${s.tabLeaves || 0}</b></span>
+          <span>⚡ fast: <b>${s.fastAnswers || 0}</b></span>
+          <span>Activity: <b style="color:${s.suspect ? 'var(--red)' : 'inherit'}">${susc}${s.suspect ? ' ⚠' : ''}</b></span>
+        </div>
+        ${accSparkline(ordered)}
+        ${byTopic ? `<div class="chiprow">${byTopic}</div>` : ''}
+        <div style="overflow:auto;margin-top:8px">
+          <table class="dtable">
+            <thead><tr><th>#</th><th>Date</th><th>Group</th><th>Answers</th><th>Correct</th><th>Accuracy</th><th>Score</th><th>Rank</th></tr></thead>
+            <tbody>${sess}</tbody>
+          </table>
+        </div>`;
         $('studDetClose').onclick = () => {
           openStud = null;
           renderStudentStats();
@@ -2991,7 +3000,7 @@
       function flag(nick, count, kind) {
         const d = document.createElement('div');
         d.className = 'flagmsg';
-        const what = kind === 'fast' ? '⚡ аномально быстрый ответ' : 'уход со вкладки';
+        const what = kind === 'fast' ? '⚡ unusually fast answer' : 'tab switch';
         d.textContent = `⚠ ${nick}: ${what}${count ? ` (${count})` : ''}`;
         $('flags').appendChild(d);
         setTimeout(() => d.remove(), 6000);
