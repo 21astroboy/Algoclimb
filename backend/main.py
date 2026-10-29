@@ -786,7 +786,11 @@ class Game:
                 return await self.send(
                     ws, {"type": "rejected", "reason": "Please enter a valid nickname and icon."}
                 )
-            nick = (msg.get("nick") or "").strip()[:24]
+            nick = (msg.get("nick") or "").strip()
+            if len(nick) > 96:
+                return await self.send(
+                    ws, {"type": "rejected", "reason": "Use a nickname of 96 characters or fewer."}
+                )
             if not nick:
                 return await self.send(ws, {"type": "rejected", "reason": "Enter your nickname."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)

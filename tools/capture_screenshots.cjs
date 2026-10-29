@@ -35,11 +35,15 @@ async function shot(page, name) {
   await page.evaluate(() => document.fonts.ready);
   const viewport = page.viewportSize();
   const wrap = await page.locator('.wrap').boundingBox();
-  const framing = viewport.width > 1000 ? {
-    clip: { x: 0, y: 0, width: viewport.width,
-      height: Math.min(viewport.height, Math.max(720, Math.ceil(wrap.y + wrap.height + 24))) },
-  } : { fullPage: true };
-  await page.screenshot({ path: path.join(out, name + '.png'), ...framing });
+  if (viewport.width > 1000) {
+    // Resize before capture: changing vh during fullPage capture can distort the map.
+    await page.setViewportSize({ width: viewport.width, height: Math.max(720, Math.ceil(wrap.y + wrap.height + 24)) });
+    await page.waitForTimeout(100);
+    await page.screenshot({ path: path.join(out, name + '.png') });
+    await page.setViewportSize(viewport);
+  } else {
+    await page.screenshot({ path: path.join(out, name + '.png'), fullPage: true });
+  }
 }
 async function drawTriangle(page) {
   const box = await page.locator('#graph').boundingBox();

@@ -28,7 +28,8 @@ The interface is **English**. Your questions, answer options and explanations ca
 - **Build a session:** filter your bank by topic, type and difficulty, or create questions in the UI.
 - **Teach at your pace:** start, pause, resume, add time, or skip a question.
 - **Use five question types:** multiple choice, graph construction, traversal, sorting and fill-in-the-blank.
-- **Follow the class:** live progress, leaderboard, answer counts and tab-switch indicators.
+- **Follow the class:** a full-width progress map and a leaderboard of all participants,
+  with large, wrapping names, answer counts and tab-switch indicators.
 - **Review the results:** per-student answers, response times, attendance, CSV and Excel exports.
 - **Keep your own data:** SQLite history and private question banks on your server; optional Google Sheets export.
 
@@ -110,10 +111,14 @@ are activity indicators for the teacher to interpret.
 
 <img src="docs/images/student-review.png" width="340" alt="Student results and question review, with original Russian task text" />
 
+**Large-class layout: 72 fictional participants across 30 checkpoints.**
+
+![Full-width class map and readable long names in the leaderboard](docs/images/teacher-large-class.png)
+
 </details>
 
-All screenshots show the real application with public demo questions and fictional
-participants. [Reproduce them locally](docs/development.md#screenshots).
+Screenshots use public demo questions and fictional participants. The large-class view
+uses a deterministic layout fixture. [Reproduce them locally](docs/development.md#screenshots).
 
 ## Bring your own questions
 

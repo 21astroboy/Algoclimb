@@ -75,6 +75,23 @@ jobs:
       - name: Prettier (проверка формата)
         run: npm run format:check
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install demo and browser dependencies
+        run: |
+          pip install -r requirements.txt
+          npx playwright install --with-deps chromium
+
+      - name: Large-class layout (72 participants)
+        run: |
+          python tools/demo_server.py > /tmp/algoclimb-demo.log 2>&1 &
+          demo_pid=$!
+          trap 'kill "$demo_pid"' EXIT
+          npm run test:layout
+
   # ─────────────────────────────── Docker (сборка образа) ────────────────
   docker:
     name: Docker — build
