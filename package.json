@@ -10,7 +10,8 @@
     "format:check": "prettier --check \"frontend/**/*.html\"",
     "lint": "npm run lint:js && npm run lint:scripts && npm run format:check",
     "lint:scripts": "node tools/check_frontend.cjs",
-    "screenshots": "node tools/capture_screenshots.cjs"
+    "screenshots": "node tools/capture_screenshots.cjs",
+    "test:layout": "node tools/check_large_class.cjs"
   },
   "dependencies": {
     "qrcode": "^1.5.4",

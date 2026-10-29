@@ -248,6 +248,17 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         intruder = await self.connect("/teacher?key=incorrect")
         self.assertEqual((await receive(intruder, "rejected"))["type"], "rejected")
 
+    async def test_long_name_survives_join_and_reconnection(self):
+        name = "Александрова-Рождественская Екатерина Константиновна"
+        student = await self.join(name)
+        await student.close()
+        await self.join(name)
+        state = await receive(self.teacher, "state", lambda m: len(m["roster"]) == 1)
+        self.assertEqual(state["roster"][0]["nick"], name)
+        rejected = await self.connect()
+        await send(rejected, "join", nick="x" * 97, icon="🦊")
+        self.assertIn("96", (await receive(rejected, "rejected"))["reason"])
+
     async def test_added_time_replaces_the_original_deadline(self):
         student = await self.join()
         task = await self.start(student, ["demo_stack"])

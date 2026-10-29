@@ -82,6 +82,13 @@ UI and WebSocket protocol, draws a graph in the mobile canvas, and captures `doc
 It also checks pause/resume, rejected-answer recovery, answer-key access and browser errors.
 Stop the demo server with Ctrl+C when finished; its runtime data is deleted.
 
+With that demo server running, `npm run test:layout` checks the teacher screen with a
+deterministic 72-person, 30-question fixture at widths from 390 to 1920 pixels. It verifies
+that progress groups do not overlap, every participant is listed, and long names wrap
+without clipping. It also captures `docs/images/teacher-large-class.png`. CI runs the same
+check in Chromium. Nicknames support up to 96 characters; longer values are rejected
+instead of silently truncated.
+
 ## Optional API docs
 
 For a direct Python launch, set `DOCS=1`; with Compose, put `DOCS=1` in `.env` and run
