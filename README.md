@@ -137,6 +137,7 @@ the interface does not translate your content.
 | [Question banks](docs/task-bank.md) | JSON fields, answer formats and multilingual content |
 | [Deployment](docs/deployment.md) | VPS setup, HTTPS, configuration, updates, backup and recovery |
 | [Development](docs/development.md) | Architecture, checks, isolated E2E tests and screenshot capture |
+| [Reliability](docs/reliability.md) | Full-session load tests, reconnect faults, score integrity and measured results |
 
 Built with **FastAPI**, **WebSockets**, **SQLite** and static HTML/CSS/JavaScript.
 No frontend build is needed to run the app.

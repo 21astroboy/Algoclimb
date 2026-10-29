@@ -43,13 +43,19 @@ jobs:
         working-directory: backend
         run: python -m smoke_test
 
-      - name: Timer and answer regression tests
+      - name: Backend regression tests
         working-directory: backend
-        run: python -m unittest test_timers test_answers
+        run: python -m unittest test_timers test_answers test_teacher_updates
 
       - name: Isolated HTTP and WebSocket E2E
         working-directory: backend
         run: python -m e2e_test
+
+      - name: Reliability verdict regressions
+        run: python -m unittest tools.test_reliability
+
+      - name: Isolated reliability smoke (QR and connection loss)
+        run: python tools/reliability_test.py --students 12 --rounds 10 --disconnects --qr --idle 1
 
   # ─────────────────────────────── Frontend (public/) ────────────────────
   frontend:

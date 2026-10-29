@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""
-Нагрузочный тест AlgoClimb по WebSocket.
+"""Legacy load probe for an explicitly disposable application instance.
 
-Зачем: проверить, тянет ли ОДИН воркер uvicorn ~120 студентов одновременно
-(подключение + вход + ответы), или студенты начинают отваливаться. Если на
-слабой машине тест даёт отвалы/большие задержки, а на мощной — нет, значит
-проблема в ресурсах VPS (нужно докупать). Если отвалы и там, и там — дело в софте.
+Prefer reliability_test.py: it starts an isolated server and verifies every round,
+acknowledgement, persisted result and reconnect. This older probe starts, finishes
+and resets the target game, and requires --allow-session-reset. It refuses a running
+or occupied target. test:true avoids classroom database rows but can still replace
+that instance's live-session snapshot. A timed, incomplete run exits unsuccessfully.
 
-Безопасно для БД: тест запускает игру в РЕЖИМЕ test (start с test:true),
-поэтому сервер НИЧЕГО не пишет в базу (ни сессию, ни ответы, ни посещаемость).
-
-Требования: python3 + библиотека websockets (входит в uvicorn[standard],
-т.е. уже есть в окружении сервера). Опционально psutil — для CPU/RAM сервера.
-
-Примеры:
-    # локально, debug-сервер на 3000, ключ преподавателя ABC123
-    python3 tools/loadtest.py --url http://localhost:3000 --key ABC123 --students 120
-
-    # с замером CPU/RAM серверного процесса (нужен psutil и PID uvicorn)
-    python3 tools/loadtest.py --url http://localhost:3000 --key ABC123 --students 120 --pid 12345
+Example (disposable server only):
+    python tools/loadtest.py --url http://localhost:3000 --key LOCALKEY \
+        --students 60 --tasks 5 --hold 20 --allow-session-reset
 """
 
 from __future__ import annotations
@@ -57,6 +48,7 @@ class Stats:
         self.answers_confirmed = 0
         self.latencies_ms: list[float] = []
         self.reject_reasons: dict[str, int] = {}
+        self.finished = 0
 
 
 def fetch_nonce(http_url: str) -> str | None:
@@ -126,6 +118,7 @@ async def student(
                         dt = (time.perf_counter() - pending_recv.pop(tid)) * 1000
                         stats.latencies_ms.append(dt)
                 elif t == "sessionend":
+                    stats.finished += 1
                     return
     except Exception:
         if done_evt.is_set():
@@ -140,9 +133,9 @@ def _answer_payload(task: dict) -> dict:
     if ty == "sort":
         return {"array": list(task.get("array") or [])}
     if ty == "order":
-        return {"order": list(task.get("order") or [])}
+        return {"order": list(task.get("nodes") or [])}
     if ty == "blank":
-        return {"blanks": []}
+        return {"blanks": [str((b.get("options") or [""])[0]) for b in task.get("blanks", [])]}
     if ty == "graph":
         return {"edges": []}
     return {}
@@ -165,6 +158,11 @@ async def run_teacher(ws_url: str, key: str, want_tasks: int):
         if tp == "catalog":
             catalog = msg.get("items") or []
         elif tp == "state":
+            if msg.get("session", {}).get("status") != "lobby" or msg.get("roster"):
+                await ws.close()
+                raise SystemExit(
+                    "Refusing to control a running or occupied session. Use reliability_test.py."
+                )
             seen_state = True
             if msg.get("token"):
                 token = msg["token"]
@@ -225,7 +223,16 @@ async def main():
         help="сколько секунд дать студентам отвечать перед finish",
     )
     ap.add_argument("--pid", type=int, default=None, help="PID uvicorn для замера CPU/RAM")
+    ap.add_argument(
+        "--allow-session-reset",
+        action="store_true",
+        help="Confirm that the target is disposable; this tool starts and resets its game",
+    )
     args = ap.parse_args()
+    if not args.allow_session_reset:
+        ap.error(
+            "Use reliability_test.py for an isolated benchmark, or explicitly pass --allow-session-reset for a disposable target"
+        )
 
     ws_url = ws_base(args.url)
     stats = Stats()
@@ -343,11 +350,18 @@ async def main():
 
     drops = stats.rejected + stats.connect_errors + stats.unexpected_drops
     print("\nВЕРДИКТ:")
-    if drops == 0 and stats.joined == args.students:
+    complete = stats.finished == args.students and stats.answers_confirmed == args.students * len(
+        task_ids
+    )
+    if drops == 0 and stats.joined == args.students and complete:
         print("  ✅ Все студенты вошли и доиграли без обрывов — сервер тянет эту нагрузку.")
     else:
-        print(f"  ⚠ Потери: {drops} (отказы/ошибки/обрывы). Разбирайся по разбивке выше.")
+        print(
+            f"  ⚠ Обрывы/ошибки: {drops}; завершили: {stats.finished}/{args.students}; подтверждений: {stats.answers_confirmed}/{args.students * len(task_ids)}."
+        )
     print("============================================\n")
+    if drops or stats.joined != args.students or not complete:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

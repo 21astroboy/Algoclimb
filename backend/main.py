@@ -378,15 +378,19 @@ class Game:
             {"nick": s["nick"], "icon": s["icon"]} for s in self.by_nick.values() if not s["kicked"]
         ]
 
-    def leaderboard(self):
+    def leaderboard(self, include_answers=True):
         rows = []
         for s in self.by_nick.values():
             if s["kicked"]:
                 continue
-            answers = [
-                ({"correct": a["correct"], "answered": a["answered"]} if a else None)
-                for a in (s["answers"].get(i) for i in range(len(self.order)))
-            ]
+            answers = (
+                [
+                    ({"correct": a["correct"], "answered": a["answered"]} if a else None)
+                    for a in (s["answers"].get(i) for i in range(len(self.order)))
+                ]
+                if include_answers
+                else []
+            )
             rows.append(
                 {
                     "nick": s["nick"],
@@ -486,8 +490,10 @@ class Game:
             "qrSvg": self.qr_svg,
             "joinUrl": self.join_url,
             "roster": self.roster_arr(),
-            "leaderboard": self.leaderboard(),
-            "details": self.session_details() if self.order else [],
+            # The live UI needs totals, not every student's per-question history.
+            # Send the full breakdown once the session finishes.
+            "leaderboard": self.leaderboard(include_answers=not running),
+            "details": self.session_details() if self.order and not running else [],
         }
         # Любая полная рассылка гасит отложенный флаг — повтор не нужен.
         self._teacher_dirty = False
@@ -864,7 +870,7 @@ class Game:
                 await self.send_current_task(s, ws)
                 if self.intermission:
                     await self.send(ws, {"type": "roundover"})
-            await self.broadcast_teacher()
+            self.mark_teacher_dirty()
             return
 
         s = self.students.get(ws)
@@ -1014,7 +1020,7 @@ class Game:
     async def on_student_disconnect(self, ws):
         if ws in self.students:
             del self.students[ws]
-        await self.broadcast_teacher()
+        self.mark_teacher_dirty()
 
     # ---------- обработка сообщений преподавателя ----------
     async def handle_teacher(self, ws, msg):

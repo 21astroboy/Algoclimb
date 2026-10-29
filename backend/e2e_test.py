@@ -191,6 +191,11 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(end["correct"], len(ids))
         self.assertEqual(len(end["review"]), len(ids))
         self.assertIn("Стек", end["review"][0]["title"])
+        teacher_end = await receive(
+            self.teacher, "state", lambda m: m["session"]["status"] == "finished"
+        )
+        self.assertEqual(len(teacher_end["details"]), len(ids))
+        self.assertEqual(len(teacher_end["leaderboard"][0]["answers"]), len(ids))
         with sqlite3.connect(self.root / "runtime/algoclimb.db") as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM answers").fetchone()[0], len(ids))
             self.assertEqual(conn.execute("SELECT count(*) FROM results").fetchone()[0], 1)
