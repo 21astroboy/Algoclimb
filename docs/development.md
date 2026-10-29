@@ -27,6 +27,12 @@ machine-readable `reason` and English `message`; a valid retry remains possible.
 For valid submissions, the existing scoring and one-attempt rules apply. A structurally
 valid but incorrect answer spends the attempt. Choice indices refer to shuffled public options.
 
+Student joins/disconnects mark teacher state dirty and share the existing 300 ms update
+window; each returning student still receives their own state immediately. During a live
+session, teacher updates omit per-question answer arrays and the full breakdown. The final
+state includes that history for results and CSV review. This avoids rebuilding unused
+class-wide history for every returning phone. See [measured reliability](reliability.md).
+
 ## Checks
 
 Use Python 3.11+ (CI uses 3.12) and Node 22+:
@@ -41,8 +47,10 @@ ruff format --check .
 mypy
 npm run lint
 (cd backend && python -m smoke_test)
-(cd backend && python -m unittest test_timers test_answers)
+(cd backend && python -m unittest test_timers test_answers test_teacher_updates)
 (cd backend && python -m e2e_test)
+python -m unittest tools.test_reliability
+python tools/reliability_test.py --students 12 --rounds 10 --disconnects --qr --idle 1
 ```
 
 CI runs these checks and builds the Docker image. E2E starts its own server on an available

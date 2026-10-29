@@ -1,0 +1,63 @@
+{
+  "passed": true,
+  "functional_checks_passed": true,
+  "latency_budgets": {
+    "answer_p99_under_1000ms": true,
+    "restore_max_under_3000ms": true,
+    "health_p99_under_500ms": true
+  },
+  "scope": "isolated loopback server; synthetic clients; not a Wi-Fi guarantee",
+  "students": 60,
+  "rounds": 30,
+  "qr_rotation": false,
+  "idle_seconds": 5.0,
+  "duration_seconds": 23.14,
+  "students_finished": 60,
+  "complete_correct_reviews": 60,
+  "consistent_scores": 60,
+  "unique_tasks_received": 1800,
+  "expected_answers": 1800,
+  "unique_answers_confirmed": 1800,
+  "wire_submissions": 1800,
+  "intentional_disconnects": 0,
+  "successful_restorations": 0,
+  "reconnect_attempts": 0,
+  "unexpected_disconnects": 0,
+  "sqlite_records": {
+    "attendance": 60,
+    "answers": 1800,
+    "results": 60
+  },
+  "answer_confirmation": {
+    "samples": 1800,
+    "p50_ms": 6.85,
+    "p95_ms": 10.76,
+    "p99_ms": 13.73,
+    "max_ms": 15.34
+  },
+  "interrupted_answer_confirmation": {
+    "samples": 0,
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null,
+    "max_ms": null
+  },
+  "connection_restore": {
+    "samples": 0,
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null,
+    "max_ms": null
+  },
+  "health_response": {
+    "samples": 112,
+    "p50_ms": 1.63,
+    "p95_ms": 5.45,
+    "p99_ms": 7.53,
+    "max_ms": 13.5
+  },
+  "errors": [],
+  "server_cpu_seconds": 1.48,
+  "server_cpu_average_percent_of_one_core": 6.42,
+  "server_peak_rss_mb": 76.69
+}

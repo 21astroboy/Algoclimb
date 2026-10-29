@@ -1,0 +1,86 @@
+{
+  "passed": false,
+  "functional_checks_passed": false,
+  "latency_budgets": {
+    "answer_p99_under_1000ms": false,
+    "restore_max_under_3000ms": false,
+    "health_p99_under_500ms": false
+  },
+  "scope": "isolated loopback server; synthetic clients; not a Wi-Fi guarantee",
+  "students": 100,
+  "rounds": 30,
+  "qr_rotation": true,
+  "idle_seconds": 5.0,
+  "duration_seconds": 138.3,
+  "students_finished": 100,
+  "complete_correct_reviews": 71,
+  "consistent_scores": 71,
+  "unique_tasks_received": 3000,
+  "expected_answers": 3000,
+  "unique_answers_confirmed": 2878,
+  "wire_submissions": 2970,
+  "intentional_disconnects": 122,
+  "successful_restorations": 122,
+  "reconnect_attempts": 122,
+  "unexpected_disconnects": 0,
+  "sqlite_records": {
+    "attendance": 100,
+    "answers": 2909,
+    "results": 100
+  },
+  "answer_confirmation": {
+    "samples": 2867,
+    "p50_ms": 390.09,
+    "p95_ms": 2785.21,
+    "p99_ms": 3031.28,
+    "max_ms": 3718.91
+  },
+  "interrupted_answer_confirmation": {
+    "samples": 11,
+    "p50_ms": 4499.06,
+    "p95_ms": 5496.62,
+    "p99_ms": 5496.62,
+    "max_ms": 5795.58
+  },
+  "connection_restore": {
+    "samples": 122,
+    "p50_ms": 7187.1,
+    "p95_ms": 10700.3,
+    "p99_ms": 11498.99,
+    "max_ms": 11700.1
+  },
+  "health_response": {
+    "samples": 212,
+    "p50_ms": 13.95,
+    "p95_ms": 888.45,
+    "p99_ms": 2210.97,
+    "max_ms": 3091.37
+  },
+  "errors": [
+    "TimeoutError: timed out",
+    "TimeoutError: timed out",
+    "TimeoutError: timed out",
+    "TimeoutError: timed out",
+    "TimeoutError: timed out",
+    "TimeoutError: timed out",
+    "student 0: answer rejected: bench_010: expired",
+    "student 0: answer rejected: bench_017: expired",
+    "student 0: answer rejected: bench_024: expired",
+    "student 1: answer rejected: bench_010: expired",
+    "student 6: answer rejected: bench_010: expired",
+    "student 6: answer rejected: bench_024: expired",
+    "student 11: answer rejected: bench_010: expired",
+    "student 30: answer rejected: bench_017: expired",
+    "student 37: answer rejected: bench_017: expired",
+    "student 44: answer rejected: bench_017: expired",
+    "student 58: answer rejected: bench_017: expired",
+    "student 65: answer rejected: bench_017: expired",
+    "student 72: answer rejected: bench_017: expired",
+    "student 79: answer rejected: bench_017: expired",
+    "student 93: answer rejected: bench_017: expired"
+  ],
+  "server_cpu_seconds": 39.89,
+  "server_cpu_average_percent_of_one_core": 28.84,
+  "server_peak_rss_mb": 91.42,
+  "server_log_tail": "\"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36534) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36542) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36550) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36552) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36562) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36570) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36586) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36594) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36600) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36604) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36616) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36630) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36640) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36652) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36654) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36662) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36672) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36684) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36698) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36702) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36718) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36728) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36730) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36744) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36748) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36756) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36762) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36772) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36782) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36790) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36792) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36808) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36814) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36826) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36832) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36848) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36856) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36866) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36878) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36892) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36906) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36912) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36914) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36920) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36924) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36936) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36946) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36948) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36950) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36960) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36968) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36984) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36988) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36990) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 36994) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37004) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37006) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37018) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37034) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37048) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37052) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37068) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37070) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37080) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37096) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37110) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37126) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37128) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37142) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37144) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37158) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37166) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37178) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37190) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37204) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37206) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37218) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37224) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37228) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37234) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37250) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 37264) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53254) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53266) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53276) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53278) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53286) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53292) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53302) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53310) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53320) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53334) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53344) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53354) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53356) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53360) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53372) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53388) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53400) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53414) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53420) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 53424) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54622) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54624) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54626) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54636) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54646) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54650) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54660) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54668) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54674) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54682) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54686) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54690) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54694) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 54696) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51780) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51790) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51804) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51810) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51826) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51832) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51844) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51856) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51868) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51880) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51896) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51906) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51912) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51914) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51918) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51926) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51938) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51940) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51964) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51970) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51482) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51494) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51506) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51512) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51524) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51530) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51534) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51550) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51554) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51570) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51584) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51588) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51598) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 51612) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35532) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35548) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35554) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35570) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35578) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35586) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35594) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35610) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35612) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35626) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35630) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35638) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35652) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35666) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35670) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35686) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 35696) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 34280) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 34292) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 34316) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42066) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42080) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42082) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42098) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42110) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42116) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42118) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42120) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42126) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42140) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42142) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42144) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42148) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42164) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42178) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42190) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42192) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42198) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42202) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 42204) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47944) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47946) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47952) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47958) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47970) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47980) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 47996) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48008) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48010) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48012) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48014) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48024) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48038) - \"WebSocket /\" [accepted]\nINFO:     ('127.0.0.1', 48048) - \"WebSocket /\" [accepted]\nINFO:     Shutting down\nINFO:     Waiting for background tasks to complete. (CTRL+C to force quit)\nINFO:     Waiting for application shutdown.\n"
+}
