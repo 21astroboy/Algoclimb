@@ -1635,7 +1635,11 @@
       // Темы и наборы определяются самим банком задач. Для демо-банка оставляем
       // красивые подписи, для любого другого предмета подпись = значение из банка.
       const TOPIC_LABELS = { asd: 'DSA', graphs: 'Graphs', py: 'Python' };
-      const BLOCK_LABELS = { comb1: 'Combinatorics: Set 1', oop1: 'OOP fundamentals: Set 1' };
+      const BLOCK_LABELS = {
+        comb1: 'Combinatorics: Set 1',
+        comb2: 'Combinatorics: Set 2',
+        oop1: 'OOP fundamentals: Set 1',
+      };
       const topicLabel = (t) => TOPIC_LABELS[t] || t || '';
       const blockLabel = (b) => BLOCK_LABELS[b] || b || '';
       function uniqSorted(vals) {
