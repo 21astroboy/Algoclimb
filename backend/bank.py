@@ -427,6 +427,8 @@ def public_task(task):
         "prompt": t["prompt"],
         "topic": t.get("topic"),
     }
+    if t.get("figure"):
+        base["figure"] = t["figure"]
     if t["type"] == "choice":
         base["options"] = list(t["options"])
     if t["type"] == "graph":

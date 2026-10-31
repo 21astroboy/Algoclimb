@@ -523,6 +523,16 @@
         white-space: pre-wrap;
         margin-bottom: 10px;
       }
+      #dFigure:not(:empty) {
+        display: flex;
+        justify-content: center;
+        margin: 2px 0 12px;
+      }
+      #dFigure svg {
+        max-width: 260px;
+        width: 100%;
+        height: auto;
+      }
       .corr {
         background: #16331f;
         border: 1px solid #2c6b3f;
@@ -1319,6 +1329,7 @@
         <button class="x" id="detailClose">✕ Close</button>
         <div class="qttl" id="dTitle"></div>
         <div class="qpr" id="dPrompt"></div>
+        <div id="dFigure"></div>
         <div class="corr" id="dCorr"></div>
         <div class="agg" id="dAgg"></div>
         <div style="overflow: auto">
@@ -2592,6 +2603,11 @@
         mathify($('dTitle'));
         $('dPrompt').textContent = d.prompt || '';
         mathify($('dPrompt'));
+        const dFig = $('dFigure');
+        dFig.innerHTML = '';
+        if (typeof d.figure === 'string' && d.figure.trim().slice(0, 4).toLowerCase() === '<svg') {
+          dFig.innerHTML = d.figure;
+        }
         let corr = `<b>Correct answer:</b> ${esc(d.correctAnswer || '')}`;
         if (d.type === 'order' && d.answerGraph && d.answerGraph.edges) {
           corr += `<div style="margin-top:8px">${graphSvg(d.answerGraph.nodes || d.nodes, d.answerGraph.edges, { size: 200, color: '#5aa9ff' })}</div>`;
