@@ -451,6 +451,7 @@ class Game:
                     "title": task["title"],
                     "prompt": task["prompt"],
                     "type": task["type"],
+                    "figure": task.get("figure"),
                     "correctAnswer": bank.answer_text(task),
                     "nodes": (task.get("nodes") or []) if is_gr else None,
                     "answerGraph": bank.answer_edges(task) if is_gr else None,
