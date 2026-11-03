@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import io
 import json
+import logging
 import os
 import random
+import secrets
 import socket
 import time
 from contextlib import asynccontextmanager
@@ -32,6 +35,9 @@ import gsheets
 from analytics import analytics_sheets, stats_data
 from security import Security, is_loopback
 from validation import valid_answer
+
+connection_log = logging.getLogger("uvicorn.error")
+
 
 BASE = Path(__file__).resolve().parent  # backend/
 PROJECT = BASE.parent  # корень проекта
@@ -346,14 +352,32 @@ class Game:
             print("[qr] segno недоступен — на экране будет только ссылка.", e)
 
     # ---------- рассылки ----------
+    def log_connection(self, ws, event, **fields):
+        student = self.students.get(ws)
+        scope = getattr(ws, "scope", {})
+        record = {
+            "event": event,
+            "session_id": self.session["id"],
+            "connection_id": scope.get("connection_id", "unknown"),
+            **fields,
+        }
+        if student:
+            # Correlate reconnects within a session without exposing names or IPs.
+            record["participant"] = hashlib.sha256(
+                f"{self.session['id']}:{student['nick']}".encode()
+            ).hexdigest()[:16]
+        connection_log.info("connection %s", json.dumps(record, ensure_ascii=False))
+
     async def send(self, ws, msg):
         # Таймаут обязателен: без него один «залипший» сокет (телефон с плохим
         # Wi-Fi, забитый TCP-буфер) блокирует отправку под общим game.lock и
         # подвешивает весь раунд для остальных. 5с — отваливаем медленного.
+        if msg.get("type") == "rejected" and ws not in self.teachers:
+            self.log_connection(ws, "join_rejected", reason=msg.get("reason"))
         try:
             await asyncio.wait_for(ws.send_text(json.dumps(msg, ensure_ascii=False)), timeout=5)
-        except Exception:
-            pass
+        except Exception as exc:
+            self.log_connection(ws, "send_failed", error=type(exc).__name__)
 
     async def broadcast_students(self, make_msg):
         # Рассылка всем студентам ПАРАЛЛЕЛЬНО, а не по очереди, чтобы медленный
@@ -854,6 +878,16 @@ class Game:
                 }
                 self.by_nick[nick] = s
                 self.students[ws] = s
+            recovery = msg.get("recovery")
+            if recovery not in (
+                "initial",
+                "heartbeat_timeout",
+                "open_timeout",
+                "socket_closed",
+                "send_failed",
+            ):
+                recovery = "unspecified"
+            self.log_connection(ws, "reconnected" if is_reconnect else "joined", recovery=recovery)
             await self.send(
                 ws,
                 {
@@ -1599,7 +1633,9 @@ async def teacher_ws(ws: WebSocket):
 
 @app.websocket("/")
 async def student_ws(ws: WebSocket):
+    ws.scope["connection_id"] = secrets.token_hex(6)
     await ws.accept()
+    game.log_connection(ws, "opened")
     ip = client_ip(ws.scope.get("client"), ws.headers)
     try:
         while True:
@@ -1610,11 +1646,16 @@ async def student_ws(ws: WebSocket):
                 continue
             if not isinstance(msg, dict):
                 continue
+            if msg.get("type") == "ping":
+                # Heartbeat does not wait for the game lock or touch SQLite.
+                await game.send(ws, {"type": "pong"})
+                continue
             async with game.lock:
                 await game.handle_student(ws, msg, ip)
-    except WebSocketDisconnect:
-        async with game.lock:
-            await game.on_student_disconnect(ws)
-    except Exception:
+    except WebSocketDisconnect as exc:
+        game.log_connection(ws, "closed", code=exc.code)
+    except Exception as exc:
+        game.log_connection(ws, "socket_error", error=type(exc).__name__)
+    finally:
         async with game.lock:
             await game.on_student_disconnect(ws)

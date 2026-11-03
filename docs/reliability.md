@@ -112,3 +112,31 @@ separately before claiming resilience to those failures.
 
 Raw JSON includes all latency distributions, CPU time, server peak RSS, integrity counters
 and errors. The local 100-student run also includes 65 seconds of idle connections.
+
+
+## Live connection recovery and diagnostics
+
+The student page sends an application `ping` every 5 seconds. The server replies
+with `pong` without acquiring the game lock or writing to SQLite. If no pong
+arrives for more than 15 seconds, the page abandons the socket and retries after
+1 second. Opening a socket also has a 15-second deadline. Returning to a visible
+tab or receiving the browser's `online` event checks the connection immediately.
+Browser suspension and network recovery can extend these times; this does not
+guarantee delivery during an outage. Rejoining restores the current task and
+accepted answer using the existing nickname behavior, without a fresh QR code.
+
+New pages use this recovery logic; already-open pages need to reload after deployment.
+
+Server logs contain JSON records prefixed with `connection`: `opened`, `joined`,
+`reconnected`, `join_rejected`, `closed`, `socket_error`, and `send_failed`.
+Records include session and connection IDs, a session-specific hash of the
+participant nickname after admission, and relevant close codes or recovery reasons.
+They exclude names, IPs, QR tokens, nonces, and answers. Routine pings are not logged.
+A reported `heartbeat_timeout` means the browser stopped receiving heartbeats;
+it does not establish whether the cause was Wi-Fi, a proxy, tab suspension, or
+server delay. Close code 1006 likewise indicates an abnormal closure, not its cause.
+
+Inspect with `docker logs --timestamps --since 1h algoclimb 2>&1 | rg 'connection '`.
+Diagnostics follow Docker log retention and are not stored as attendance or
+anti-cheating events. Run `node --test tools/test_connection.cjs` for deterministic
+silent-outage, hung-open, stale-socket, tab-resume, and reconnect checks.

@@ -249,6 +249,15 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(end["score"], 0)
         self.assertFalse(end["review"][0]["answered"])
 
+    async def test_application_heartbeat_before_and_after_join(self):
+        student = await self.connect()
+        await send(student, "ping")
+        self.assertEqual(await receive(student, "pong"), {"type": "pong"})
+        await send(student, "join", nick="Heartbeat")
+        await receive(student, "joined")
+        await send(student, "ping")
+        self.assertEqual(await receive(student, "pong"), {"type": "pong"})
+
     async def test_teacher_key_is_required(self):
         intruder = await self.connect("/teacher?key=incorrect")
         self.assertEqual((await receive(intruder, "rejected"))["type"], "rejected")

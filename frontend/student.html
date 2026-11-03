@@ -517,31 +517,99 @@
       let ws = null;
       let pendingJoin = null; // {type:'join',...} — отправить при открытии
       let lastJoin = null; // последняя заявка — для переподключения после входа
+      let reconnectTimer = null;
+      let heartbeatTimer = null;
+      let lastPong = 0;
+      let recoveryReason = 'initial';
+      function scheduleReconnect(reason) {
+        recoveryReason = reason;
+        clearInterval(heartbeatTimer);
+        if (me && me.done) return;
+        if (me) $('fb').innerHTML = '<span class="no">Connection lost. Reconnecting…</span>';
+        if (reconnectTimer === null) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connectWS();
+          }, 1000);
+        }
+      }
+      function checkConnection() {
+        if (me && me.done) {
+          clearInterval(heartbeatTimer);
+          return;
+        }
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (Date.now() - lastPong >= 15000) {
+          const stale = ws;
+          ws = null; // ignore late events from the abandoned connection
+          try {
+            stale.close();
+          } catch (e) {}
+          scheduleReconnect('heartbeat_timeout');
+          return;
+        }
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } catch (e) {
+          const stale = ws;
+          ws = null;
+          try {
+            stale.close();
+          } catch (closeError) {}
+          scheduleReconnect('send_failed');
+        }
+      }
       function connectWS() {
-        ws = new WebSocket(`${proto}://${location.host}/?role=student`);
-        ws.onopen = () => {
-          // после восстановления связи заново регистрируем сокет,
-          // если студент уже входил (иначе сервер не узнает этот сокет).
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING))
+          return;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        const socket = new WebSocket(`${proto}://${location.host}/?role=student`);
+        ws = socket;
+        // A TCP connection attempt can also hang without an onclose event.
+        const openingTimer = setTimeout(() => {
+          if (ws !== socket || socket.readyState !== WebSocket.CONNECTING) return;
+          ws = null;
+          socket.close();
+          scheduleReconnect('open_timeout');
+        }, 15000);
+        socket.onopen = () => {
+          clearTimeout(openingTimer);
+          if (ws !== socket) return;
+          lastPong = Date.now();
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = setInterval(checkConnection, 5000);
           const p = pendingJoin || (me && !me.done ? lastJoin : null);
           pendingJoin = null;
           if (p) {
-            try {
-              ws.send(JSON.stringify(p));
-            } catch (e) {}
+            socket.send(JSON.stringify({ ...p, recovery: recoveryReason }));
           }
+          checkConnection();
         };
-        ws.onmessage = (e) => handle(JSON.parse(e.data));
-        ws.onerror = () => {
-          try {
-            ws.close();
-          } catch (e) {}
+        socket.onmessage = (e) => {
+          if (ws !== socket) return;
+          const message = JSON.parse(e.data);
+          if (message.type === 'pong') {
+            lastPong = Date.now();
+            return;
+          }
+          handle(message);
         };
-        ws.onclose = () => {
-          if (me && me.done) return; // игра закончена — переподключаться не нужно
-          if (me) $('fb').innerHTML = '<span class="no">Connection lost. Reconnecting…</span>';
-          setTimeout(connectWS, 1000); // авто-переподключение
+        socket.onerror = () => {
+          if (ws !== socket) return;
+          socket.close();
+        };
+        socket.onclose = () => {
+          clearTimeout(openingTimer);
+          if (ws !== socket) return;
+          ws = null;
+          scheduleReconnect('socket_closed');
         };
       }
+      window.addEventListener('online', checkConnection);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) checkConnection();
+      });
       connectWS();
 
       // Код входа из QR (?t=КОД): подставляем сам, ручной ввод не нужен.

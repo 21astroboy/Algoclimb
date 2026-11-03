@@ -1,5 +1,6 @@
 """Keep reconnect bursts cheap without dropping final teacher answer history."""
 
+import json
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -38,6 +39,34 @@ class TeacherUpdateTests(unittest.IsolatedAsyncioTestCase):
         game.broadcast_teacher.assert_not_awaited()
         joined = [c.args[1] for c in game.send.call_args_list if c.args[1]["type"] == "joined"]
         self.assertEqual(len(joined), 120)
+
+    async def test_connection_logs_correlate_reconnect_without_identity_or_token(self):
+        game = main.Game()
+        game.send = AsyncMock()
+        first, second = object(), object()
+        with (
+            patch.dict(main.config["qrRotation"], enabled=False),
+            self.assertLogs(main.connection_log, level="INFO") as logs,
+        ):
+            await game.handle_student(first, {"type": "join", "nick": "Private Name"}, "127.0.0.1")
+            await game.on_student_disconnect(first)
+            await game.handle_student(
+                second,
+                {
+                    "type": "join",
+                    "nick": "Private Name",
+                    "token": "SECRET",
+                    "recovery": "heartbeat_timeout",
+                },
+                "127.0.0.1",
+            )
+        records = [json.loads(line.split("connection ", 1)[1]) for line in logs.output]
+        self.assertEqual([r["event"] for r in records], ["joined", "reconnected"])
+        self.assertEqual(records[0]["participant"], records[1]["participant"])
+        self.assertEqual(records[1]["recovery"], "heartbeat_timeout")
+        self.assertNotIn("Private Name", str(logs.output))
+        self.assertNotIn("SECRET", str(logs.output))
+        self.assertNotIn("127.0.0.1", str(logs.output))
 
     async def test_full_history_is_only_built_and_sent_after_finish(self):
         game = main.Game()
