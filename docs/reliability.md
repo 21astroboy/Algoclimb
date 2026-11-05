@@ -116,11 +116,35 @@ and errors. The local 100-student run also includes 65 seconds of idle connectio
 
 ## Live connection recovery and diagnostics
 
-The student page sends an application `ping` every 5 seconds. The server replies
+The student page sends an application `ping` every 4 seconds. The server replies
 with `pong` without acquiring the game lock or writing to SQLite. If no pong
-arrives for more than 15 seconds, the page abandons the socket and retries after
-1 second. Opening a socket also has a 15-second deadline. Returning to a visible
-tab or receiving the browser's `online` event checks the connection immediately.
+arrives for 10 seconds, the page abandons the socket and retries after a jittered
+0.5–1.5 seconds. Opening a socket also has a 15-second deadline. Returning to a
+visible tab, `pageshow` or the browser's `online` event sends an immediate probe:
+if no pong arrives within 2.5 seconds, the page reconnects without waiting for the
+heartbeat timeout.
+
+Submitted answers stay queued until the server confirms or rejects them. If no
+confirmation arrives within 5 seconds, the page probes the connection. After a
+reconnect the server re-sends the current task and the page re-sends the queued
+answer; the server still accepts only one answer per question, so a duplicate is
+ignored and the stored confirmation is replayed.
+
+On `joined` the server issues a per-participant reconnect secret. The page keeps it
+in `localStorage` and rejoins automatically after a reload. Reconnecting an existing
+nickname requires that secret, or, when it is missing (another device, cleared
+storage), a fresh QR code and nonce as for a first join. Participants restored from a
+snapshot written by an older version have no secret and keep the old behavior.
+Nicknames are matched case-insensitively. When a participant joins again, older
+sockets of that participant are detached; a still-open tab shows "Opened on another
+tab or device" and stops reconnecting.
+
+The server detaches a student socket when a send fails or times out, and when it has
+received nothing (not even a ping) for `connection.staleAfterSec` (30 seconds). Uvicorn
+with `--ws wsproto` does not send protocol pings, so without this a socket that died
+silently stays "online" until TCP gives up. When everyone who is connected has answered,
+the round waits up to `connection.reconnectGraceMs` (8 seconds) for students whose
+connection dropped moments ago before closing early.
 Browser suspension and network recovery can extend these times; this does not
 guarantee delivery during an outage. Rejoining restores the current task and
 accepted answer using the existing nickname behavior, without a fresh QR code.
@@ -128,7 +152,8 @@ accepted answer using the existing nickname behavior, without a fresh QR code.
 New pages use this recovery logic; already-open pages need to reload after deployment.
 
 Server logs contain JSON records prefixed with `connection`: `opened`, `joined`,
-`reconnected`, `join_rejected`, `closed`, `socket_error`, and `send_failed`.
+`reconnected`, `join_rejected`, `closed`, `socket_error`, `send_failed` and `dropped`
+(with reason `send_failed`, `stale` or `replaced`).
 Records include session and connection IDs, a session-specific hash of the
 participant nickname after admission, and relevant close codes or recovery reasons.
 They exclude names, IPs, QR tokens, nonces, and answers. Routine pings are not logged.

@@ -78,6 +78,16 @@ TIME = config.get("timeLimits") or {"choice": 10, "graph": 25}
 SCORE = config.get("scoring") or {"base": 100, "minFraction": 0.4}
 REVEAL_MS = config.get("revealMs", 1800)
 AC = config.get("antiCheat") or {"fastMs": 1500, "suspectThreshold": 4}
+_CONN = config.get("connection") or {}
+# Сколько ждать студента, у которого только что оборвалась связь, прежде чем
+# закрыть раунд досрочно «потому что все ответили». Без этого студент, который
+# в момент залпа ответов переподключался (1–2 с), молча терял вопрос.
+RECONNECT_GRACE_MS = int(_CONN.get("reconnectGraceMs", 8000))
+# Клиент шлёт ping каждые несколько секунд. Сокет, от которого ничего не
+# приходило дольше этого времени, — «мёртвый» (телефон сменил сеть, вкладку
+# выгрузили, NAT забыл соединение). uvicorn с --ws wsproto сам ping не шлёт,
+# поэтому без этой проверки такие сокеты живут, пока не истечёт TCP (минуты).
+STALE_AFTER_S = float(_CONN.get("staleAfterSec", 30))
 
 
 def gen_key():
@@ -132,6 +142,22 @@ def time_limit_for(task):
     return (TIME["choice"] if quick else TIME["graph"]) * 1000
 
 
+_LOCAL_IPS_CACHE: list[str] | None = None
+
+
+def cached_local_ips():
+    # getaddrinfo(gethostname()) может надолго заблокировать event loop (DNS).
+    # build_qr вызывается при каждой ротации QR, поэтому адреса считаем один раз.
+    global _LOCAL_IPS_CACHE
+    if _LOCAL_IPS_CACHE is None:
+        _LOCAL_IPS_CACHE = local_ips()
+    return _LOCAL_IPS_CACHE
+
+
+def now_ms():
+    return int(time.time() * 1000)
+
+
 def local_ips():
     out = []
     try:
@@ -180,6 +206,15 @@ class Game:
         self.join_url = None
         self._timer = None
         self._reveal = None
+        # Отложенная перепроверка «все ответили» после окна ожидания переподключения.
+        self._grace = None
+        # Фоновые задачи закрытия сокетов (держим ссылки, чтобы их не собрал GC).
+        self._closers = set()
+        # QR-картинка тяжёлая (PNG base64); шлём её учителю только при изменении.
+        self.qr_version = 0
+        self._teacher_qr_seen = {}
+        # Последний записанный снимок — чтобы не переписывать файл без изменений.
+        self._last_snapshot_key = None
         # Экран преподавателя обновляем «пачками»: на залпе ответов ставим этот
         # флаг, а фоновый цикл рассылает тяжёлое состояние не чаще раза в окно.
         self._teacher_dirty = False
@@ -242,10 +277,17 @@ class Game:
             if not self._is_active():
                 SNAPSHOT_FILE.unlink(missing_ok=True)
                 return
+            data = self.snapshot_dict()
+            data.pop("savedAt", None)
+            key = json.dumps(data, ensure_ascii=False)
+            if key == self._last_snapshot_key and SNAPSHOT_FILE.exists():
+                return  # ничего не изменилось — не пишем на диск каждые 2 с
+            data["savedAt"] = now_ms()
             SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
             tmp = SNAPSHOT_FILE.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(self.snapshot_dict(), ensure_ascii=False), encoding="utf-8")
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
             tmp.replace(SNAPSHOT_FILE)
+            self._last_snapshot_key = key
         except Exception as e:
             print("Не удалось сохранить снимок сессии:", e)
 
@@ -253,6 +295,7 @@ class Game:
         # Восстанавливаем состояние из снимка при старте процесса. Возвращаем True,
         # если восстановлена идущая игра (нужно досоздать таймер раунда в lifespan).
         try:
+            self._last_snapshot_key = None
             if not SNAPSHOT_FILE.exists():
                 return False
             data = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
@@ -262,9 +305,14 @@ class Game:
             self.session = data.get("session") or {"id": None, "status": "lobby", "test": False}
             # JSON приводит целочисленные ключи answers к строкам — возвращаем int.
             by_nick = {}
+            restored_at = now_ms()
             for nick, s in (data.get("by_nick") or {}).items():
                 ans = s.get("answers") or {}
                 s["answers"] = {int(k): v for k, v in ans.items()}
+                # После рестарта сервера все студенты отключены и сейчас
+                # переподключаются. Без этого первый вернувшийся и ответивший
+                # студент закрыл бы раунд за весь класс («все подключённые ответили»).
+                s["disconnectedAt"] = restored_at
                 by_nick[nick] = s
             self.by_nick = by_nick
             self.order = data.get("order") or []
@@ -328,7 +376,8 @@ class Game:
         if PUBLIC_URL:
             base = PUBLIC_URL + "/"
         else:
-            ip = HOST_IP or (local_ips()[0] if local_ips() else "localhost")
+            ips = cached_local_ips()
+            ip = HOST_IP or (ips[0] if ips else "localhost")
             base = f"http://{ip}:{PORT}/"
         self.join_url = (
             (base + "?t=" + sec.current_token()) if config["qrRotation"].get("enabled") else base
@@ -348,12 +397,15 @@ class Game:
                 'style="width:100%;height:100%;display:block;'
                 'image-rendering:pixelated">'
             )
+            self.qr_version += 1
         except Exception as e:
             print("[qr] segno недоступен — на экране будет только ссылка.", e)
 
     # ---------- рассылки ----------
     def log_connection(self, ws, event, **fields):
-        student = self.students.get(ws)
+        self.log_connection_for(ws, self.students.get(ws), event, **fields)
+
+    def log_connection_for(self, ws, student, event, **fields):
         scope = getattr(ws, "scope", {})
         record = {
             "event": event,
@@ -378,6 +430,62 @@ class Game:
             await asyncio.wait_for(ws.send_text(json.dumps(msg, ensure_ascii=False)), timeout=5)
         except Exception as exc:
             self.log_connection(ws, "send_failed", error=type(exc).__name__)
+            # Раньше здесь только писали в лог, а сокет оставался «живым»:
+            # студент не получал, например, новый вопрос, но продолжал получать
+            # pong и поэтому не переподключался — сидел на старом экране весь
+            # раунд. Теперь такое соединение выбрасываем: клиент заметит
+            # отсутствие pong, переподключится и получит актуальное состояние.
+            if ws not in self.teachers:
+                self.drop_student_socket(ws, "send_failed")
+
+    def _mark_left(self, s):
+        # Студент остался без единого живого сокета — запоминаем момент, чтобы
+        # несколько секунд не закрывать раунд без него (см. maybe_end_round).
+        if not any(st is s for st in self.students.values()):
+            s["disconnectedAt"] = now_ms()
+
+    def drop_student_socket(self, ws, reason, notice=None):
+        # Отцепляем сокет от игры немедленно (рассылки и подсчёт «онлайн» его
+        # больше не видят) и закрываем в фоне: закрытие «мёртвого» сокета само
+        # может зависнуть, а мы, как правило, держим game.lock.
+        scope = getattr(ws, "scope", None)
+        if isinstance(scope, dict):
+            if scope.get("algoclimb_dropped"):
+                return
+            scope["algoclimb_dropped"] = True
+        s = self.students.pop(ws, None)
+        if s is not None:
+            self.log_connection_for(ws, s, "dropped", reason=reason)
+            self._mark_left(s)
+            self.mark_teacher_dirty()
+        if not hasattr(ws, "close"):
+            return
+
+        async def close_quietly():
+            try:
+                if notice is not None:
+                    await asyncio.wait_for(
+                        ws.send_text(json.dumps(notice, ensure_ascii=False)), timeout=1
+                    )
+            except Exception:
+                pass
+            try:
+                await asyncio.wait_for(ws.close(code=4000), timeout=2)
+            except Exception:
+                pass
+
+        task = asyncio.create_task(close_quietly())
+        self._closers.add(task)
+        task.add_done_callback(self._closers.discard)
+
+    def reap_stale(self):
+        # Сокеты, молчащие дольше STALE_AFTER_S (клиент шлёт ping каждые ~4 с).
+        now = time.monotonic()
+        for ws in list(self.students):
+            scope = getattr(ws, "scope", None)
+            last = scope.get("last_rx") if isinstance(scope, dict) else None
+            if last is not None and now - last > STALE_AFTER_S:
+                self.drop_student_socket(ws, "stale")
 
     async def broadcast_students(self, make_msg):
         # Рассылка всем студентам ПАРАЛЛЕЛЬНО, а не по очереди, чтобы медленный
@@ -390,6 +498,13 @@ class Game:
                 coros.append(self.send(ws, msg))
         if coros:
             await asyncio.gather(*coros)
+
+    def find_participant(self, nick):
+        s = self.by_nick.get(nick)
+        if s is not None:
+            return s
+        folded = nick.casefold()
+        return next((v for k, v in self.by_nick.items() if k.casefold() == folded), None)
 
     def connected_nicks(self):
         return {s["nick"] for s in self.students.values() if not s["kicked"]}
@@ -512,7 +627,6 @@ class Game:
             "intermission": self.intermission,
             "paused": self.paused,
             "token": sec.current_token() if config["qrRotation"].get("enabled") else None,
-            "qrSvg": self.qr_svg,
             "joinUrl": self.join_url,
             "roster": self.roster_arr(),
             # The live UI needs totals, not every student's per-question history.
@@ -523,7 +637,14 @@ class Game:
         # Любая полная рассылка гасит отложенный флаг — повтор не нужен.
         self._teacher_dirty = False
         for ws in list(self.teachers):
-            await self.send(ws, payload)
+            # PNG-картинку QR (несколько КБ) отправляем, только если этот
+            # экран её ещё не видел: раньше она уходила с каждым обновлением
+            # (до ~3 раз в секунду во время залпа ответов).
+            if self._teacher_qr_seen.get(ws) != self.qr_version:
+                self._teacher_qr_seen[ws] = self.qr_version
+                await self.send(ws, {**payload, "qrSvg": self.qr_svg})
+            else:
+                await self.send(ws, payload)
 
     def mark_teacher_dirty(self):
         # Отложенная рассылка преподавателю: собственно отправку сделает
@@ -565,11 +686,12 @@ class Game:
 
     # ---------- таймеры ----------
     def _cancel_timers(self):
-        for t in (self._timer, self._reveal):
+        for t in (self._timer, self._reveal, self._grace):
             if t:
                 t.cancel()
         self._timer = None
         self._reveal = None
+        self._grace = None
 
     def _schedule(self, attr, delay_ms, coro_factory):
         previous = getattr(self, attr)
@@ -624,6 +746,9 @@ class Game:
         if self._timer:
             self._timer.cancel()
             self._timer = None
+        if self._grace:
+            self._grace.cancel()
+            self._grace = None
         for s in self.by_nick.values():
             if s["kicked"]:
                 continue
@@ -681,11 +806,31 @@ class Game:
         await self._advance()
 
     async def maybe_end_round(self):
-        if self.paused:
+        if (
+            self.paused
+            or self.session["status"] != "running"
+            or self.round < 0
+            or self.intermission
+        ):
             return
-        nicks = list(self.connected_nicks())
-        if nicks and all(n in self.round_answered for n in nicks):
-            await self.end_round("all")
+        connected = self.connected_nicks()
+        if not connected or not all(n in self.round_answered for n in connected):
+            return
+        # Все подключённые ответили. Но если у кого-то связь оборвалась только
+        # что, он, скорее всего, уже переподключается — даём ему несколько
+        # секунд, а не закрываем раунд без него.
+        now = now_ms()
+        wait_ms = 0
+        for s in self.by_nick.values():
+            if s["kicked"] or s["nick"] in connected or s["nick"] in self.round_answered:
+                continue
+            left = RECONNECT_GRACE_MS - (now - s.get("disconnectedAt", 0))
+            if left > 0:
+                wait_ms = max(wait_ms, left)
+        if wait_ms > 0:
+            self._schedule("_grace", wait_ms + 50, self.maybe_end_round)
+            return
+        await self.end_round("all")
 
     # ---------- управление раундом ----------
     async def pause_round(self):
@@ -724,6 +869,8 @@ class Game:
             }
         )
         await self.broadcast_teacher()
+        # Пока шла пауза, могло истечь окно ожидания переподключившихся.
+        await self.maybe_end_round()
 
     async def skip_round(self):
         if self.session["status"] != "running" or self.round < 0:
@@ -825,14 +972,37 @@ class Game:
             if not nick:
                 return await self.send(ws, {"type": "rejected", "reason": "Enter your nickname."})
             dbg = config["debug"].get("enabled") and is_loopback(ip)
-            existing = self.by_nick.get(nick)
-            # Переподключение уже допущенного ника НЕ требует свежего кода входа.
-            # Код/nonce из QR проверяем только при первом входе — иначе при разрыве
-            # связи (блокировка экрана телефона, смена Wi-Fi, ротация QR) студент
-            # получал бы отказ и вылетал из игры. Состояние (очки, ответы) при
-            # обрыве сокета сохраняется в by_nick, поэтому вернуть его безопасно.
+            existing = self.find_participant(nick)
+            if existing is not None:
+                nick = existing["nick"]  # «ivan» и «Ivan» — один и тот же участник
             is_reconnect = existing is not None and not existing["kicked"]
-            if not dbg and not is_reconnect:
+            # Переподключение без свежего QR-кода разрешаем только по секрету
+            # переподключения, который сервер выдал этому участнику при входе
+            # (клиент хранит его в localStorage). Раньше хватало одного ника:
+            # любой, кто знает ник одногруппника, мог войти и отвечать за него.
+            # Участники из снимка, созданного старой версией, секрета не имеют —
+            # для них сохраняем прежнее поведение, чтобы деплой посреди пары
+            # никого не выбросил.
+            resume = msg.get("resume")
+            resume_ok = bool(
+                is_reconnect
+                and existing.get("resume")
+                and isinstance(resume, str)
+                and secrets.compare_digest(existing["resume"].encode(), resume.encode())
+            )
+            legacy = is_reconnect and not existing.get("resume")
+            if msg.get("auto") and not (resume_ok or legacy):
+                # Автовосход после перезагрузки страницы: восстановить нечего
+                # (новое занятие, сброс, кик). Клиент молча покажет форму входа.
+                return await self.send(
+                    ws,
+                    {
+                        "type": "rejected",
+                        "code": "resume_failed",
+                        "reason": "Your previous session could not be restored. Join again.",
+                    },
+                )
+            if not dbg and not (resume_ok or legacy):
                 if not sec.token_ok(msg.get("token")):
                     return await self.send(
                         ws,
@@ -856,6 +1026,14 @@ class Game:
                         {"type": "rejected", "reason": "You have been removed from this session."},
                     )
                 s = existing
+                # Старые сокеты того же участника — либо «мёртвые» (телефон
+                # сменил сеть, сервер ещё не заметил), либо вторая вкладка.
+                # Отцепляем их, чтобы рассылки не ждали мёртвый сокет, а вторая
+                # вкладка показала «открыто на другом устройстве» и не
+                # переподключалась по кругу.
+                for other, st in list(self.students.items()):
+                    if st is s and other is not ws:
+                        self.drop_student_socket(other, "replaced", notice={"type": "replaced"})
                 self.students[ws] = s
             else:
                 if self.session["status"] != "lobby":
@@ -878,6 +1056,9 @@ class Game:
                 }
                 self.by_nick[nick] = s
                 self.students[ws] = s
+            if not s.get("resume"):
+                s["resume"] = secrets.token_urlsafe(18)
+            s.pop("disconnectedAt", None)
             recovery = msg.get("recovery")
             if recovery not in (
                 "initial",
@@ -885,6 +1066,9 @@ class Game:
                 "open_timeout",
                 "socket_closed",
                 "send_failed",
+                "answer_timeout",
+                "resume_probe",
+                "page_reload",
             ):
                 recovery = "unspecified"
             self.log_connection(ws, "reconnected" if is_reconnect else "joined", recovery=recovery)
@@ -895,6 +1079,8 @@ class Game:
                     "nick": s["nick"],
                     "icon": s["icon"],
                     "status": self.session["status"],
+                    # Секрет переподключения: только этому сокету, не учителю.
+                    "resume": s["resume"],
                 },
             )
             if self.session["status"] == "running":
@@ -1050,19 +1236,33 @@ class Game:
                         "count": s["tabLeaves"],
                     },
                 )
-            await self.broadcast_teacher()
+            # Раньше — полная немедленная рассылка состояния на каждый уход со
+            # вкладки (в обход 300-мс пачек). Класс разом свернул браузер = залп
+            # тяжёлых рассылок под общим lock.
+            self.mark_teacher_dirty()
 
     async def on_student_disconnect(self, ws):
-        if ws in self.students:
-            del self.students[ws]
+        s = self.students.pop(ws, None)
+        if s is not None:
+            self._mark_left(s)
+            if self.session["status"] == "running" and not self.intermission:
+                # Если остальные уже ответили, раунд закроется после окна ожидания.
+                await self.maybe_end_round()
         self.mark_teacher_dirty()
 
-    # ---------- обработка сообщений преподавателя ----------
-    async def handle_teacher(self, ws, msg):
+    # ---------- статистика (вне game.lock и вне event loop) ----------
+    # Раньше getStats выполнялся под общим game.lock прямо в event loop.
+    # list_sessions делает подзапросы по всей истории ответов без индексов, так
+    # что открытая во время пары «Статистика» подвешивала весь класс (pong не
+    # уходили → у студентов срабатывал таймаут heartbeat). Состояние игры эти
+    # запросы не трогают, поэтому lock не нужен; чтение идёт через отдельное
+    # соединение SQLite (WAL: читатель не блокирует запись ответов).
+    async def handle_teacher_db(self, ws, msg):
         t = msg.get("type")
         if t == "getStats":
             try:
-                await self.send(ws, {"type": "stats", **stats_data(msg.get("stream"), AC)})
+                stats = await asyncio.to_thread(stats_data, msg.get("stream"), AC)
+                await self.send(ws, {"type": "stats", **stats})
             except Exception as e:
                 await self.send(
                     ws,
@@ -1074,15 +1274,21 @@ class Game:
                         "error": str(e),
                     },
                 )
-            return
+            return True
         if t == "wipeData":
             try:
-                db.wipe_all()
+                await asyncio.to_thread(db.wipe_all)
                 await self.send(ws, {"type": "wiped", "ok": True})
-                await self.send(ws, {"type": "stats", **stats_data(None, AC)})
+                stats = await asyncio.to_thread(stats_data, None, AC)
+                await self.send(ws, {"type": "stats", **stats})
             except Exception as e:
                 await self.send(ws, {"type": "wiped", "ok": False, "error": str(e)})
-            return
+            return True
+        return False
+
+    # ---------- обработка сообщений преподавателя ----------
+    async def handle_teacher(self, ws, msg):
+        t = msg.get("type")
         if t == "addTask":
             task = bank.build_custom_task(msg.get("task"))
             if not task:
@@ -1341,6 +1547,16 @@ async def lifespan(_app: FastAPI):
                 if game._teacher_dirty:
                     await game.broadcast_teacher()
 
+    async def stale_loop():
+        # Выбрасываем «мёртвые» сокеты, от которых давно нет даже ping.
+        while True:
+            await asyncio.sleep(5)
+            try:
+                async with game.lock:
+                    game.reap_stale()
+            except Exception as e:
+                print("[stale] ошибка в фоновом цикле:", e)
+
     async def snapshot_loop():
         # Периодически сохраняем состояние живой сессии на диск. Худший случай при
         # падении — потеря ~2 секунд прогресса. Под game.lock, чтобы снимок был
@@ -1366,6 +1582,7 @@ async def lifespan(_app: FastAPI):
     _BG_TASKS.add(asyncio.create_task(nonce_loop()))
     _BG_TASKS.add(asyncio.create_task(teacher_flush_loop()))
     _BG_TASKS.add(asyncio.create_task(snapshot_loop()))
+    _BG_TASKS.add(asyncio.create_task(stale_loop()))
 
     yield
 
@@ -1463,7 +1680,9 @@ async def export_xlsx(
     try:
         from analytics import build_xlsx
 
-        buf = build_xlsx(analytics_sheets(stream, AC))
+        # Excel собирается в отдельном потоке: в event loop это блокировало
+        # всех студентов на время выгрузки.
+        buf = await asyncio.to_thread(lambda: build_xlsx(analytics_sheets(stream, AC)))
         fname = f"algoclimb-analytics-{time.strftime('%Y-%m-%d')}.xlsx"
         from urllib.parse import quote
 
@@ -1623,23 +1842,34 @@ async def teacher_ws(ws: WebSocket):
                 continue
             if not isinstance(msg, dict):
                 continue
+            if await game.handle_teacher_db(ws, msg):
+                continue
             async with game.lock:
                 await game.handle_teacher(ws, msg)
     except WebSocketDisconnect:
-        game.teachers.discard(ws)
+        pass
     except Exception:
+        pass
+    finally:
         game.teachers.discard(ws)
+        game._teacher_qr_seen.pop(ws, None)
 
 
 @app.websocket("/")
 async def student_ws(ws: WebSocket):
     ws.scope["connection_id"] = secrets.token_hex(6)
+    ws.scope["last_rx"] = time.monotonic()
     await ws.accept()
     game.log_connection(ws, "opened")
     ip = client_ip(ws.scope.get("client"), ws.headers)
     try:
         while True:
             raw = await ws.receive_text()
+            if ws.scope.get("algoclimb_dropped"):
+                # Сервер уже списал это соединение (таймаут отправки, молчание,
+                # вход с другой вкладки) — завершаем обработчик, сокет закроется.
+                break
+            ws.scope["last_rx"] = time.monotonic()
             try:
                 msg = json.loads(raw)
             except Exception:

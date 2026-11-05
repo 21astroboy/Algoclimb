@@ -32,6 +32,8 @@ function setup() {
     setInterval: (fn, delay) => { timers.set(++next, { fn, delay, interval: true }); return next; },
     clearTimeout: (id) => timers.delete(id), clearInterval: (id) => timers.delete(id),
   });
+  // Fixed jitter: reconnectDelay() becomes exactly 1000 ms.
+  vm.runInContext('Math.random = () => 0.5;', context);
   vm.runInContext(source, context);
   vm.runInContext("lastJoin = { type: 'join', nick: 'Student', token: 'old' };", context);
   return { sockets, events, messages, context,
@@ -47,7 +49,7 @@ function setup() {
 }
 test('silent open socket is replaced; old events cannot corrupt new connection', () => {
   const x = setup(); const old = x.sockets[0]; old.open();
-  x.advance(16000); x.run(5000); x.run(1000);
+  x.advance(16000); x.run(4000); x.run(1000);
   assert.equal(x.sockets.length, 2);
   const fresh = x.sockets[1]; fresh.open();
   assert.equal(fresh.sent[0].recovery, 'heartbeat_timeout');
@@ -60,9 +62,9 @@ test('silent open socket is replaced; old events cannot corrupt new connection',
 test('healthy pong keeps connection alive, including wake from a short suspension', () => {
   const x = setup(); const socket = x.sockets[0]; socket.open();
   for (let i = 0; i < 12; i++) {
-    x.advance(5000); socket.message({ type: 'pong' }); x.run(5000);
+    x.advance(4000); socket.message({ type: 'pong' }); x.run(4000);
   }
-  x.events.visibilitychange(); x.run(1000);
+  x.events.visibilitychange(); socket.message({ type: 'pong' }); x.run(2500); x.run(1000);
   assert.equal(x.sockets.length, 1);
   assert.equal(x.messages.length, 0);
 });
@@ -84,4 +86,41 @@ test('normal closure restores join and completed games stop reconnecting', () =>
   vm.runInContext('me.done = true;', x.context);
   x.sockets[1].close(); x.run(1000);
   assert.equal(x.sockets.length, 2);
+});
+test('waking with a socket that looks open but is dead reconnects within the probe window', () => {
+  const x = setup(); const socket = x.sockets[0]; socket.open();
+  x.advance(3000); x.events.visibilitychange();
+  assert.equal(socket.sent.at(-1).type, 'ping');
+  x.advance(2500); x.run(2500); x.run(1000);
+  assert.equal(x.sockets.length, 2);
+  x.sockets[1].open();
+  assert.equal(x.sockets[1].sent[0].recovery, 'resume_probe');
+});
+test('unacknowledged answer triggers a probe and a reconnect instead of hanging', () => {
+  const x = setup(); const socket = x.sockets[0]; socket.open();
+  vm.runInContext("submitAnswer('t1', { choice: 0 });", x.context);
+  assert.deepEqual(socket.sent.at(-1), { type: 'answer', taskId: 't1', payload: { choice: 0 } });
+  x.advance(5000); x.run(5000);
+  assert.equal(socket.sent.at(-1).type, 'ping');
+  x.advance(2500); x.run(2500); x.run(1000);
+  assert.equal(x.sockets.length, 2);
+  x.sockets[1].open();
+  assert.equal(x.sockets[1].sent[0].recovery, 'answer_timeout');
+  // The answer stays queued until the server re-sends the task after rejoin.
+  assert.equal(vm.runInContext('pendingAnswer && pendingAnswer.taskId', x.context), 't1');
+});
+test('acknowledged answer with a live connection does not reconnect', () => {
+  const x = setup(); const socket = x.sockets[0]; socket.open();
+  vm.runInContext("submitAnswer('t1', { choice: 0 });", x.context);
+  x.advance(5000); x.run(5000); socket.message({ type: 'pong' });
+  x.run(2500); x.run(1000);
+  assert.equal(x.sockets.length, 1);
+  vm.runInContext('settleAnswer();', x.context);
+  assert.equal(vm.runInContext('pendingAnswer', x.context), null);
+});
+test('answering while offline queues the answer without throwing', () => {
+  const x = setup(); x.sockets[0].open(); x.sockets[0].close();
+  vm.runInContext("submitAnswer('t2', { blanks: ['x'] });", x.context);
+  assert.equal(vm.runInContext('pendingAnswer.taskId', x.context), 't2');
+  assert.equal(x.sockets[0].sent.filter((m) => m.type === 'answer').length, 0);
 });

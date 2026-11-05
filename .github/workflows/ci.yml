@@ -45,7 +45,7 @@ jobs:
 
       - name: Backend regression tests
         working-directory: backend
-        run: python -m unittest test_timers test_answers test_teacher_updates
+        run: python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery
 
       - name: Isolated HTTP and WebSocket E2E
         working-directory: backend
