@@ -78,6 +78,9 @@ jobs:
       - name: Inline JavaScript syntax
         run: npm run lint:scripts
 
+      - name: Connection recovery regressions
+        run: node --test tools/test_connection.cjs
+
       - name: Prettier (проверка формата)
         run: npm run format:check
 
