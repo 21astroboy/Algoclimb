@@ -215,7 +215,7 @@ class Student:
                 async with websockets.connect(
                     self.run.ws_url + "/", open_timeout=10, ping_interval=None, max_queue=128
                 ) as ws:
-                    fields = {"nick": self.nick, "icon": "🦉"}
+                    fields = {"nick": self.nick, "icon": "🦉", "resumeProtocol": 1}
                     if self.first_join.is_set() and self.resume:
                         fields["resume"] = self.resume
                     if not self.first_join.is_set() and self.run.args.qr:

@@ -63,11 +63,14 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             ws, {"type": "answer", "taskId": TASK["id"], "payload": {"choice": 1}}, "10.0.0.5"
         )
 
-    async def test_reconnect_needs_resume_secret_or_fresh_qr(self):
+    async def test_reconnect_needs_resume_secret_even_with_fresh_qr(self):
         with patch.dict(main.config["qrRotation"], enabled=True):
             first = FakeWS()
             joined = await self.join(
-                first, token=main.sec.current_token(), nonce=main.sec.issue_nonce()
+                first,
+                token=main.sec.current_token(),
+                nonce=main.sec.issue_nonce(),
+                resumeProtocol=1,
             )
             self.assertEqual(joined["type"], "joined")
             secret = joined["resume"]
@@ -85,12 +88,15 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(restored["type"], "joined")
             self.assertEqual(restored["resume"], secret)
 
-            # A different device can still recover by scanning the current QR code.
+            # The shared classroom QR cannot replace this participant's identity.
             other = FakeWS()
             rescan = await self.join(
                 other, token=main.sec.current_token(), nonce=main.sec.issue_nonce()
             )
-            self.assertEqual(rescan["type"], "joined")
+            self.assertEqual(rescan["code"], "resume_required")
+            self.assertIn(again, self.game.students)
+            self.assertNotIn(other, self.game.students)
+            self.assertFalse(again.scope.get("algoclimb_dropped", False))
 
     async def test_automatic_resume_fails_quietly_without_matching_participant(self):
         ws = FakeWS()
@@ -118,6 +124,56 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             reply = await self.join(FakeWS(), nick="Legacy")
             self.assertEqual(reply["type"], "joined")
             self.assertTrue(reply["resume"])
+
+    async def test_legacy_page_can_reconnect_repeatedly_after_snapshot_restore(self):
+        with patch.dict(main.config["qrRotation"], enabled=False):
+            old = FakeWS()
+            await self.join(old)
+        # A pre-#23 snapshot has no secret or compatibility marker.
+        person = self.game.by_nick["Student"]
+        person.pop("resume")
+        person.pop("legacyResume", None)
+        await self.game.on_student_disconnect(old)
+        with patch.dict(main.config["qrRotation"], enabled=True):
+            for _ in range(3):
+                ws = FakeWS()
+                reply = await self.join(ws, token="EXPIRED", nonce="USED")
+                self.assertEqual(reply["type"], "joined")
+                await self.game.on_student_disconnect(ws)
+        self.assertTrue(person["legacyResume"])
+        # The compatibility marker survives writing and loading a snapshot.
+        snapshot = json.dumps(self.game.snapshot_dict())
+        restored = main.Game()
+        with patch.object(main, "SNAPSHOT_FILE") as snap:
+            snap.exists.return_value = True
+            snap.read_text.return_value = snapshot
+            restored.load_snapshot()
+        self.assertTrue(restored.by_nick["Student"]["legacyResume"])
+
+    async def test_capable_client_upgrades_legacy_entry_to_protected_identity(self):
+        with patch.dict(main.config["qrRotation"], enabled=False):
+            old = FakeWS()
+            secret = (await self.join(old))["resume"]
+            modern = FakeWS()
+            await self.join(modern, resume=secret, resumeProtocol=1)
+            self.assertFalse(self.game.by_nick["Student"]["legacyResume"])
+            intruder = FakeWS()
+            reply = await self.join(intruder)
+        self.assertEqual(reply["code"], "resume_required")
+        self.assertIn(modern, self.game.students)
+
+    async def test_modern_identity_stays_protected_when_qr_rotation_is_off(self):
+        with patch.dict(main.config["qrRotation"], enabled=False):
+            owner = FakeWS()
+            secret = (await self.join(owner, resumeProtocol=1))["resume"]
+            intruder = FakeWS()
+            self.assertEqual((await self.join(intruder))["code"], "resume_required")
+            replacement = FakeWS()
+            reply = await self.join(replacement, resume=secret, resumeProtocol=1)
+        self.assertEqual(reply["type"], "joined")
+        await asyncio.gather(*self.game._closers)
+        self.assertTrue(owner.closed)
+        self.assertIn(replacement, self.game.students)
 
     async def test_nickname_case_does_not_create_a_second_participant(self):
         with patch.dict(main.config["qrRotation"], enabled=False):

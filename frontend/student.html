@@ -742,7 +742,13 @@
           .querySelectorAll('.ic')
           .forEach((x) => x.classList.toggle('sel', x.textContent === icon));
         $('nick').value = stored.nick;
-        lastJoin = { type: 'join', nick: stored.nick, icon, resume: stored.resume };
+        lastJoin = {
+          type: 'join',
+          nick: stored.nick,
+          icon,
+          resume: stored.resume,
+          resumeProtocol: 1,
+        };
         pendingJoin = { ...lastJoin, auto: true };
         recoveryReason = 'page_reload';
         $('joinErr').textContent = 'Restoring your session…';
@@ -756,7 +762,7 @@
         }
         if (!joinNonce) await fetchNonce();
         const token = urlTok || $('tok').value.trim().toUpperCase();
-        const payload = { type: 'join', nick, icon, token, nonce: joinNonce };
+        const payload = { type: 'join', nick, icon, token, nonce: joinNonce, resumeProtocol: 1 };
         lastJoin = payload;
         $('joinErr').textContent = '';
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -806,7 +812,13 @@
           me = m;
           $('joinErr').textContent = '';
           if (m.resume) {
-            lastJoin = { type: 'join', nick: m.nick, icon: m.icon, resume: m.resume };
+            lastJoin = {
+              type: 'join',
+              nick: m.nick,
+              icon: m.icon,
+              resume: m.resume,
+              resumeProtocol: 1,
+            };
             saveStored({ nick: m.nick, icon: m.icon, resume: m.resume });
           }
           $('meNick').textContent = m.nick;
