@@ -925,35 +925,37 @@ class Game:
             for i, r in enumerate(ranked):
                 db.record_result(self.session["id"], r["nick"], 0, 1, r["score"], i + 1)
 
-        def _sessionend(s):
-            place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
-            review = []
-            for ri, task in enumerate(self.order):
-                a = s["answers"].get(ri)
-                review.append(
-                    {
-                        "title": task["title"],
-                        "prompt": task["prompt"],
-                        "type": task["type"],
-                        "answered": bool(a and a["answered"]),
-                        "correct": bool(a and a["correct"]),
-                        "yourAnswer": (a.get("ansText", "") if (a and a["answered"]) else None),
-                        "correctAnswer": bank.answer_text(task),
-                        "explain": EXPLAIN.get(task["id"], ""),
-                    }
-                )
-            return {
-                "type": "sessionend",
-                "place": place,
-                "score": s["score"],
-                "correct": s["correct"],
-                "total": len(self.order),
-                "bestStreak": s.get("bestStreak", 0),
-                "review": review,
-            }
-
-        await self.broadcast_students(_sessionend)
+        await self.broadcast_students(lambda s: self.session_end_payload(s, ranked))
         await self.broadcast_teacher()
+
+    def session_end_payload(self, s, ranked=None):
+        if ranked is None:
+            ranked = self.leaderboard()
+        place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
+        review = []
+        for ri, task in enumerate(self.order):
+            a = s["answers"].get(ri)
+            review.append(
+                {
+                    "title": task["title"],
+                    "prompt": task["prompt"],
+                    "type": task["type"],
+                    "answered": bool(a and a["answered"]),
+                    "correct": bool(a and a["correct"]),
+                    "yourAnswer": (a.get("ansText", "") if (a and a["answered"]) else None),
+                    "correctAnswer": bank.answer_text(task),
+                    "explain": EXPLAIN.get(task["id"], ""),
+                }
+            )
+        return {
+            "type": "sessionend",
+            "place": place,
+            "score": s["score"],
+            "correct": s["correct"],
+            "total": len(self.order),
+            "bestStreak": s.get("bestStreak", 0),
+            "review": review,
+        }
 
     # ---------- обработка сообщений студента ----------
     async def handle_student(self, ws, msg, ip):
@@ -976,13 +978,9 @@ class Game:
             if existing is not None:
                 nick = existing["nick"]  # «ivan» и «Ivan» — один и тот же участник
             is_reconnect = existing is not None and not existing["kicked"]
-            # Переподключение без свежего QR-кода разрешаем только по секрету
-            # переподключения, который сервер выдал этому участнику при входе
-            # (клиент хранит его в localStorage). Раньше хватало одного ника:
-            # любой, кто знает ник одногруппника, мог войти и отвечать за него.
-            # Участники из снимка, созданного старой версией, секрета не имеют —
-            # для них сохраняем прежнее поведение, чтобы деплой посреди пары
-            # никого не выбросил.
+            # A shared admission QR proves classroom access, not nickname ownership.
+            # Old pages cannot retain resume secrets; keep their compatibility
+            # status for this session until a capable client upgrades the entry.
             resume = msg.get("resume")
             resume_ok = bool(
                 is_reconnect
@@ -990,7 +988,9 @@ class Game:
                 and isinstance(resume, str)
                 and secrets.compare_digest(existing["resume"].encode(), resume.encode())
             )
-            legacy = is_reconnect and not existing.get("resume")
+            legacy = is_reconnect and (
+                existing.get("legacyResume", False) or not existing.get("resume")
+            )
             if msg.get("auto") and not (resume_ok or legacy):
                 # Автовосход после перезагрузки страницы: восстановить нечего
                 # (новое занятие, сброс, кик). Клиент молча покажет форму входа.
@@ -1000,6 +1000,15 @@ class Game:
                         "type": "rejected",
                         "code": "resume_failed",
                         "reason": "Your previous session could not be restored. Join again.",
+                    },
+                )
+            if is_reconnect and not (resume_ok or legacy):
+                return await self.send(
+                    ws,
+                    {
+                        "type": "rejected",
+                        "code": "resume_required",
+                        "reason": "This nickname is already in use. Return using your original browser.",
                     },
                 )
             if not dbg and not (resume_ok or legacy):
@@ -1056,6 +1065,10 @@ class Game:
                 }
                 self.by_nick[nick] = s
                 self.students[ws] = s
+            if legacy or not is_reconnect:
+                s["legacyResume"] = msg.get("resumeProtocol") != 1
+            if resume_ok and msg.get("resumeProtocol") == 1:
+                s["legacyResume"] = False
             if not s.get("resume"):
                 s["resume"] = secrets.token_urlsafe(18)
             s.pop("disconnectedAt", None)
@@ -1091,6 +1104,8 @@ class Game:
                 await self.send_current_task(s, ws)
                 if self.intermission:
                     await self.send(ws, {"type": "roundover"})
+            elif self.session["status"] == "finished":
+                await self.send(ws, self.session_end_payload(s))
             self.mark_teacher_dirty()
             return
 
@@ -1487,7 +1502,10 @@ Commands include `start` (optional `taskIds` and `test`), `pause`, `resume`,
 ### Student WebSocket
 Connect to `ws(s)://<host>/`. Send `join` with `nick` and `icon`.
 When QR rotation is enabled, initial entry also needs the QR `token` and a fresh
-`nonce` from `/api/nonce`. Existing nickname reconnection keeps its current behavior.
+`nonce` from `/api/nonce`. Clients that store reconnect secrets send `resumeProtocol: 1`.
+Use the `resume` secret from `joined` to reconnect a protected nickname; a shared
+QR cannot replace it. Older pages retain session-scoped nickname compatibility.
+Rejoining a finished session also returns `sessionend` with the final review.
 The server sends `joined` or `rejected`, then `task`, `answered`, `roundover`,
 `paused`, `resumed`, `addtime` and `sessionend` events as the session progresses.
 

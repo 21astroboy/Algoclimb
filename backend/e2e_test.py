@@ -128,6 +128,7 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self.connections = []
+        self.resume_secrets = {}
         self.teacher = await self.connect("/teacher?key=" + KEY)
         await receive(self.teacher, "state")
         await send(self.teacher, "reset")
@@ -146,9 +147,17 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
 
     async def join(self, nick="Alice"):
         ws = await self.connect()
-        await send(ws, "join", nick=nick, icon="🦊")
+        await send(
+            ws,
+            "join",
+            nick=nick,
+            icon="🦊",
+            resumeProtocol=1,
+            resume=self.resume_secrets.get(nick),
+        )
         msg = await receive(ws, "joined")
         self.assertEqual(msg["nick"], nick)
+        self.resume_secrets[nick] = msg["resume"]
         return ws
 
     async def start(self, student, ids, practice=True):
@@ -257,6 +266,35 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
         await receive(student, "joined")
         await send(student, "ping")
         self.assertEqual(await receive(student, "pong"), {"type": "pong"})
+
+    async def test_reconnect_after_missing_session_end_restores_results(self):
+        student = await self.join()
+        task = await self.start(student, ["demo_stack", "demo_triangle"])
+        await send(student, "answer", taskId=task["id"], payload=self.correct(task))
+        accepted = await receive(student, "answered")
+        await student.close()
+        await send(self.teacher, "finish")
+        await receive(self.teacher, "state", lambda m: m["session"]["status"] == "finished")
+        returning = await self.connect()
+        await send(
+            returning,
+            "join",
+            nick="Alice",
+            resume=self.resume_secrets["Alice"],
+            resumeProtocol=1,
+            auto=True,
+        )
+        self.assertEqual((await receive(returning, "joined"))["status"], "finished")
+        result = await receive(returning, "sessionend")
+        self.assertEqual(result["score"], accepted["points"])
+        self.assertEqual(result["correct"], 1)
+        self.assertEqual(result["place"], 1)
+        self.assertEqual(len(result["review"]), 2)
+        self.assertTrue(result["review"][0]["answered"])
+        # Repeating the automatic restore returns the same result.
+        await returning.close()
+        again = await self.join()
+        self.assertEqual(await receive(again, "sessionend"), result)
 
     async def test_teacher_key_is_required(self):
         intruder = await self.connect("/teacher?key=incorrect")

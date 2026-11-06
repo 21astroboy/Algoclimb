@@ -131,13 +131,26 @@ answer; the server still accepts only one answer per question, so a duplicate is
 ignored and the stored confirmation is replayed.
 
 On `joined` the server issues a per-participant reconnect secret. The page keeps it
-in `localStorage` and rejoins automatically after a reload. Reconnecting an existing
-nickname requires that secret, or, when it is missing (another device, cleared
-storage), a fresh QR code and nonce as for a first join. Participants restored from a
-snapshot written by an older version have no secret and keep the old behavior.
-Nicknames are matched case-insensitively. When a participant joins again, older
-sockets of that participant are detached; a still-open tab shows "Opened on another
-tab or device" and stops reconnecting.
+in `localStorage` and rejoins automatically after a reload. Updated clients send
+`resumeProtocol: 1` on every join. Reconnecting a protected nickname requires its
+secret, even if QR rotation is off: the shared QR and nonce admit new participants,
+but cannot replace an existing participant. If storage is cleared or the student
+switches devices without the secret, automatic recovery of that identity is unavailable;
+use the original browser. This release does not add a teacher identity-recovery flow.
+
+For pre-secret snapshots and pages that do not support storing secrets, a
+`legacyResume` flag retains nickname-based rejoining throughout the session,
+including repeated reconnects and server restarts. Such entries keep the old,
+weaker ownership guarantees. A client sending `resumeProtocol: 1` upgrades a legacy
+entry to secret-based recovery, and it cannot be downgraded by omitting the field.
+Reload pages between lessons to use protected identities for all new entries.
+
+Nicknames are matched case-insensitively. When an authenticated participant joins
+again, older sockets of that participant are detached; a still-open tab shows
+"Opened on another tab or device" and stops reconnecting. If the session has already
+finished, rejoining sends the final score, place and question review again without
+writing duplicate results to SQLite. This also covers missing the final broadcast
+during a connection loss.
 
 The server detaches a student socket when a send fails or times out, and when it has
 received nothing (not even a ping) for `connection.staleAfterSec` (30 seconds). Uvicorn
@@ -147,7 +160,7 @@ the round waits up to `connection.reconnectGraceMs` (8 seconds) for students who
 connection dropped moments ago before closing early.
 Browser suspension and network recovery can extend these times; this does not
 guarantee delivery during an outage. Rejoining restores the current task and
-accepted answer using the existing nickname behavior, without a fresh QR code.
+accepted answer using the reconnect secret (or legacy compatibility), without a fresh QR code.
 
 New pages use this recovery logic; already-open pages need to reload after deployment.
 
