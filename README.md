@@ -130,6 +130,39 @@ Start with the [question bank guide](docs/task-bank.md) and
 [demo examples](backend/data/task-bank.example.json). The bank determines the subject;
 the interface does not translate your content.
 
+## Question types
+
+A bank is a JSON array of task objects. Every task shares a common core — `id`, `type`,
+`topic`, `level` (`1`–`3`, affects scoring), `title` and `prompt` — plus these optional fields:
+
+- `hint` — a short clue shown while the question is live.
+- `block` — groups the task into a named set that the UI turns into a filter.
+- `timeLimit` — per-question time in seconds, overriding the default for that type.
+- `figure` — an inline `<svg>…</svg>` string rendered as a static picture under the prompt
+  (useful for a diagram or a monospaced directory tree). Only strings beginning with `<svg`
+  are rendered.
+
+Five `type` values are available. `choice` and `blank` are subject-agnostic and enough for any
+quiz; `order`, `sort` and `graph` are specialized for algorithms and graph theory.
+
+| Type | What the student does | Type-specific fields |
+| --- | --- | --- |
+| `choice` | Picks one option | `options` (list of choices), `answer` (zero-based index of the correct one). Option order is reshuffled each round. |
+| `blank` | Fills gaps in a template | `template` with each gap marked `___`; `blanks` — one entry per gap: `answer` + optional `alts` for free text, or `options` for a dropdown. |
+| `order` | Reproduces a traversal order | `nodes`, `edges` (`[[a, b], …]`), `start`, `mode` (`bfs` or `dfs`). Any valid traversal from the start is accepted. |
+| `sort` | Arranges an array into the target state | `array`, `algo`, `steps`, and `expected` (the accepted result array). |
+| `graph` | Constructs a graph on given `nodes` | one of: `requiredEdges` (exact edge set); `weighted` + `refEdges` (a minimum spanning tree); or `graphKind` (+ `graphArg`) for "any graph with a property". |
+
+For the property-based `graph` type, `graphKind` accepts `anyTree`, `anyForest`
+(`graphArg` = number of components), `anyCycle`, `anyPath`, `anyComplete`,
+`anyCompleteBipartite`, `anyStar`, `anyBinaryTree`, `anyCycleChord`, `anyEulerian`,
+`anyRegular` (`graphArg` = degree) and `anyComponents` (`graphArg` = number of components).
+The checker accepts any graph that satisfies the property, not one fixed answer.
+
+The UI builds its topic, type, level and set filters from whatever is present in the bank, so
+adding tasks with a new `topic` or `block` makes those appear automatically. See the
+[question bank guide](docs/task-bank.md) for full field semantics and multilingual notes.
+
 ## Documentation
 
 | Guide | What it covers |
