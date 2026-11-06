@@ -99,6 +99,7 @@ class Student:
         self.run = run
         self.nick = f"Benchmark participant with a long name {idx:03d}"
         self.first_join = asyncio.Event()
+        self.resume = None
         self.jobs = set()
         self.received = set()
         self.confirmed = set()
@@ -158,6 +159,8 @@ class Student:
             message = json.loads(raw)
             kind = message.get("type")
             if kind == "joined":
+                # Like the browser, keep the reconnect secret for later rejoins.
+                self.resume = message.get("resume")
                 self.first_join.set()
             elif kind == "rejected":
                 self.errors.append("join rejected: " + message.get("reason", "unknown"))
@@ -197,6 +200,14 @@ class Student:
     def received_index(self):
         return [self.run.task_ids.index(tid) for tid in self.received]
 
+    async def heartbeat(self, ws):
+        while True:
+            await asyncio.sleep(4)
+            try:
+                await send(ws, "ping")
+            except Exception:
+                return
+
     async def run_client(self):
         while not self.run.finished.is_set() and self.end is None:
             self.intentional = False
@@ -205,12 +216,19 @@ class Student:
                     self.run.ws_url + "/", open_timeout=10, ping_interval=None, max_queue=128
                 ) as ws:
                     fields = {"nick": self.nick, "icon": "🦉"}
+                    if self.first_join.is_set() and self.resume:
+                        fields["resume"] = self.resume
                     if not self.first_join.is_set() and self.run.args.qr:
                         fields["nonce"] = (
                             await asyncio.to_thread(http_json, self.run.http_url + "/api/nonce")
                         )["nonce"]
                         fields["token"] = self.run.token
                     await send(ws, "join", **fields)
+                    # Like the browser page: an application ping every 4 seconds.
+                    # The server detaches student sockets that stay silent.
+                    beat = asyncio.create_task(self.heartbeat(ws))
+                    self.jobs.add(beat)
+                    beat.add_done_callback(self.jobs.discard)
                     await self.consume(ws)
                     if self.end is not None or self.errors:
                         return

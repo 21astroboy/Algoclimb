@@ -25,6 +25,11 @@ _lock = threading.Lock()
 _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
 _conn.row_factory = sqlite3.Row
 _conn.execute("PRAGMA journal_mode = WAL;")
+# В режиме WAL synchronous=NORMAL безопасен для целостности (БД не портится при
+# сбое питания, теряются максимум последние транзакции) и убирает fsync на каждый
+# commit. Запись ответа идёт синхронно в event loop под game.lock, поэтому
+# fsync на каждый ответ на медленном диске VPS тормозил весь класс.
+_conn.execute("PRAGMA synchronous = NORMAL;")
 _conn.executescript(
     """
     CREATE TABLE IF NOT EXISTS sessions (
@@ -49,9 +54,22 @@ _conn.executescript(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id INTEGER, nick TEXT, kind TEXT, at TEXT
     );
+    -- Аналитика (list_sessions) считает подзапросы по session_id для каждой
+    -- сессии; без индексов это полный перебор всей истории ответов.
+    CREATE INDEX IF NOT EXISTS idx_answers_session ON answers(session_id);
+    CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(session_id);
+    CREATE INDEX IF NOT EXISTS idx_results_session ON results(session_id);
+    CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
     """
 )
 _conn.commit()
+
+# Отдельное соединение для чтения аналитики. Запросы статистики выполняются в
+# фоновом потоке; в режиме WAL читатель не блокирует писателя, поэтому запись
+# ответов студентов (в event loop) не ждёт, пока учитель смотрит статистику.
+_read_lock = threading.Lock()
+_read_conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+_read_conn.row_factory = sqlite3.Row
 
 
 def _now():
@@ -66,8 +84,8 @@ def _exec(sql, args=()):
 
 
 def _all(sql, args=()):
-    with _lock:
-        return [dict(r) for r in _conn.execute(sql, args).fetchall()]
+    with _read_lock:
+        return [dict(r) for r in _read_conn.execute(sql, args).fetchall()]
 
 
 def wipe_all():
@@ -79,10 +97,11 @@ def wipe_all():
         except sqlite3.Error:
             pass
         _conn.commit()
-    try:
-        _conn.execute("VACUUM;")
-    except sqlite3.Error:
-        pass
+        # wipe_all теперь вызывается из фонового потока — VACUUM тоже под lock.
+        try:
+            _conn.execute("VACUUM;")
+        except sqlite3.Error:
+            pass
     return True
 
 

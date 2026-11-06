@@ -22,6 +22,12 @@
       * {
         box-sizing: border-box;
       }
+      html,
+      body {
+        /* Без этого свайп вниз в начале страницы (pull-to-refresh) перезагружал
+           вкладку посреди вопроса. */
+        overscroll-behavior-y: none;
+      }
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -519,18 +525,56 @@
       let lastJoin = null; // последняя заявка — для переподключения после входа
       let reconnectTimer = null;
       let heartbeatTimer = null;
+      let probeTimer = null;
       let lastPong = 0;
       let recoveryReason = 'initial';
+      const HEARTBEAT_MS = 4000; // как часто шлём ping
+      const PONG_TIMEOUT_MS = 10000; // нет pong дольше — сокет считаем мёртвым
+      const PROBE_MS = 2500; // быстрая проверка после возврата на вкладку
+      const ANSWER_ACK_MS = 5000; // столько ждём подтверждения ответа до проверки связи
+      // Ответ, который сервер ещё не подтвердил. Если связь оборвалась в момент
+      // отправки (сокет «открыт», но мёртв), ответ не теряется: после
+      // переподключения сервер снова присылает текущий вопрос, и мы отправляем
+      // ответ повторно. Повтор безопасен — сервер принимает один ответ на вопрос.
+      let pendingAnswer = null;
+      let answerAckTimer = null;
+      function reconnectDelay() {
+        // 0,5–1,5 с со случайным разбросом: после сбоя точки доступа класс
+        // не ломится на сервер в одну и ту же миллисекунду.
+        return 500 + Math.floor(Math.random() * 1000);
+      }
       function scheduleReconnect(reason) {
         recoveryReason = reason;
         clearInterval(heartbeatTimer);
+        clearTimeout(probeTimer);
+        probeTimer = null;
+        clearTimeout(answerAckTimer);
+        answerAckTimer = null;
         if (me && me.done) return;
         if (me) $('fb').innerHTML = '<span class="no">Connection lost. Reconnecting…</span>';
         if (reconnectTimer === null) {
           reconnectTimer = setTimeout(() => {
             reconnectTimer = null;
             connectWS();
-          }, 1000);
+          }, reconnectDelay());
+        }
+      }
+      // Бросаем текущий сокет (поздние события от него игнорируются) и переподключаемся.
+      function abandonSocket(reason) {
+        const stale = ws;
+        ws = null;
+        try {
+          if (stale) stale.close();
+        } catch (e) {}
+        scheduleReconnect(reason);
+      }
+      function sendPing() {
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+          return true;
+        } catch (e) {
+          abandonSocket('send_failed');
+          return false;
         }
       }
       function checkConnection() {
@@ -539,25 +583,66 @@
           return;
         }
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        if (Date.now() - lastPong >= 15000) {
-          const stale = ws;
-          ws = null; // ignore late events from the abandoned connection
-          try {
-            stale.close();
-          } catch (e) {}
-          scheduleReconnect('heartbeat_timeout');
+        if (Date.now() - lastPong >= PONG_TIMEOUT_MS) {
+          abandonSocket('heartbeat_timeout');
+          return;
+        }
+        sendPing();
+      }
+      // Быстрая проверка. После блокировки экрана или смены сети сокет часто
+      // выглядит открытым, но уже мёртв: всё, что в него отправлено, пропадает.
+      // Не ждём таймаута heartbeat — если pong не пришёл за PROBE_MS, сразу
+      // переподключаемся.
+      function probeConnection(reason) {
+        if (me && me.done) return;
+        if (!ws) {
+          connectWS();
+          return;
+        }
+        if (ws.readyState !== WebSocket.OPEN) return;
+        if (Date.now() - lastPong >= PONG_TIMEOUT_MS) {
+          abandonSocket('heartbeat_timeout');
+          return;
+        }
+        const socket = ws;
+        const sentAt = Date.now();
+        if (!sendPing()) return;
+        clearTimeout(probeTimer);
+        probeTimer = setTimeout(() => {
+          probeTimer = null;
+          if (ws === socket && lastPong < sentAt) abandonSocket(reason);
+        }, PROBE_MS);
+      }
+      function submitAnswer(taskId, payload) {
+        pendingAnswer = { type: 'answer', taskId, payload };
+        flushAnswer();
+      }
+      function flushAnswer() {
+        if (!pendingAnswer) return;
+        clearTimeout(answerAckTimer);
+        answerAckTimer = null;
+        if (!me || !ws || ws.readyState !== WebSocket.OPEN) {
+          // Уйдёт автоматически, когда после переподключения придёт этот же вопрос.
+          $('fb').innerHTML =
+            '<span class="wait">Connection lost. Your answer will be sent after reconnecting…</span>';
           return;
         }
         try {
-          ws.send(JSON.stringify({ type: 'ping' }));
+          ws.send(JSON.stringify(pendingAnswer));
         } catch (e) {
-          const stale = ws;
-          ws = null;
-          try {
-            stale.close();
-          } catch (closeError) {}
-          scheduleReconnect('send_failed');
+          abandonSocket('send_failed');
+          return;
         }
+        $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+        answerAckTimer = setTimeout(() => {
+          answerAckTimer = null;
+          if (pendingAnswer) probeConnection('answer_timeout');
+        }, ANSWER_ACK_MS);
+      }
+      function settleAnswer() {
+        pendingAnswer = null;
+        clearTimeout(answerAckTimer);
+        answerAckTimer = null;
       }
       function connectWS() {
         if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING))
@@ -578,7 +663,7 @@
           if (ws !== socket) return;
           lastPong = Date.now();
           clearInterval(heartbeatTimer);
-          heartbeatTimer = setInterval(checkConnection, 5000);
+          heartbeatTimer = setInterval(checkConnection, HEARTBEAT_MS);
           const p = pendingJoin || (me && !me.done ? lastJoin : null);
           pendingJoin = null;
           if (p) {
@@ -606,9 +691,11 @@
           scheduleReconnect('socket_closed');
         };
       }
-      window.addEventListener('online', checkConnection);
+      window.addEventListener('online', () => probeConnection('resume_probe'));
+      // pageshow: страница вернулась из bfcache (свайп «назад» и т.п.).
+      window.addEventListener('pageshow', () => probeConnection('resume_probe'));
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) checkConnection();
+        if (!document.hidden) probeConnection('resume_probe');
       });
       connectWS();
 
@@ -624,6 +711,42 @@
         } catch (e) {}
       }
       fetchNonce();
+
+      // Сохраняем вход в localStorage: если телефон выгрузил вкладку в фоне или
+      // страницу случайно перезагрузили, студент возвращается в игру сам, без
+      // повторного ввода ника (раньше опечатка в нике после старта означала
+      // «The session has already started» и выбывание до конца пары).
+      const STORE_KEY = 'algoclimb.student';
+      const STORE_TTL_MS = 12 * 60 * 60 * 1000;
+      function loadStored() {
+        try {
+          const v = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+          if (v && v.nick && v.resume && Date.now() - (v.at || 0) < STORE_TTL_MS) return v;
+        } catch (e) {}
+        return null;
+      }
+      function saveStored(v) {
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify({ ...v, at: Date.now() }));
+        } catch (e) {}
+      }
+      function clearStored() {
+        try {
+          localStorage.removeItem(STORE_KEY);
+        } catch (e) {}
+      }
+      const stored = loadStored();
+      if (stored) {
+        icon = stored.icon || icon;
+        document
+          .querySelectorAll('.ic')
+          .forEach((x) => x.classList.toggle('sel', x.textContent === icon));
+        $('nick').value = stored.nick;
+        lastJoin = { type: 'join', nick: stored.nick, icon, resume: stored.resume };
+        pendingJoin = { ...lastJoin, auto: true };
+        recoveryReason = 'page_reload';
+        $('joinErr').textContent = 'Restoring your session…';
+      }
 
       $('joinBtn').onclick = async () => {
         const nick = $('nick').value.trim();
@@ -653,6 +776,24 @@
 
       function handle(m) {
         if (m.type === 'rejected') {
+          if (m.code === 'resume_failed') {
+            // Восстанавливать нечего (новое занятие, сброс) — обычная форма входа.
+            clearStored();
+            lastJoin = null;
+            $('joinErr').textContent = '';
+            fetchNonce();
+            return;
+          }
+          if (me) {
+            // Переподключение отклонено: возвращаем на экран входа, а не
+            // оставляем «Reconnecting…» на экране вопроса навсегда.
+            $('nick').value = me.nick;
+            me = null;
+            lastJoin = null;
+            settleAnswer();
+            clearInterval(timerInt);
+            show('join');
+          }
           // Код входа берётся из QR автоматически — вручную вводить не нужно.
           // Если код невалиден/протух — просим отсканировать QR заново, а не печатать.
           if (/code/i.test(m.reason))
@@ -663,6 +804,11 @@
         }
         if (m.type === 'joined') {
           me = m;
+          $('joinErr').textContent = '';
+          if (m.resume) {
+            lastJoin = { type: 'join', nick: m.nick, icon: m.icon, resume: m.resume };
+            saveStored({ nick: m.nick, icon: m.icon, resume: m.resume });
+          }
           $('meNick').textContent = m.nick;
           $('meIcon').textContent = m.icon;
           show(m.status === 'running' ? 'task' : 'lobby');
@@ -670,6 +816,15 @@
         }
         if (m.type === 'task') {
           renderTask(m);
+          if (pendingAnswer) {
+            if (pendingAnswer.taskId === m.task.id) {
+              // Вернулись после обрыва на тот же вопрос — досылаем ответ.
+              // Если сервер его уже принял, следом придёт answered.
+              answered = true;
+              lockInputs();
+              flushAnswer();
+            } else settleAnswer();
+          }
           return;
         }
         if (m.type === 'paused') {
@@ -685,10 +840,12 @@
           return;
         }
         if (m.type === 'answered') {
+          settleAnswer();
           showAnswered(m);
           return;
         }
         if (m.type === 'answerRejected') {
+          if (pendingAnswer && pendingAnswer.taskId === m.taskId) settleAnswer();
           if (!curTask || m.taskId !== curTask.id) return;
           answered = false;
           if (m.reason === 'paused') onPaused();
@@ -698,6 +855,7 @@
           return;
         }
         if (m.type === 'roundover') {
+          settleAnswer();
           roundOver(m);
           return;
         }
@@ -706,11 +864,19 @@
           return;
         }
         if (m.type === 'sessionend') {
+          settleAnswer();
+          clearStored();
           finished(m.place, m.score, m.correct, m.total, m.review, m.bestStreak);
           return;
         }
         if (m.type === 'kicked') {
+          settleAnswer();
+          clearStored();
           kicked();
+          return;
+        }
+        if (m.type === 'replaced') {
+          replaced();
           return;
         }
       }
@@ -839,10 +1005,7 @@
               if (answered || locked) return;
               answered = true;
               lockInputs();
-              ws.send(
-                JSON.stringify({ type: 'answer', taskId: t.id, payload: { choice: +b.dataset.i } })
-              );
-              $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+              submitAnswer(t.id, { choice: +b.dataset.i });
             })
         );
       }
@@ -1098,14 +1261,7 @@
           if (answered || locked) return;
           answered = true;
           lockInputs();
-          ws.send(
-            JSON.stringify({
-              type: 'answer',
-              taskId: t.id,
-              payload: { edges: edges.map((ed) => [nodes[ed.a].label, nodes[ed.b].label]) },
-            })
-          );
-          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+          submitAnswer(t.id, { edges: edges.map((ed) => [nodes[ed.a].label, nodes[ed.b].label]) });
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1257,8 +1413,7 @@
           answered = true;
           lockInputs();
           const edges = [...chosen].map((i) => [ref[i][0], ref[i][1]]);
-          ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { edges } }));
-          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+          submitAnswer(t.id, { edges });
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1401,14 +1556,7 @@
           if (answered || locked) return;
           answered = true;
           lockInputs();
-          ws.send(
-            JSON.stringify({
-              type: 'answer',
-              taskId: t.id,
-              payload: { order: order.map((i) => labels[i]) },
-            })
-          );
-          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+          submitAnswer(t.id, { order: order.map((i) => labels[i]) });
         };
         window.addEventListener('resize', resize);
         resize();
@@ -1464,8 +1612,7 @@
           if (answered || locked) return;
           answered = true;
           lockInputs();
-          ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { array: cur } }));
-          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+          submitAnswer(t.id, { array: cur });
         };
       }
 
@@ -1505,8 +1652,7 @@
           for (let i = 0; i < parts.length - 1; i++) if (vals[i] == null) vals[i] = '';
           answered = true;
           lockInputs();
-          ws.send(JSON.stringify({ type: 'answer', taskId: t.id, payload: { blanks: vals } }));
-          $('fb').innerHTML = '<span class="wait">Submitting answer…</span>';
+          submitAnswer(t.id, { blanks: vals });
         };
       }
 
@@ -1559,6 +1705,17 @@
         mathify(box);
         box.classList.remove('hidden');
       }
+      function replaced() {
+        // Этот же участник вошёл с другой вкладки/устройства. Не переподключаемся,
+        // иначе две вкладки выбивали бы друг друга по кругу.
+        if (me) me.done = true;
+        settleAnswer();
+        clearInterval(timerInt);
+        show('done');
+        $('medal').textContent = '📱';
+        $('doneMsg').textContent = 'Opened on another tab or device';
+        $('doneSub').textContent = 'Reload this page to continue here.';
+      }
       function kicked() {
         if (me) me.done = true;
         clearInterval(timerInt);
@@ -1590,8 +1747,11 @@
 
       /* анти-ИИ: уход со вкладки */
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden && me && !me.done && !$('task').classList.contains('hidden'))
+        if (!document.hidden || !me || me.done || $('task').classList.contains('hidden')) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        try {
           ws.send(JSON.stringify({ type: 'tableave' }));
+        } catch (e) {}
       });
     </script>
   </body>
