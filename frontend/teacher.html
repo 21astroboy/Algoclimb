@@ -2256,6 +2256,9 @@
           return;
         }
         if (m.type !== 'state') return;
+        // Keep the last QR even when it arrived on the results/game screen.
+        if (!Object.hasOwn(m, 'qrSvg') && state && Object.hasOwn(state, 'qrSvg'))
+          m = { ...m, qrSvg: state.qrSvg };
         state = m;
         TOTAL = m.session.total || TOTAL;
         if (m.session.stream != null) setStreamUI(m.session.stream);
@@ -2287,10 +2290,13 @@
             .join('') || '<div class="muted">No students have joined yet…</div>';
         const url = m.joinUrl || `http://${location.host}/`;
         $('url').textContent = url;
-        if (m.qrSvg) $('qr').innerHTML = m.qrSvg;
-        else
-          $('qr').innerHTML =
-            '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:8px;text-align:center;color:#08111f;font-size:13px;line-height:1.4">QR unavailable —<br>open the link below manually</div>';
+        // Incremental state updates omit the unchanged QR image.
+        if (Object.hasOwn(m, 'qrSvg')) {
+          if (m.qrSvg) $('qr').innerHTML = m.qrSvg;
+          else
+            $('qr').innerHTML =
+              '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:8px;text-align:center;color:#08111f;font-size:13px;line-height:1.4">QR unavailable —<br>open the link below manually</div>';
+        }
         if (m.token) {
           $('token').classList.remove('hidden');
           $('token').textContent = 'Code: ' + m.token;

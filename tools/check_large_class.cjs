@@ -2,6 +2,11 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const language = process.env.SCREENSHOT_LANGUAGE || 'ru';
+assert.ok(['en', 'ru'].includes(language));
+const out = path.join(__dirname, '..', 'docs/images', language);
+fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ channel: process.env.SCREENSHOT_BROWSER || undefined });
   try {
@@ -18,14 +23,26 @@ const path = require('node:path');
     await page.locator('#keyInput').fill('LOCAL-DEMO-ONLY');
     await page.locator('#keyForm button').click();
     await page.locator('.catrow').first().waitFor({ state: 'attached' });
-    // Freeze networking for the deterministic 72-person / 30-question display fixture.
+    // The first QR may arrive while showing results; a later lobby update omits it.
     await page.evaluate(() => {
+      const initial = state;
+      const { qrSvg, ...incremental } = initial;
+      if (!qrSvg) throw new Error('Demo did not provide a QR image');
+      state = null;
+      document.getElementById('qr').innerHTML = '';
+      render({ ...initial, session: { ...initial.session, status: 'finished' } });
+      render({ ...incremental, session: { ...initial.session, status: 'lobby' } });
+    });
+    await page.locator('#qr img').waitFor({ state: 'visible' });
+    // Freeze networking for the deterministic 72-person / 30-question display fixture.
+    await page.evaluate((language) => {
       ws.onclose = null;
       ws.onmessage = null;
       ws.close();
       const surnames = ['Александрова-Рождественская', 'Константинопольский', "O'Connor-MacDonald", 'Петрова'];
+      const englishNames = ['Alexandra Montgomery-Wellington', 'Christopher Hamilton', "Catherine O'Connor-MacDonald", 'Elizabeth Richardson'];
       const rows = Array.from({ length: 72 }, (_, i) => ({
-        rank: i + 1, nick: `${surnames[i % surnames.length]} Екатерина Константиновна ${i + 1}`,
+        rank: i + 1, nick: language === 'en' ? `${englishNames[i % englishNames.length]} ${i + 1}` : `${surnames[i % surnames.length]} Екатерина Константиновна ${i + 1}`,
         icon: ['🦉', '🦊', '🐙', '🐧'][i % 4], correct: i % 31,
         score: (72 - i) * 100, tabLeaves: i % 3, fastAnswers: i % 4,
         connected: true, answeredThisRound: i % 2 === 0, answers: [],
@@ -43,7 +60,7 @@ const path = require('node:path');
       document.getElementById('timer').textContent = '00:28';
       buildMountain(rows);
       buildLB(rows, true);
-    });
+    }, language);
     for (const width of [1920, 1440, 1024, 768, 390]) {
       await page.setViewportSize({ width, height: 1080 });
       await page.waitForTimeout(100);
@@ -77,7 +94,7 @@ const path = require('node:path');
     }
     await page.setViewportSize({ width: 1440, height: 1700 });
     await page.waitForTimeout(100);
-    await page.screenshot({ path: path.join(__dirname, '..', 'docs/images/teacher-large-class.png') });
+    await page.screenshot({ path: path.join(out, 'teacher-large-class.png') });
     // A group of 72 at one checkpoint must be counted without growing into its neighbors.
     await page.evaluate(() => {
       state.leaderboard.forEach((row) => { row.correct = 0; });

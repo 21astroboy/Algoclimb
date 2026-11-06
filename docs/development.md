@@ -47,7 +47,7 @@ ruff format --check .
 mypy
 npm run lint
 (cd backend && python -m smoke_test)
-(cd backend && python -m unittest test_timers test_answers test_teacher_updates)
+(cd backend && python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery)
 (cd backend && python -m e2e_test)
 python -m unittest tools.test_reliability
 python tools/reliability_test.py --students 12 --rounds 10 --disconnects --qr --idle 1
@@ -66,36 +66,60 @@ separately. No frontend bundler is required.
 
 ## Screenshots
 
-Screenshots are captured from real local sessions with fictional participants and the public
-Russian demo bank. Nothing is read from the deployed VPS. The demo uses temporary data,
-fixed arrays and a local demo key; fast-answer flags are disabled for scripted participants.
+Screenshots come from real local sessions with fictional participants. Nothing is
+read from the VPS. The demo uses temporary data, a fixed local key, deterministic
+sort arrays, and the public English/Russian fixtures in `tools/fixtures/`. Each
+fixture includes all five task types; changing it does not change the production bank.
 
-In one terminal, activate the Python environment and start:
-
-```bash
-python tools/demo_server.py
-```
-
-In another terminal:
+Install the browser dependencies once:
 
 ```bash
 npm ci
 npx playwright install chromium
-npm run screenshots
 ```
 
-If Google Chrome is installed, `SCREENSHOT_BROWSER=chrome npm run screenshots` can use it
-instead. The script uses only `127.0.0.1:8098`, joins six fictional students, operates the real
-UI and WebSocket protocol, draws a graph in the mobile canvas, and captures `docs/images/`.
-It also checks pause/resume, rejected-answer recovery, answer-key access and browser errors.
-Stop the demo server with Ctrl+C when finished; its runtime data is deleted.
+Start the English demo in one terminal (with the Python environment active):
 
-With that demo server running, `npm run test:layout` checks the teacher screen with a
-deterministic 72-person, 30-question fixture at widths from 390 to 1920 pixels. It verifies
-that progress groups do not overlap, every participant is listed, and long names wrap
-without clipping. It also captures `docs/images/teacher-large-class.png`. CI runs the same
-check in Chromium. Nicknames support up to 96 characters; longer values are rejected
-instead of silently truncated.
+```bash
+python tools/demo_server.py --language en
+```
+
+In another terminal, capture the English sessions and the separate layout fixture:
+
+```bash
+SCREENSHOT_LANGUAGE=en npm run screenshots
+SCREENSHOT_LANGUAGE=en npm run test:layout
+```
+
+Stop the server with Ctrl+C, then repeat with the Russian bank:
+
+```bash
+# Terminal 1
+python tools/demo_server.py --language ru
+
+# Terminal 2
+SCREENSHOT_LANGUAGE=ru npm run screenshots
+SCREENSHOT_LANGUAGE=ru npm run test:layout
+```
+
+If Google Chrome is installed, prefix the capture commands with
+`SCREENSHOT_BROWSER=chrome`. Server and capture languages must match. The default
+for both is `ru`. Outputs are `docs/images/en/` and `docs/images/ru/`.
+
+The capture script connects only to `127.0.0.1:8098`, joins six fictional students,
+uses the actual teacher/student UI and WebSocket protocol, and draws a graph in the
+mobile canvas. It captures the lobby, live map, final results, analytics, student
+review, and one mobile screen for every task type. It also checks pause/resume,
+rejected-answer recovery, answer-key access and browser errors. Demo bots send
+heartbeats so the stale-socket cleanup does not remove them during capture.
+
+The large-class image is an explicitly labeled deterministic display fixture:
+72 fictional participants, 30 checkpoints, and long English or Russian names.
+`test:layout` verifies widths from 390 to 1920 pixels, checks progress groups for
+overlap, checks all participants are listed and long names wrap, then saves
+`teacher-large-class.png` in the selected language directory. CI runs this layout
+check in Chromium. Nicknames support up to 96 characters; longer values are rejected.
+Stop the demo server after capture; its temporary runtime is deleted.
 
 ## Optional API docs
 

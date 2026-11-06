@@ -6,8 +6,10 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const base = 'http://127.0.0.1:8098';
 const root = path.join(__dirname, '..');
-const out = path.join(root, 'docs', 'images');
-const tasks = JSON.parse(fs.readFileSync(path.join(root, 'backend/data/task-bank.example.json')));
+const language = process.env.SCREENSHOT_LANGUAGE || 'ru';
+assert.ok(['en', 'ru'].includes(language));
+const out = path.join(root, 'docs', 'images', language);
+const tasks = JSON.parse(fs.readFileSync(path.join(root, `tools/fixtures/screenshot-bank.${language}.json`)));
 const errors = [];
 const bots = [];
 let browser;
@@ -17,7 +19,11 @@ async function bot(nick, icon) {
   const messages = [];
   ws.on('message', (raw) => messages.push(JSON.parse(raw)));
   await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
-  ws.send(JSON.stringify({ type: 'join', nick, icon }));
+  ws.send(JSON.stringify({ type: 'join', nick, icon, resumeProtocol: 1 }));
+  const heartbeat = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+  }, 4000);
+  ws.once('close', () => clearInterval(heartbeat));
   const peer = { ws, messages, nick };
   bots.push(peer);
   await wait(peer, 'joined');
@@ -81,6 +87,7 @@ async function drawTriangle(page) {
   await bot('Grace', '🦉'); await bot('Alan', '🐧'); await bot('Edsger', '🐙');
   await bot('Barbara', '🐝'); await bot('Donald', '🦁');
   await teacher.waitForFunction(() => document.getElementById('cnt').textContent === '6');
+  await teacher.locator('#qr img').waitFor();
   await teacher.locator('#catAll').click();
   await shot(teacher, 'teacher-lobby');
   await teacher.locator('#startBtn').click();
@@ -107,6 +114,7 @@ async function drawTriangle(page) {
         payload = { choice: peer.nick === 'Alan' ? (index + 1) % task.options.length : index };
       } else if (task.type === 'graph') payload = { edges: source.requiredEdges || source.example };
       else if (task.type === 'order') payload = { order: ['A', 'B', 'C', 'D', 'E'] };
+      else if (task.type === 'blank') payload = { blanks: source.blanks.map((b) => b.answer) };
       else payload = { array: source.expected };
       peer.ws.send(JSON.stringify({ type: 'answer', taskId: task.id, payload }));
       await wait(peer, 'answered');
@@ -122,9 +130,13 @@ async function drawTriangle(page) {
       await shot(teacher, 'teacher-live');
       await student.locator('#gsubmit').click();
     } else {
+      if (source.type === 'order') await shot(student, 'student-order');
+      if (source.type === 'sort') await shot(student, 'student-sort');
+      if (source.type === 'blank') await shot(student, 'student-blank');
       // Other interactive types are covered over real WS in e2e_test.py.
       const payload = source.type === 'graph' ? { edges: source.example } :
-        source.type === 'order' ? { order: ['A', 'B', 'C', 'D', 'E'] } : { array: source.expected };
+        source.type === 'order' ? { order: ['A', 'B', 'C', 'D', 'E'] } :
+        source.type === 'blank' ? { blanks: source.blanks.map((b) => b.answer) } : { array: source.expected };
       await student.evaluate(({ taskId, payload }) => ws.send(JSON.stringify({ type: 'answer', taskId, payload })), { taskId: source.id, payload });
     }
   }
@@ -145,7 +157,7 @@ async function drawTriangle(page) {
   assert.equal(await teacher.locator('html').getAttribute('lang'), 'en');
   assert.equal(await student.locator('html').getAttribute('lang'), 'en');
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed; screenshots saved in docs/images/');
+  console.log(`Browser checks passed; screenshots saved in docs/images/${language}/`);
 })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => {
   for (const peer of bots) peer.ws.close();
   if (browser) await browser.close();

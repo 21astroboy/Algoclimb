@@ -470,41 +470,41 @@ def answer_text(t):
             mst = _kruskal(t["refEdges"], t["nodes"])
             w = sum(e[2] for e in mst)
             return (
-                "Минимальный остов (суммарный вес "
+                "Minimum spanning tree (total weight "
                 + str(w)
                 + "): "
                 + ", ".join(f"{e[0]}–{e[1]} ({e[2]})" for e in mst)
             )
         if t.get("requiredEdges") is not None:
-            return "Рёбра: " + ", ".join(f"{e[0]}–{e[1]}" for e in t["requiredEdges"])
+            return "Edges: " + ", ".join(f"{e[0]}–{e[1]}" for e in t["requiredEdges"])
         base = (
-            ("Любой граф с нужным свойством. " + t["hint"])
+            ("Any graph satisfying the required property. " + t["hint"])
             if t.get("hint")
-            else "Любой граф с нужным свойством."
+            else "Any graph satisfying the required property."
         )
         ex = t.get("example")
-        extra = (" Пример: " + ", ".join(f"{e[0]}–{e[1]}" for e in ex) + ".") if ex else ""
+        extra = (" Example: " + ", ".join(f"{e[0]}–{e[1]}" for e in ex) + ".") if ex else ""
         return base + extra
     if ty == "order":
         ex = " → ".join(str(v) for v in sample_order(t["nodes"], t["edges"], t["start"], t["mode"]))
         return (
             ("BFS" if t["mode"] == "bfs" else "DFS")
-            + " из "
+            + " from "
             + str(t["start"])
-            + " — например: "
+            + " — for example: "
             + ex
-            + " (принимается любой корректный порядок обхода)"
+            + " (any valid traversal order is accepted)"
         )
     if ty == "sort":
         exp = ", ".join(
             str(v) for v in (t.get("expected") or simulate_sort(t["array"], t["algo"], t["steps"]))
         )
-        algo = "сортировки вставками" if t["algo"] == "insertion" else "пузырьковой сортировки"
-        return f"После {t['steps']} шаг(ов) {algo}: [{exp}]"
+        algo = "insertion sort" if t["algo"] == "insertion" else "bubble sort"
+        return f"After {t['steps']} step(s) of {algo}: [{exp}]"
     if ty == "blank":
         parts = []
         for i, b in enumerate(t["blanks"]):
-            alts = (" (или: " + ", ".join(b["alts"]) + ")") if b.get("alts") else ""
+            alts = (" (or: " + ", ".join(b["alts"]) + ")") if b.get("alts") else ""
             parts.append(f"{i + 1}) {b['answer']}{alts}")
         return "; ".join(parts)
     return ""
