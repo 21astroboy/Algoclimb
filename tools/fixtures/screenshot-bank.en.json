@@ -1,0 +1,181 @@
+[
+  {
+    "id": "demo_stack",
+    "type": "choice",
+    "topic": "asd",
+    "level": 1,
+    "title": "Stack",
+    "prompt": "Which access rule does a stack follow?",
+    "options": [
+      "FIFO — first in, first out",
+      "LIFO — last in, first out",
+      "Random access by index",
+      "Sorted on every insertion"
+    ],
+    "answer": 1
+  },
+  {
+    "id": "demo_binsearch",
+    "type": "choice",
+    "topic": "asd",
+    "level": 1,
+    "title": "Binary search",
+    "prompt": "Which condition is required for binary search in an array?",
+    "options": [
+      "The array is sorted",
+      "All values are distinct",
+      "The length is a power of two",
+      "The array contains numbers"
+    ],
+    "answer": 0
+  },
+  {
+    "id": "demo_triangle",
+    "type": "graph",
+    "topic": "graphs",
+    "level": 1,
+    "title": "Build a triangle",
+    "prompt": "Connect A, B and C so that every pair of vertices is joined.",
+    "nodes": [
+      "A",
+      "B",
+      "C"
+    ],
+    "requiredEdges": [
+      [
+        "A",
+        "B"
+      ],
+      [
+        "B",
+        "C"
+      ],
+      [
+        "A",
+        "C"
+      ]
+    ]
+  },
+  {
+    "id": "demo_tree4",
+    "type": "graph",
+    "topic": "graphs",
+    "level": 2,
+    "title": "A tree on four vertices",
+    "prompt": "Build any tree on A, B, C and D: a connected graph with exactly three edges and no cycles.",
+    "nodes": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "graphKind": "anyTree",
+    "example": [
+      [
+        "A",
+        "B"
+      ],
+      [
+        "B",
+        "C"
+      ],
+      [
+        "C",
+        "D"
+      ]
+    ],
+    "hint": "A tree with n vertices has n − 1 edges and no cycles."
+  },
+  {
+    "id": "demo_bfs",
+    "type": "order",
+    "topic": "graphs",
+    "level": 1,
+    "title": "Breadth-first search (BFS)",
+    "prompt": "Run BFS from A. Select the vertices in their visit order.",
+    "nodes": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E"
+    ],
+    "edges": [
+      [
+        "A",
+        "B"
+      ],
+      [
+        "A",
+        "C"
+      ],
+      [
+        "B",
+        "D"
+      ],
+      [
+        "C",
+        "D"
+      ],
+      [
+        "C",
+        "E"
+      ]
+    ],
+    "start": "A",
+    "mode": "bfs",
+    "hint": "Use a queue: visit A, then its neighbors, then the next layer."
+  },
+  {
+    "id": "demo_bubble",
+    "type": "sort",
+    "topic": "asd",
+    "level": 1,
+    "title": "Bubble sort: one pass",
+    "prompt": "Arrange the values as they appear after ONE left-to-right pass of ascending bubble sort.",
+    "array": [
+      5,
+      2,
+      8,
+      1,
+      9,
+      3
+    ],
+    "algo": "bubble",
+    "steps": 1,
+    "expected": [
+      2,
+      5,
+      1,
+      8,
+      3,
+      9
+    ],
+    "hint": "Compare adjacent values from left to right. The largest value moves to the end."
+  },
+  {
+    "id": "demo_blank",
+    "type": "blank",
+    "topic": "asd",
+    "level": 1,
+    "title": "Fill in the blanks: stack",
+    "prompt": "Complete the description of a stack.",
+    "template": "A stack follows the ___ rule. The ___ operation adds an item.",
+    "blanks": [
+      {
+        "answer": "LIFO",
+        "alts": [
+          "last in first out"
+        ]
+      },
+      {
+        "answer": "push",
+        "options": [
+          "push",
+          "pop",
+          "peek"
+        ]
+      }
+    ]
+  }
+]

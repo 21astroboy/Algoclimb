@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8098)
+    parser.add_argument("--language", choices=["en", "ru"], default="ru")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="algoclimb-demo-") as folder:
         root = Path(folder)
@@ -30,7 +31,9 @@ def main():
             {
                 "CONFIG_PATH": str(root / "config.json"),
                 "RUNTIME_DIR": str(root / "runtime"),
-                "TASK_BANK_PATH": str(ROOT / "backend/data/task-bank.example.json"),
+                "TASK_BANK_PATH": str(
+                    ROOT / f"tools/fixtures/screenshot-bank.{args.language}.json"
+                ),
                 "EXPLANATIONS_PATH": str(root / "explanations.json"),
                 "TEACHER_KEY": "LOCAL-DEMO-ONLY",
                 "QR_ROTATION": "0",
