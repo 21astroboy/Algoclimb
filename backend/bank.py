@@ -16,6 +16,8 @@ import os
 import random
 from pathlib import Path
 
+import catalog
+
 # Каталог бэкенда (backend/) и корень проекта. В Docker WORKDIR=/app, поэтому
 # PROJECT/secrets соответствует примонтированной папке /app/secrets.
 BASE = Path(__file__).resolve().parent
@@ -709,7 +711,9 @@ def catalog_data():
             "topic": t.get("topic"),
             "type": t["type"],
             "level": t.get("level", 1),
-            "block": t.get("block"),
+            "block": catalog.set_for(t),
+            "section": catalog.section_for(t),
+            "setLabel": catalog.set_label(catalog.set_for(t), catalog.section_for(t)),
             "custom": bool(t.get("custom")),
         }
         for t in TASKS

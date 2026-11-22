@@ -30,9 +30,11 @@ from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 import bank
+import catalog
 import db
 import gsheets
 from analytics import analytics_sheets, stats_data
+from developer_api import register as register_developer_api
 from security import Security, is_loopback
 from validation import valid_answer
 
@@ -218,6 +220,7 @@ class Game:
         # Экран преподавателя обновляем «пачками»: на залпе ответов ставим этот
         # флаг, а фоновый цикл рассылает тяжёлое состояние не чаще раза в окно.
         self._teacher_dirty = False
+        self.pending_imports = {}
         self.custom_specs = []
         self.load_custom_tasks()
 
@@ -608,6 +611,7 @@ class Game:
                 "status": self.session["status"],
                 "stream": self.current_stream,
                 "total": len(self.order),
+                "metadata": self.session.get("metadata"),
             },
             "test": bool(self.session["test"]),
             "gradesExportEnabled": bool(config["gsheets"].get("enabled")),
@@ -918,12 +922,10 @@ class Game:
         await self.broadcast_teacher()
 
     async def finish_game(self):
-        self.session["status"] = "finished"
         ranked = self.leaderboard()
         if not self.session["test"]:
-            db.set_session_status(self.session["id"], "finished")
-            for i, r in enumerate(ranked):
-                db.record_result(self.session["id"], r["nick"], 0, 1, r["score"], i + 1)
+            db.finish_session(self.session["id"], ranked)
+        self.session["status"] = "finished"
 
         await self.broadcast_students(lambda s: self.session_end_payload(s, ranked))
         await self.broadcast_teacher()
@@ -1355,30 +1357,65 @@ class Game:
                 await self.send(w, {"type": "answerkey", "items": self.answer_key_data()})
             return await self.send(ws, {"type": "taskAdded", "ok": True, "deleted": tid})
         if t == "start" and self.session["status"] == "lobby":
-            ids = msg.get("taskIds")
-            if isinstance(ids, list) and ids:
-                seen = set()
-                order = []
-                for i in ids:
-                    if i not in seen:
-                        seen.add(i)
-                        if i in bank.BY_ID:
-                            order.append(bank.BY_ID[i])
-                self.order = order
+            imported = None
+            if msg.get("importId"):
+                imported = (
+                    self.pending_imports.get(msg["importId"])
+                    if isinstance(msg["importId"], str)
+                    else None
+                )
+                if imported is None or time.time() - imported["created"] >= 3600:
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "startRejected",
+                            "error": "This bank expired or was already used. Upload it again.",
+                        },
+                    )
+                self.order = imported["tasks"]
             else:
-                self.order = self.select_tasks()
+                ids = msg.get("taskIds")
+                if isinstance(ids, list) and ids:
+                    seen = set()
+                    order = []
+                    for i in ids:
+                        if isinstance(i, str) and i not in seen:
+                            seen.add(i)
+                            if i in bank.BY_ID:
+                                order.append(bank.BY_ID[i])
+                    self.order = order
+                else:
+                    self.order = self.select_tasks()
             if not self.order:
                 return
-            if not config.get("paramize") or config["paramize"].get("enabled") is not False:
+            if imported is None and (
+                not config.get("paramize") or config["paramize"].get("enabled") is not False
+            ):
                 self.order = [bank.paramize_task(t) for t in self.order]
+            title = None
+            if imported is not None:
+                title = msg.get("title", imported["title"])
+                if not isinstance(title, str) or not 1 <= len(title.strip()) <= 160:
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "startRejected",
+                            "error": "Provide a session name of 1 to 160 characters.",
+                        },
+                    )
+                title = title.strip()
+            session_meta = catalog.metadata(self.order, title, "upload" if imported else "library")
+            self.session["metadata"] = session_meta
             self.session["test"] = bool(msg.get("test"))
             if self.session["test"]:
                 self.session["id"] = "test-" + str(int(time.time() * 1000))
             else:
-                self.session["id"] = db.create_session(self.current_stream)
+                self.session["id"] = db.create_session(self.current_stream, session_meta)
                 db.set_session_status(self.session["id"], "running")
                 for nick, s in self.by_nick.items():
                     db.record_attendance(self.session["id"], nick, s["icon"], s["ip"])
+            if imported is not None:
+                self.pending_imports.pop(msg["importId"], None)
             self.session["status"] = "running"
             self.intermission = False
             await self.begin_round(0)
@@ -1628,6 +1665,9 @@ app = FastAPI(
     redoc_url="/redoc" if _show_docs else None,
     openapi_url="/openapi.json" if _show_docs else None,
 )
+
+
+register_developer_api(app, game, TEACHER_KEY)
 
 
 def client_ip(scope_client, headers):

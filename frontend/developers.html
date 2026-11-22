@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AlgoClimb · Developer API</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08111f;
+        --panel: #102544;
+        --border: #233e60;
+        --text: #e6edf9;
+        --muted: #91a5c3;
+        --accent: #ffd23f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          16px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          Roboto,
+          Arial,
+          sans-serif;
+      }
+      main {
+        max-width: 1120px;
+        margin: 32px auto;
+        padding: 0 24px;
+      }
+      header,
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header {
+        justify-content: space-between;
+        margin-bottom: 36px;
+      }
+      .brand {
+        font-size: 24px;
+        font-weight: 800;
+      }
+      .brand span {
+        color: var(--accent);
+      }
+      a {
+        color: var(--accent);
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      h2 {
+        font-size: 22px;
+        margin-top: 0;
+      }
+      p,
+      small {
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      section {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        background: var(--panel);
+        margin-bottom: 24px;
+      }
+      label {
+        display: block;
+        margin: 14px 0;
+      }
+      input {
+        display: block;
+        width: 100%;
+        margin-top: 6px;
+      }
+      input,
+      button {
+        font: inherit;
+        border-radius: 9px;
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+      }
+      button {
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        color: var(--bg);
+        font-weight: 700;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .hidden {
+        display: none;
+      }
+      .error {
+        color: #ffb1ac;
+        white-space: pre-wrap;
+      }
+      pre {
+        overflow: auto;
+        background: var(--bg);
+        padding: 16px;
+        border-radius: 10px;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        color: var(--muted);
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+      #token {
+        display: block;
+        margin: 16px 0;
+        color: var(--accent);
+      }
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        main {
+          padding: 0 16px;
+        }
+        section {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand">
+          Algo
+          <span>Climb</span>
+        </div>
+        <a href="/teacher">Teacher workspace</a>
+      </header>
+      <h1>Developer API</h1>
+      <p>
+        Create a key to read saved sessions and results. Each key expires 24 hours after creation.
+      </p>
+      <div class="grid">
+        <section>
+          <h2>Create an API key</h2>
+          <form id="issueForm">
+            <label>
+              Teacher key
+              <input id="teacherKey" type="password" autocomplete="off" required />
+            </label>
+            <label>
+              Key name
+              <input id="keyName" value="Developer integration" maxlength="80" required />
+            </label>
+            <p>Access to saved sessions, results, answers, attendance and events.</p>
+            <button class="primary" id="issueBtn">Create API key</button>
+          </form>
+          <p id="error" class="error" role="alert"></p>
+        </section>
+        <section id="created" class="hidden" aria-live="polite">
+          <h2>API key created</h2>
+          <p>Copy the key now. It is shown once for this request.</p>
+          <code id="token"></code>
+          <p id="expiry"></p>
+          <div class="actions">
+            <button id="copy" class="primary">Copy key</button>
+            <button id="revoke">Revoke key</button>
+          </div>
+          <p id="keyStatus"></p>
+        </section>
+      </div>
+      <section>
+        <h2>Read session data</h2>
+        <pre>
+GET /api/v1/sessions?limit=50&amp;offset=0
+GET /api/v1/sessions/{id}
+GET /api/v1/sessions/{id}/results
+GET /api/v1/sessions/{id}/answers
+GET /api/v1/sessions/{id}/attendance
+GET /api/v1/sessions/{id}/events
+
+Authorization: Bearer &lt;api-key&gt;</pre>
+        <p>
+          All responses are JSON. List endpoints accept limit and offset. Expired and revoked keys
+          return HTTP 401.
+        </p>
+        <p>
+          Older set names are inferred from answered question IDs. Missing historical data is marked
+          unavailable. Practice sessions have no saved database history.
+        </p>
+      </section>
+      <section id="sessions">
+        <div class="actions">
+          <h2>Session history</h2>
+          <button id="load" disabled>Load sessions</button>
+          <button id="next" class="hidden">Next page</button>
+        </div>
+        <p id="historyStatus" aria-live="polite">Create an API key to view saved sessions.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Session / sets</th>
+                <th>Group</th>
+                <th>Winner</th>
+                <th>Points</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <pre id="details" class="hidden"></pre>
+      </section>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let token = '',
+        keyId = '',
+        offset = 0;
+      async function api(path, options = {}) {
+        const response = await fetch(path, { cache: 'no-store', ...options });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(typeof data.detail === 'string' ? data.detail : 'Request failed.');
+        return data;
+      }
+      $('issueForm').onsubmit = async (event) => {
+        event.preventDefault();
+        $('issueBtn').disabled = true;
+        $('error').textContent = '';
+        try {
+          const data = await api('/api/v1/auth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Teacher-Key': $('teacherKey').value },
+            body: JSON.stringify({ name: $('keyName').value }),
+          });
+          token = data.access_token;
+          keyId = data.id;
+          $('token').textContent = token;
+          $('expiry').textContent = 'Expires ' + new Date(data.expires_at).toLocaleString();
+          $('created').classList.remove('hidden');
+          $('keyStatus').textContent = '';
+          $('load').disabled = false;
+          $('revoke').disabled = false;
+          offset = 0;
+        } catch (error) {
+          $('error').textContent = error.message;
+        } finally {
+          $('issueBtn').disabled = false;
+        }
+      };
+      $('copy').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(token);
+          $('keyStatus').textContent = 'Copied.';
+        } catch {
+          $('keyStatus').textContent = 'Select the displayed key and copy it manually.';
+        }
+      };
+      $('revoke').onclick = async () => {
+        try {
+          await api('/api/v1/auth/token/' + encodeURIComponent(keyId) + '/revoke', {
+            method: 'POST',
+            headers: { 'X-Teacher-Key': $('teacherKey').value },
+          });
+          token = '';
+          $('token').textContent = '';
+          $('keyStatus').textContent = 'Key revoked.';
+          $('load').disabled = true;
+          $('revoke').disabled = true;
+          $('next').classList.add('hidden');
+        } catch (error) {
+          $('error').textContent = error.message;
+        }
+      };
+      async function loadSessions() {
+        try {
+          const data = await api('/api/v1/sessions?limit=50&offset=' + offset, {
+            headers: { Authorization: 'Bearer ' + token },
+          });
+          $('rows').replaceChildren();
+          for (const session of data.items) {
+            const row = document.createElement('tr');
+            const title = session.title || 'Unknown set';
+            for (const value of [
+              session.started_at ? new Date(session.started_at).toLocaleString() : session.date,
+              title + (session.provenance !== 'recorded' ? ' (inferred / incomplete)' : ''),
+              session.stream,
+              session.winner?.nick || 'No final result',
+              session.winner?.total ?? '—',
+            ]) {
+              const cell = document.createElement('td');
+              cell.textContent = String(value);
+              row.appendChild(cell);
+            }
+            const actions = document.createElement('td');
+            for (const kind of ['results', 'answers']) {
+              const button = document.createElement('button');
+              button.textContent = kind;
+              button.onclick = async () => {
+                try {
+                  const result = await api(
+                    '/api/v1/sessions/' + session.id + '/' + kind + '?limit=500',
+                    { headers: { Authorization: 'Bearer ' + token } }
+                  );
+                  $('details').textContent = JSON.stringify(result, null, 2);
+                  $('details').classList.remove('hidden');
+                } catch (error) {
+                  $('historyStatus').textContent = error.message;
+                }
+              };
+              actions.appendChild(button);
+            }
+            row.appendChild(actions);
+            $('rows').appendChild(row);
+          }
+          $('historyStatus').textContent = data.items.length + ' sessions · offset ' + offset;
+          $('next').classList.toggle('hidden', data.items.length < 50);
+        } catch (error) {
+          $('historyStatus').textContent = error.message;
+        }
+      }
+      $('load').onclick = () => {
+        offset = 0;
+        loadSessions();
+      };
+      $('next').onclick = () => {
+        offset += 50;
+        loadSessions();
+      };
+    </script>
+  </body>
+</html>
