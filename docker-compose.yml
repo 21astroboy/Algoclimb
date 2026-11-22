@@ -3,7 +3,7 @@ services:
     build: .
     container_name: algoclimb
     ports:
-      - "${PORT:-3000}:3000"
+      - "${BIND_IP:-0.0.0.0}:${PORT:-3000}:3000"
     environment:
       # Публичный адрес сервера — попадёт в QR-код и ссылку для студентов.
       # Напр. PUBLIC_URL=https://algoclimb.example.ru  или  http://203.0.113.10:3000
