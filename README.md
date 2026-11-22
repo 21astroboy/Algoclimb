@@ -163,10 +163,10 @@ See who answered, which questions were difficult, and how long each response too
 Export the summary or inspect individual answers. Tab-switch and fast-answer flags
 are activity indicators for the teacher to interpret.
 
-![Session results with per-question answer indicators](docs/images/en/teacher-results.png)
+![Workspace analytics with separate report tabs](docs/images/en/workspace-analytics.png)
 
 <details>
-<summary>More screenshots: analytics and student review</summary>
+<summary>Earlier interface and student screen examples</summary>
 
 ![Session analytics from an isolated demo](docs/images/en/teacher-analytics.png)
 
@@ -282,7 +282,7 @@ Try a new bank in Practice before using it for assessment.
 | `./algoclimb deploy` | Pull `origin/main`, rebuild and recreate the app; update between classes. |
 | `./algoclimb restart` | Restart the existing image; does not rebuild changed code. |
 | `PUBLIC_URL` | Address phones can reach, used in the QR. |
-| `TEACHER_KEY` | Fixed private key for teacher controls and answer-key access. |
+| `TEACHER_KEY` | Initial owner bootstrap key; shared-key access is disabled after owner setup. |
 | `QR_ROTATION=1` | Rotate admission QR codes; use `QR_INTERVAL` for the interval. |
 
 For public hosting, configure HTTPS and WebSocket forwarding in a reverse proxy. Back up
