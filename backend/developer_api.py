@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
+import accounts
 import bank
 import catalog
 import db
@@ -50,6 +51,7 @@ def session_info(row, include_questions=True):
     saved.setdefault("question_count", len(saved["questions"]))
     if not include_questions:
         saved.pop("questions", None)
+        saved.pop("snapshot", None)
     winners = db.history_records(sid, "results", 1)
     winner = winners[0] if winners and winners[0]["place"] == 1 else None
     return {**row, **saved, "winner": winner}
@@ -57,6 +59,10 @@ def session_info(row, include_questions=True):
 
 def register(app, game, teacher_key):
     def require_teacher(request):
+        if accounts.initialized():
+            raise HTTPException(
+                403, "Use your personal workspace to manage keys and question imports."
+            )
         candidate = request.headers.get("X-Teacher-Key", "")
         if not secrets.compare_digest(candidate.encode(), teacher_key.encode()):
             raise HTTPException(401, "Invalid teacher key.")
@@ -65,14 +71,20 @@ def register(app, game, teacher_key):
         auth = request.headers.get("Authorization", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
         digest = hashlib.sha256(token.encode()).hexdigest()
-        if not token or not await asyncio.to_thread(
-            db.developer_key_valid, digest, int(time.time())
-        ):
-            raise HTTPException(
-                401,
-                "API key is invalid, expired or revoked.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        rows = await asyncio.to_thread(
+            db._all,
+            "SELECT * FROM developer_keys WHERE token_hash=? AND revoked=0 AND expires_at>?",
+            (digest, int(time.time())),
+        )
+        if not token or not rows:
+            raise HTTPException(401, "API key is invalid, expired or revoked.")
+        owner = rows[0].get("owner_id")
+        if accounts.initialized():
+            u = accounts.user(owner) if owner else None
+            if not u or not u["active"]:
+                raise HTTPException(401, "API key owner is inactive.")
+            return u
+        return None
 
     @app.get("/developers", response_class=HTMLResponse, include_in_schema=False)
     async def portal():
@@ -123,8 +135,23 @@ def register(app, game, teacher_key):
     async def sessions(
         request: Request, limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0)
     ):
-        await require_api(request)
-        rows = await asyncio.to_thread(db.history_sessions, limit, offset)
+        u = await require_api(request)
+        if u and u["role"] != "admin":
+            rows = await asyncio.to_thread(
+                db._all,
+                "SELECT s.* FROM sessions s JOIN session_owners o ON s.id=o.session_id WHERE o.owner_id=? ORDER BY s.id DESC",
+                (u["id"],),
+            )
+            allowed = []
+            for row in rows:
+                try:
+                    accounts.own_session(u, row["id"])
+                    allowed.append(row)
+                except HTTPException:
+                    pass
+            rows = allowed[offset : offset + limit]
+        else:
+            rows = await asyncio.to_thread(db.history_sessions, limit, offset)
         items = await asyncio.to_thread(
             lambda: [session_info(row, include_questions=False) for row in rows]
         )
@@ -135,7 +162,9 @@ def register(app, game, teacher_key):
 
     @app.get("/api/v1/sessions/{session_id}", tags=["Developer API"])
     async def session(session_id: int, request: Request):
-        await require_api(request)
+        u = await require_api(request)
+        if u:
+            accounts.own_session(u, session_id)
         row = await asyncio.to_thread(db.history_session, session_id)
         if row is None:
             raise HTTPException(404, "Session not found.")
@@ -151,12 +180,28 @@ def register(app, game, teacher_key):
         limit: int = Query(100, ge=1, le=500),
         offset: int = Query(0, ge=0),
     ):
-        await require_api(request)
+        u = await require_api(request)
+        if u:
+            accounts.own_session(u, session_id)
         if kind not in ("results", "answers", "attendance", "events"):
             raise HTTPException(404, "Unknown record type.")
         if await asyncio.to_thread(db.history_session, session_id) is None:
             raise HTTPException(404, "Session not found.")
         items = await asyncio.to_thread(db.history_records, session_id, kind, limit, offset)
+        if kind in ("results", "attendance"):
+            owners = db._all("SELECT room FROM session_owners WHERE session_id=?", (session_id,))
+            checks = (
+                db._all(
+                    "SELECT nick,status FROM attendance_checks WHERE room=?", (owners[0]["room"],)
+                )
+                if owners
+                else []
+            )
+            by_nick = {check["nick"]: check["status"] for check in checks}
+            items = [
+                {**item, "attendance_status": by_nick.get(item["nick"], "not_checked")}
+                for item in items
+            ]
         return JSONResponse(
             {"session_id": session_id, "items": items, "limit": limit, "offset": offset},
             headers={"Cache-Control": "no-store"},

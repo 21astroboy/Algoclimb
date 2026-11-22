@@ -35,3 +35,8 @@ eslint.config.js
 package.json
 package-lock.json
 pyproject.toml
+
+# Local research and non-runtime design artifacts
+AB-test
+*.ipynb
+design

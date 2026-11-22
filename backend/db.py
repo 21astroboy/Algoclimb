@@ -430,7 +430,7 @@ def history_session(sid):
 def history_records(sid, kind, limit=100, offset=0):
     columns = {
         "results": "nick,total,place,base_points,multiplier",
-        "answers": "nick,task_id,correct,duration_ms,submitted_at",
+        "answers": "nick,task_id,correct,duration_ms,submitted_at,answer_text,points",
         "attendance": "nick,icon,joined_at",
         "events": "nick,kind,at",
     }

@@ -29,10 +29,12 @@ from pathlib import Path
 from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
+import accounts
 import bank
 import catalog
 import db
 import gsheets
+import workspace
 from analytics import analytics_sheets, stats_data
 from developer_api import register as register_developer_api
 from security import Security, is_loopback
@@ -163,10 +165,9 @@ def now_ms():
 def local_ips():
     out = []
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        out.append(s.getsockname()[0])
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            out.append(s.getsockname()[0])
     except Exception:
         pass
     try:
@@ -187,7 +188,12 @@ def shuffle(arr):
 
 # ================================================================ игровой движок
 class Game:
-    def __init__(self):
+    def __init__(self, owner_id=None, room_id=""):
+        self.owner_id = owner_id
+        self.room_id = room_id
+        self._snapshot_file = db.DATA_DIR / (
+            f"room-{room_id}.json" if room_id else "session-state.json"
+        )
         self.lock = asyncio.Lock()
         self.current_stream = config.get("stream", 1)
         self.session = {"id": None, "status": "lobby", "test": False}
@@ -224,6 +230,10 @@ class Game:
         self.custom_specs = []
         self.load_custom_tasks()
 
+    @property
+    def snapshot_file(self):
+        return self._snapshot_file if self.room_id else SNAPSHOT_FILE
+
     # ---------- пользовательские задачи ----------
     def load_custom_tasks(self):
         try:
@@ -251,7 +261,7 @@ class Game:
     def _is_active(self):
         # Сессию стоит хранить, пока есть участники или идёт игра. Пустое лобби
         # (после reset) — хранить нечего, снимок удаляем.
-        return self.session["status"] == "running" or bool(self.by_nick)
+        return bool(self.room_id) or self.session["status"] == "running" or bool(self.by_nick)
 
     def snapshot_dict(self):
         # Только сериализуемые поля: без ws-сокетов, таймеров и asyncio-объектов.
@@ -271,6 +281,7 @@ class Game:
             "intermission": self.intermission,
             "paused": self.paused,
             "pause_remain": self.pause_remain,
+            "pending_imports": self.pending_imports,
         }
 
     def save_snapshot(self):
@@ -278,18 +289,18 @@ class Game:
         # битый файл. Любая ошибка не должна ронять игру — молча пропускаем.
         try:
             if not self._is_active():
-                SNAPSHOT_FILE.unlink(missing_ok=True)
+                self.snapshot_file.unlink(missing_ok=True)
                 return
             data = self.snapshot_dict()
             data.pop("savedAt", None)
             key = json.dumps(data, ensure_ascii=False)
-            if key == self._last_snapshot_key and SNAPSHOT_FILE.exists():
+            if key == self._last_snapshot_key and self.snapshot_file.exists():
                 return  # ничего не изменилось — не пишем на диск каждые 2 с
             data["savedAt"] = now_ms()
-            SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
-            tmp = SNAPSHOT_FILE.with_suffix(".json.tmp")
+            self.snapshot_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.snapshot_file.with_suffix(".json.tmp")
             tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-            tmp.replace(SNAPSHOT_FILE)
+            tmp.replace(self.snapshot_file)
             self._last_snapshot_key = key
         except Exception as e:
             print("Не удалось сохранить снимок сессии:", e)
@@ -299,9 +310,9 @@ class Game:
         # если восстановлена идущая игра (нужно досоздать таймер раунда в lifespan).
         try:
             self._last_snapshot_key = None
-            if not SNAPSHOT_FILE.exists():
+            if not self.snapshot_file.exists():
                 return False
-            data = json.loads(SNAPSHOT_FILE.read_text(encoding="utf-8"))
+            data = json.loads(self.snapshot_file.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or data.get("v") != 1:
                 return False
             self.current_stream = data.get("current_stream", self.current_stream)
@@ -326,6 +337,7 @@ class Game:
             self.intermission = bool(data.get("intermission"))
             self.paused = bool(data.get("paused"))
             self.pause_remain = data.get("pause_remain", 0)
+            self.pending_imports = data.get("pending_imports", {})
             n = len(self.by_nick)
             print(f"  Восстановлена сессия: статус={self.session['status']}, участников={n}")
             return self.session["status"] == "running"
@@ -352,10 +364,16 @@ class Game:
             remain = self.round_deadline - int(time.time() * 1000)
             self._schedule("_timer", max(0, remain) + 400, lambda: self.end_round("timeout"))
 
+    def available_tasks(self):
+        if self.owner_id:
+            u = accounts.user(self.owner_id)
+            return accounts.catalog_tasks(u) if u and u["active"] else []
+        return bank.active_tasks(config.get("activeTasks"))
+
     # ---------- отбор задач ----------
     def select_tasks(self):
         demo = config.get("demo") or {}
-        pool = bank.active_tasks(config.get("activeTasks"))
+        pool = self.available_tasks()
         if not demo.get("enabled"):
             return list(pool)
         n = max(1, demo.get("count", 5))
@@ -382,8 +400,12 @@ class Game:
             ips = cached_local_ips()
             ip = HOST_IP or (ips[0] if ips else "localhost")
             base = f"http://{ip}:{PORT}/"
+        if self.room_id:
+            base += "?room=" + self.room_id
         self.join_url = (
-            (base + "?t=" + sec.current_token()) if config["qrRotation"].get("enabled") else base
+            (base + ("&" if "?" in base else "?") + "t=" + sec.current_token())
+            if config["qrRotation"].get("enabled")
+            else base
         )
         try:
             import segno
@@ -427,6 +449,18 @@ class Game:
         # Таймаут обязателен: без него один «залипший» сокет (телефон с плохим
         # Wi-Fi, забитый TCP-буфер) блокирует отправку под общим game.lock и
         # подвешивает весь раунд для остальных. 5с — отваливаем медленного.
+        if (
+            ws not in self.teachers
+            and self.session.get("reveal", "immediate") != "immediate"
+            and msg.get("type") in ("answered", "roundover")
+        ):
+            msg = {
+                k: v
+                for k, v in msg.items()
+                if k
+                not in ("correct", "points", "basePoints", "speedBonus", "streakBonus", "streak")
+            }
+            msg["feedbackHidden"] = True
         if msg.get("type") == "rejected" and ws not in self.teachers:
             self.log_connection(ws, "join_rejected", reason=msg.get("reason"))
         try:
@@ -517,7 +551,9 @@ class Game:
 
     def roster_arr(self):
         return [
-            {"nick": s["nick"], "icon": s["icon"]} for s in self.by_nick.values() if not s["kicked"]
+            {"nick": s["nick"], "icon": s["icon"], "connected": self.is_connected(s["nick"])}
+            for s in self.by_nick.values()
+            if not s["kicked"]
         ]
 
     def leaderboard(self, include_answers=True):
@@ -552,7 +588,7 @@ class Game:
         return rows
 
     def answer_key_data(self):
-        pool = bank.active_tasks(config.get("activeTasks"))
+        pool = self.available_tasks()
         return [
             {
                 "id": t["id"],
@@ -612,6 +648,7 @@ class Game:
                 "stream": self.current_stream,
                 "total": len(self.order),
                 "metadata": self.session.get("metadata"),
+                "preparation": self.session.get("preparation"),
             },
             "test": bool(self.session["test"]),
             "gradesExportEnabled": bool(config["gsheets"].get("enabled")),
@@ -633,6 +670,13 @@ class Game:
             "token": sec.current_token() if config["qrRotation"].get("enabled") else None,
             "joinUrl": self.join_url,
             "roster": self.roster_arr(),
+            "room": self.room_id,
+            "attendance": db._all(
+                "SELECT nick,status,distance,accuracy FROM attendance_checks WHERE room=?",
+                (self.room_id,),
+            )
+            if self.room_id
+            else [],
             # The live UI needs totals, not every student's per-question history.
             # Send the full breakdown once the session finishes.
             "leaderboard": self.leaderboard(include_answers=not running),
@@ -641,6 +685,13 @@ class Game:
         # Любая полная рассылка гасит отложенный флаг — повтор не нужен.
         self._teacher_dirty = False
         for ws in list(self.teachers):
+            if self.owner_id:
+                try:
+                    accounts.current(ws)
+                except Exception:
+                    self.teachers.discard(ws)
+                    await ws.close(code=1008)
+                    continue
             # PNG-картинку QR (несколько КБ) отправляем, только если этот
             # экран её ещё не видел: раньше она уходила с каждым обновлением
             # (до ~3 раз в секунду во время залпа ответов).
@@ -926,6 +977,20 @@ class Game:
         if not self.session["test"]:
             db.finish_session(self.session["id"], ranked)
         self.session["status"] = "finished"
+        if self.owner_id:
+            u = accounts.user(self.owner_id)
+            if (
+                u
+                and u["suspend_after"]
+                and not any(
+                    g is not self
+                    and g.owner_id == self.owner_id
+                    and g.session["status"] == "running"
+                    for g in rooms.values()
+                )
+            ):
+                db._exec("UPDATE users SET active=0,suspend_after=0 WHERE id=?", (self.owner_id,))
+                accounts.revoke_all(self.owner_id)
 
         await self.broadcast_students(lambda s: self.session_end_payload(s, ranked))
         await self.broadcast_teacher()
@@ -935,7 +1000,7 @@ class Game:
             ranked = self.leaderboard()
         place = next((i + 1 for i, r in enumerate(ranked) if r["nick"] == s["nick"]), 0)
         review = []
-        for ri, task in enumerate(self.order):
+        for ri, task in enumerate(self.order) if self.session.get("reveal") != "teacher" else []:
             a = s["answers"].get(ri)
             review.append(
                 {
@@ -1087,6 +1152,10 @@ class Game:
             ):
                 recovery = "unspecified"
             self.log_connection(ws, "reconnected" if is_reconnect else "joined", recovery=recovery)
+            if self.session.get("id") and not self.session["test"]:
+                db.record_event(
+                    self.session["id"], s["nick"], "reconnected" if is_reconnect else "joined"
+                )
             await self.send(
                 ws,
                 {
@@ -1202,6 +1271,16 @@ class Game:
             }
             if not self.session["test"]:
                 db.record_answer(self.session["id"], s["nick"], task["id"], correct, ans_ms)
+                db._exec(
+                    "UPDATE answers SET answer_text=?,points=?,payload_json=? WHERE id=(SELECT MAX(id) FROM answers WHERE session_id=? AND nick=?)",
+                    (
+                        ans_text,
+                        points,
+                        json.dumps(raw_payload, ensure_ascii=False),
+                        self.session["id"],
+                        s["nick"],
+                    ),
+                )
 
             if correct and 0 <= ans_ms < AC.get("fastMs", 1500):
                 s["fastAnswers"] = s.get("fastAnswers", 0) + 1
@@ -1261,6 +1340,8 @@ class Game:
     async def on_student_disconnect(self, ws):
         s = self.students.pop(ws, None)
         if s is not None:
+            if self.session.get("id") and not self.session["test"]:
+                db.record_event(self.session["id"], s["nick"], "disconnected")
             self._mark_left(s)
             if self.session["status"] == "running" and not self.intermission:
                 # Если остальные уже ответили, раунд закроется после окна ожидания.
@@ -1357,6 +1438,8 @@ class Game:
                 await self.send(w, {"type": "answerkey", "items": self.answer_key_data()})
             return await self.send(ws, {"type": "taskAdded", "ok": True, "deleted": tid})
         if t == "start" and self.session["status"] == "lobby":
+            if self.owner_id and self.session.get("preparation"):
+                msg = {**msg, **self.session["preparation"]}
             imported = None
             if msg.get("importId"):
                 imported = (
@@ -1381,18 +1464,36 @@ class Game:
                     for i in ids:
                         if isinstance(i, str) and i not in seen:
                             seen.add(i)
-                            if i in bank.BY_ID:
-                                order.append(bank.BY_ID[i])
+                            available = {t["id"]: t for t in self.available_tasks()}
+                            if i in available:
+                                order.append(available[i])
                     self.order = order
                 else:
                     self.order = self.select_tasks()
             if not self.order:
                 return
+            if self.owner_id:
+                u = accounts.user(self.owner_id)
+                if (
+                    not u
+                    or not u["active"]
+                    or u["suspend_after"]
+                    or not all(
+                        catalog.section_for(task) in accounts.sections(u) for task in self.order
+                    )
+                ):
+                    return await self.send(
+                        ws,
+                        {
+                            "type": "startRejected",
+                            "error": "Subject access denied or account suspended.",
+                        },
+                    )
             if imported is None and (
                 not config.get("paramize") or config["paramize"].get("enabled") is not False
             ):
                 self.order = [bank.paramize_task(t) for t in self.order]
-            title = None
+            title = self.session.get("title")
             if imported is not None:
                 title = msg.get("title", imported["title"])
                 if not isinstance(title, str) or not 1 <= len(title.strip()) <= 160:
@@ -1405,13 +1506,27 @@ class Game:
                     )
                 title = title.strip()
             session_meta = catalog.metadata(self.order, title, "upload" if imported else "library")
-            self.session["metadata"] = session_meta
+            session_meta["attendance_required"] = bool(self.session.get("geo"))
+            session_meta["feedback_policy"] = self.session.get("reveal", "immediate")
+            session_meta["snapshot"] = [
+                {
+                    **{k: v for k, v in t.items() if not callable(v)},
+                    "correctAnswer": bank.answer_text(t),
+                }
+                for t in self.order
+            ]
+            self.session["metadata"] = {k: v for k, v in session_meta.items() if k != "snapshot"}
             self.session["test"] = bool(msg.get("test"))
             if self.session["test"]:
                 self.session["id"] = "test-" + str(int(time.time() * 1000))
             else:
                 self.session["id"] = db.create_session(self.current_stream, session_meta)
                 db.set_session_status(self.session["id"], "running")
+                if self.owner_id:
+                    db._exec(
+                        "INSERT INTO session_owners VALUES(?,?,?)",
+                        (self.session["id"], self.owner_id, self.room_id),
+                    )
                 for nick, s in self.by_nick.items():
                     db.record_attendance(self.session["id"], nick, s["icon"], s["ip"])
             if imported is not None:
@@ -1514,6 +1629,36 @@ class Game:
 game = Game()
 # Восстанавливаем прерванную сессию из снимка (если процесс падал посреди игры).
 _restored_running = game.load_snapshot()
+rooms = {"": game}
+for _row in db._all("SELECT * FROM room_owners"):
+    _room_game = Game(_row["owner_id"], _row["room"])
+    _room_game.load_snapshot()
+    rooms[_row["room"]] = _room_game
+
+
+def new_room(u):
+    if u["suspend_after"]:
+        from fastapi import HTTPException
+
+        raise HTTPException(403, "Access ends after the current class.")
+    active = [
+        g
+        for g in rooms.values()
+        if g.owner_id == u["id"] and g.session["status"] in ("lobby", "running")
+    ]
+    if len(active) >= 5:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            409, "Close or finish an existing room before creating another (limit 5)."
+        )
+    rid = secrets.token_urlsafe(12)
+    g = Game(u["id"], rid)
+    g.build_qr()
+    rooms[rid] = g
+    db._exec("INSERT INTO room_owners VALUES(?,?,?)", (rid, u["id"], int(time.time())))
+    return g
+
 
 # Фоновые задачи (ротация QR, чистка nonce, снимки состояния). Храним ссылки,
 # чтобы их не собрал GC.
@@ -1521,7 +1666,7 @@ _BG_TASKS: set[asyncio.Task] = set()
 
 # ================================================================ FastAPI
 API_DESCRIPTION = """
-**AlgoClimb** runs one shared classroom session in a single FastAPI process.
+**AlgoClimb** runs isolated teacher-owned classroom rooms in a single FastAPI process.
 Use **one Uvicorn worker**. HTTP endpoints are listed below; live events use WebSockets.
 
 ### Screens
@@ -1580,9 +1725,10 @@ async def lifespan(_app: FastAPI):
     async def qr_loop():
         while config["qrRotation"].get("enabled"):
             await asyncio.sleep(sec._interval_ms() / 1000)
-            async with game.lock:
-                game.build_qr()
-                await game.broadcast_teacher()
+            for current in list(rooms.values()):
+                async with current.lock:
+                    current.build_qr()
+                    await current.broadcast_teacher()
 
     async def nonce_loop():
         while True:
@@ -1596,19 +1742,19 @@ async def lifespan(_app: FastAPI):
         # ответов выходит 1–2 тяжёлые рассылки вместо сотни.
         while True:
             await asyncio.sleep(0.3)
-            if not game._teacher_dirty:
-                continue
-            async with game.lock:
-                if game._teacher_dirty:
-                    await game.broadcast_teacher()
+            for current in list(rooms.values()):
+                if current._teacher_dirty:
+                    async with current.lock:
+                        await current.broadcast_teacher()
 
     async def stale_loop():
         # Выбрасываем «мёртвые» сокеты, от которых давно нет даже ping.
         while True:
             await asyncio.sleep(5)
             try:
-                async with game.lock:
-                    game.reap_stale()
+                for current in list(rooms.values()):
+                    async with current.lock:
+                        current.reap_stale()
             except Exception as e:
                 print("[stale] ошибка в фоновом цикле:", e)
 
@@ -1619,17 +1765,21 @@ async def lifespan(_app: FastAPI):
         while True:
             await asyncio.sleep(2)
             try:
-                async with game.lock:
+                for current in list(rooms.values()):
+                    async with current.lock:
+                        await current.watchdog_tick()
+                        current.save_snapshot()
                     # Сначала расклиниваем зависшую паузу, потом снимаем снимок,
                     # чтобы на диск попало уже восстановленное состояние.
-                    await game.watchdog_tick()
-                    game.save_snapshot()
+
             except Exception as e:
                 print("[snapshot/watchdog] ошибка в фоновом цикле:", e)
 
     # Восстановленную игру нужно «дотолкнуть»: досоздать таймер текущего раунда.
-    if _restored_running:
-        await game.reschedule_after_restore()
+    for current in list(rooms.values()):
+        current.build_qr()
+        if current.session["status"] == "running":
+            await current.reschedule_after_restore()
 
     # Держим ссылки на фоновые задачи, иначе сборщик мусора может их прервать.
     if config["qrRotation"].get("enabled"):
@@ -1646,8 +1796,9 @@ async def lifespan(_app: FastAPI):
     for t in _BG_TASKS:
         t.cancel()
     _BG_TASKS.clear()
-    async with game.lock:
-        game.save_snapshot()
+    for current in list(rooms.values()):
+        async with current.lock:
+            current.save_snapshot()
 
 
 # Swagger (/docs, /redoc, /openapi.json) показываем только в debug-режиме или при
@@ -1667,6 +1818,7 @@ app = FastAPI(
 )
 
 
+workspace.register(app, rooms, new_room, TEACHER_KEY)
 register_developer_api(app, game, TEACHER_KEY)
 
 
@@ -1733,7 +1885,7 @@ async def export_xlsx(
     key: str = Query("", description="Teacher access key"),
     stream: str | None = Query(None, description="Class group (optional)"),
 ):
-    if key.strip() != TEACHER_KEY:
+    if accounts.initialized() or key.strip() != TEACHER_KEY:
         return PlainTextResponse("Teacher access key required", status_code=403)
     try:
         from analytics import build_xlsx
@@ -1858,7 +2010,7 @@ async def root_page():
     description="Teacher dashboard (`teacher.html`); controls use WebSocket `/teacher?key=...`.",
 )
 async def teacher_page():
-    return _serve("teacher.html")
+    return _serve("workspace.html") if accounts.initialized() else _serve("teacher.html")
 
 
 @app.get(
@@ -1880,41 +2032,73 @@ async def static_files(path: str):
 @app.websocket("/teacher")
 async def teacher_ws(ws: WebSocket):
     await ws.accept()
-    key = (ws.query_params.get("key") or "").strip()
-    if key != TEACHER_KEY:
-        await game.send(ws, {"type": "rejected", "reason": "Invalid teacher access key."})
-        await ws.close()
+    origin = ws.headers.get("origin")
+    if origin and origin.split("://", 1)[-1] != ws.headers.get("host"):
+        await ws.close(code=1008)
         return
-    game.teachers.add(ws)
-    await game.send(ws, {"type": "answerkey", "items": game.answer_key_data()})
-    await game.send(ws, {"type": "catalog", "items": bank.catalog_data()})
-    await game.send(ws, {"type": "taskTemplates", "graph": bank.graph_template_list()})
-    async with game.lock:
-        await game.broadcast_teacher()
+    g = game
+    u = None
+    if accounts.initialized():
+        try:
+            u = accounts.current(ws)
+            candidate = rooms.get(ws.query_params.get("room", ""))
+            if not candidate:
+                await ws.close(code=1008)
+                return
+            g = candidate
+            if g.owner_id != u["id"] and u["role"] != "admin":
+                await ws.close(code=1008)
+                return
+        except Exception:
+            await ws.close(code=1008)
+            return
+    elif (ws.query_params.get("key") or "").strip() != TEACHER_KEY:
+        await game.send(ws, {"type": "rejected", "reason": "Invalid teacher access key."})
+        await ws.close(code=1008)
+        return
+    g.teachers.add(ws)
+    await g.send(ws, {"type": "answerkey", "items": g.answer_key_data()})
+    await g.send(ws, {"type": "catalog", "items": bank.catalog_data() if not u else []})
+    await g.send(ws, {"type": "taskTemplates", "graph": bank.graph_template_list()})
+    async with g.lock:
+        await g.broadcast_teacher()
     try:
         while True:
-            raw = await ws.receive_text()
-            try:
-                msg = json.loads(raw)
-            except Exception:
-                continue
+            msg = json.loads(await ws.receive_text())
             if not isinstance(msg, dict):
                 continue
-            if await game.handle_teacher_db(ws, msg):
+            if u:
+                u = accounts.current(ws)
+                if msg.get("type") == "start" and u["suspend_after"]:
+                    continue
+                # Legacy bulk mutation/export endpoints must never cross account boundaries.
+                if msg.get("type") in (
+                    "wipeData",
+                    "getStats",
+                    "exportGrades",
+                    "addTask",
+                    "deleteTask",
+                    "reset",
+                ):
+                    continue
+            if await g.handle_teacher_db(ws, msg):
                 continue
-            async with game.lock:
-                await game.handle_teacher(ws, msg)
-    except WebSocketDisconnect:
-        pass
-    except Exception:
+            async with g.lock:
+                await g.handle_teacher(ws, msg)
+    except (WebSocketDisconnect, Exception):
         pass
     finally:
-        game.teachers.discard(ws)
-        game._teacher_qr_seen.pop(ws, None)
+        g.teachers.discard(ws)
+        g._teacher_qr_seen.pop(ws, None)
 
 
 @app.websocket("/")
 async def student_ws(ws: WebSocket):
+    game = rooms.get(ws.query_params.get("room", ""))
+    if game is None:
+        await ws.accept()
+        await ws.close(code=1008)
+        return
     ws.scope["connection_id"] = secrets.token_hex(6)
     ws.scope["last_rx"] = time.monotonic()
     await ws.accept()

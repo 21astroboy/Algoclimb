@@ -39,7 +39,7 @@ def metadata(tasks, title=None, source="library"):
         sets[(section, block)] = {
             "id": block,
             "section": section,
-            "name": set_label(block, section),
+            "name": task.get("setName") or set_label(block, section),
         }
     return {
         "title": title or " / ".join(item["name"] for item in sets.values()) or "Session",
