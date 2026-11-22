@@ -77,6 +77,20 @@ class WorkspaceTests(unittest.TestCase):
         self.addCleanup(client.close)
         return client, r.json(), token
 
+    def test_owner_can_sign_in_with_username_without_email(self):
+        alias = "owner-" + secrets.token_hex(8)
+        db._exec("UPDATE users SET email=? WHERE id=?", (alias, self.uid))
+        try:
+            client = TestClient(main.app)
+            self.addCleanup(client.close)
+            r = client.post(
+                "/api/workspace/login", json={"email": alias, "password": self.password}
+            )
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json()["id"], self.uid)
+        finally:
+            db._exec("UPDATE users SET email=? WHERE id=?", (self.uid + "@example.org", self.uid))
+
     def test_invitation_one_use_and_teacher_cannot_invite(self):
         c, _, token = self.teacher()
         self.assertEqual(

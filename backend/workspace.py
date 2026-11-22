@@ -182,7 +182,7 @@ def register(app, rooms, new_room, teacher_key):
     async def login(request: Request):
         limited(request)
         body = await read_json(request)
-        rows = db._all("SELECT id FROM users WHERE email=?", (email(body),))
+        rows = db._all("SELECT id FROM users WHERE email=?", (text(body, "email", 254).lower(),))
         u = ac.user(rows[0]["id"]) if rows else None
         if (
             not u
