@@ -40,7 +40,7 @@ const base = process.env.WORKSPACE_TEST_URL || 'http://127.0.0.1:8099';
       })
     ).json();
     await ctx.request.post(base + '/api/workspace/rooms/' + imported.room + '/settings', {
-      data: { title: 'Browser class', reveal: 'after' },
+      data: { title: 'Browser class', reveal: 'after', importId: imported.import_id },
     });
     await p.evaluate(
       ({ id, importId }) => {

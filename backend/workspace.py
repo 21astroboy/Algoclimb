@@ -206,6 +206,21 @@ def register(app, rooms, new_room, teacher_key):
     async def me(request: Request):
         return ac.public(ac.current(request))
 
+    @app.post("/api/workspace/account")
+    async def update_account(request: Request):
+        u = ac.current(request)
+        body = await read_json(request)
+        if not await asyncio.to_thread(ac.password_ok, body.get("current_password"), u["password"]):
+            raise HTTPException(403, "Current password is incorrect.")
+        hashed = await asyncio.to_thread(ac.password_hash, body.get("password"))
+        db._exec(
+            "UPDATE users SET name=?,subject=?,password=? WHERE id=?",
+            (text(body, "name"), text(body, "subject"), hashed, u["id"]),
+        )
+        ac.revoke_all(u["id"])
+        ac.audit(u["id"], "profile_password_changed", u["id"])
+        return login_response(ac.user(u["id"]), request)
+
     @app.post("/api/workspace/activate")
     async def activate(request: Request):
         limited(request)

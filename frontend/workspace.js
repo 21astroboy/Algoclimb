@@ -134,7 +134,7 @@ function nav() {
   ];
   if (room) items.splice(2, 0, ['lobby', 'Current session']);
   if (me.role === 'admin') items.push(['admin', 'Administration']);
-  return `<aside class="rail"><div class="brand">Algo<em>Climb</em></div>${items.map(([p, t]) => button(t, () => navigate(p), p === page)).join('')}<div class="profile">${esc(me.name)}<br>${esc(me.subject)}<br>${esc(me.role)} · ${Object.keys(catalog.sections).join(', ')}<br>${button(
+  return `<aside class="rail"><div class="brand">Algo<em>Climb</em></div>${items.map(([p, t]) => button(t, () => navigate(p), p === page)).join('')}<div class="profile">${esc(me.name)}<br>${esc(me.subject)}<br>${esc(me.role)} · ${Object.keys(catalog.sections).join(', ')}<br>${button('Account & password', editAccount)}${button(
     'Sign out',
     async () => {
       await api('/logout', {});
@@ -148,6 +148,25 @@ function pruneActions() {
     [...document.querySelectorAll('[data-action]')].map((el) => Number(el.dataset.action))
   );
   for (const id of events.keys()) if (!live.has(id)) events.delete(id);
+}
+function editAccount() {
+  modal(
+    'Account & password',
+    `${input('profileName', 'Full name', me.name)}${input('profileSubject', 'Teaching subject / institution', me.subject)}${input('oldPassword', 'Current password', '', 'password')}${input('newPassword', 'New password · 10–256 characters', '', 'password')}<p>Saving signs out other browsers and revokes your existing API keys.</p>${formError()}${button(
+      'Save & update password',
+      () =>
+        formTask(async () => {
+          await api('/account', {
+            name: $('profileName').value,
+            subject: $('profileSubject').value,
+            current_password: $('oldPassword').value,
+            password: $('newPassword').value,
+          });
+          location.reload();
+        }),
+      true
+    )}`
+  );
 }
 function render() {
   if (!me) return;

@@ -188,6 +188,26 @@ class WorkspaceTests(unittest.TestCase):
             400,
         )
 
+    def test_password_change_requires_old_password_and_rotates_credentials(self):
+        c, _u, _ = self.teacher()
+        key = c.post("/api/workspace/keys", json={"name": "Old key"}).json()
+        body = {
+            "name": "Updated teacher",
+            "subject": "Graphs",
+            "password": "new-profile-password",
+            "current_password": "wrong-password",
+        }
+        self.assertEqual(c.post("/api/workspace/account", json=body).status_code, 403)
+        body["current_password"] = self.password
+        self.assertEqual(c.post("/api/workspace/account", json=body).status_code, 200)
+        self.assertEqual(c.get("/api/workspace/me").json()["name"], "Updated teacher")
+        self.assertEqual(
+            c.get(
+                "/api/v1/sessions", headers={"Authorization": "Bearer " + key["token"]}
+            ).status_code,
+            401,
+        )
+
     def test_room_isolation_geo_accuracy_and_manual_override(self):
         c, _u, _ = self.teacher()
         other, _, _ = self.teacher()
