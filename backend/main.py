@@ -977,6 +977,7 @@ class Game:
         if not self.session["test"]:
             db.finish_session(self.session["id"], ranked)
         self.session["status"] = "finished"
+        self.session["finishedAt"] = int(time.time())
         if self.owner_id:
             u = accounts.user(self.owner_id)
             if (
@@ -1769,6 +1770,15 @@ async def lifespan(_app: FastAPI):
                     async with current.lock:
                         await current.watchdog_tick()
                         current.save_snapshot()
+                    if current.room_id and current.session["status"] == "finished":
+                        finished_at = current.session.setdefault("finishedAt", int(time.time()))
+                        if time.time() - finished_at > 86400:
+                            for socket_ws in list(current.students) + list(current.teachers):
+                                await socket_ws.close(code=1000)
+                            current._cancel_timers()
+                            rooms.pop(current.room_id, None)
+                            db._exec("DELETE FROM room_owners WHERE room=?", (current.room_id,))
+                            current.snapshot_file.unlink(missing_ok=True)
                     # Сначала расклиниваем зависшую паузу, потом снимаем снимок,
                     # чтобы на диск попало уже восстановленное состояние.
 

@@ -24,6 +24,8 @@ A one-session import creates a separate bank for that room, with a one-hour star
 
 ## Live rooms and analytics
 
+Finished live rooms expire after 24 hours to release memory; saved reports and attendance remain in SQLite.
+
 Each room has an unguessable join URL and isolated roster, timers, imports and reconnect storage. Up to five unfinished rooms per teacher are permitted; close unused rooms in My sessions. One Uvicorn worker is required. SQLite and per-room snapshots live under the persistent runtime volume. Snapshots are written approximately every two seconds and on graceful shutdown; a crash can lose the most recent unsaved progress.
 
 The teacher workspace has Overview, Question library, My sessions, Analytics, API keys and Feedback & requests. Owner-only Administration contains users, invitations, recovery, keys, publication requests and an audit log.
