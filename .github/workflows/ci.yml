@@ -45,7 +45,7 @@ jobs:
 
       - name: Backend regression tests
         working-directory: backend
-        run: python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery
+        run: python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery test_import_bank
 
       - name: Isolated HTTP and WebSocket E2E
         working-directory: backend
@@ -100,6 +100,7 @@ jobs:
           demo_pid=$!
           trap 'kill "$demo_pid"' EXIT
           npm run test:layout
+          node tools/check_workspace.cjs
 
   # ─────────────────────────────── Docker (сборка образа) ────────────────
   docker:

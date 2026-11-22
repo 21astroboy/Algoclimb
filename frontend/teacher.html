@@ -1030,37 +1030,67 @@
               · leave empty to use the session configuration
             </span>
           </div>
-          <div class="bar">
-            <input type="search" id="catSearch" placeholder="Search titles or questions…" />
-            <button class="chip on" data-f="topic" data-v="all">All topics</button>
-            <button class="chip on" data-f="type" data-v="all">All types</button>
-            <button class="chip" data-f="type" data-v="choice">Choice</button>
-            <button class="chip" data-f="type" data-v="graph">Build graph</button>
-            <button class="chip" data-f="type" data-v="order">Traversal</button>
-            <button class="chip" data-f="type" data-v="sort">Sorting</button>
-            <button class="chip" data-f="type" data-v="blank">Fill blanks</button>
-            <button class="chip on" data-f="level" data-v="all">All levels</button>
-            <button class="chip" data-f="level" data-v="1">Lv.1</button>
-            <button class="chip" data-f="level" data-v="2">Lv.2</button>
-            <button class="chip" data-f="level" data-v="3">Lv.3</button>
+          <div class="bar" style="margin-top: 16px">
+            <button class="btn ghost" id="uploadBankBtn">Upload JSON for one session</button>
+            <input type="file" id="uploadBankFile" accept="application/json,.json" hidden />
+            <a class="btn ghost" href="/developers" target="_blank" rel="noopener">
+              API &amp; session history
+            </a>
           </div>
-          <div class="bar" id="blockBar">
-            <span class="muted" style="align-self: center">Question sets:</span>
-            <button class="chip on" data-f="block" data-v="all">All questions</button>
+          <div
+            id="uploadBankPanel"
+            class="hidden"
+            style="padding: 16px; border: 1px solid var(--line); border-radius: 12px">
+            <label>
+              Session name
+              <input id="importTitle" maxlength="160" />
+            </label>
+            <p id="importSummary"></p>
+            <div id="importPreview"></div>
+            <button class="btn ghost" id="clearImport">Use the main library</button>
           </div>
-          <div class="bar">
-            <button class="btn ghost" id="catAll">Select visible</button>
-            <button class="btn ghost" id="catNone">Clear selection</button>
-            <button class="btn ghost" id="catRand">🎲 Pick 10 at random</button>
-            <button
-              class="btn ghost"
-              id="openMaker"
-              style="border-color: var(--accent); color: var(--accent)">
-              ➕ Create question
-            </button>
-            <span class="muted" id="catCount" style="font-size: 12px; margin-left: auto"></span>
+          <p id="importError" class="muted" role="alert"></p>
+          <div id="catalogControls">
+            <div class="bar" id="sectionBar">
+              <button class="chip on" data-f="section" data-v="all">All subjects</button>
+              <button class="chip" data-f="section" data-v="algorithms">Algorithms</button>
+              <button class="chip" data-f="section" data-v="oop">OOP</button>
+              <button class="chip" data-f="section" data-v="graphs">Graphs</button>
+              <button class="chip" data-f="section" data-v="db">DB</button>
+              <button class="chip" data-f="section" data-v="nn">NN</button>
+            </div>
+            <div class="bar">
+              <input type="search" id="catSearch" placeholder="Search titles or questions…" />
+              <button class="chip on" data-f="topic" data-v="all">All topics</button>
+              <button class="chip on" data-f="type" data-v="all">All types</button>
+              <button class="chip" data-f="type" data-v="choice">Choice</button>
+              <button class="chip" data-f="type" data-v="graph">Build graph</button>
+              <button class="chip" data-f="type" data-v="order">Traversal</button>
+              <button class="chip" data-f="type" data-v="sort">Sorting</button>
+              <button class="chip" data-f="type" data-v="blank">Fill blanks</button>
+              <button class="chip on" data-f="level" data-v="all">All levels</button>
+              <button class="chip" data-f="level" data-v="1">Lv.1</button>
+              <button class="chip" data-f="level" data-v="2">Lv.2</button>
+              <button class="chip" data-f="level" data-v="3">Lv.3</button>
+            </div>
+            <div class="bar" id="blockBar">
+              <span class="muted" style="align-self: center">Question sets:</span>
+              <button class="chip on" data-f="block" data-v="all">All questions</button>
+            </div>
+            <div class="bar">
+              <button class="btn ghost" id="catAll">Select visible</button>
+              <button class="btn ghost" id="catNone">Clear selection</button>
+              <button class="btn ghost" id="catRand">🎲 Pick 10 at random</button>
+              <button
+                class="btn ghost"
+                id="openMaker"
+                style="border-color: var(--accent); color: var(--accent)">
+                ➕ Create question
+              </button>
+              <span class="muted" id="catCount" style="font-size: 12px; margin-left: auto"></span>
+            </div>
+            <div class="catlist" id="catList"></div>
           </div>
-          <div class="catlist" id="catList"></div>
         </div>
       </section>
 
@@ -1578,8 +1608,75 @@
         testMode = !testMode;
         updateTestBtn();
       };
+      let sessionImport = null;
+      $('uploadBankBtn').onclick = () => $('uploadBankFile').click();
+      $('uploadBankFile').onchange = async () => {
+        const file = $('uploadBankFile').files[0];
+        if (!file) return;
+        sessionImport = null;
+        $('uploadBankPanel').classList.add('hidden');
+        $('catalogControls').classList.remove('hidden');
+        $('importError').textContent = '';
+        $('startBtn').disabled = true;
+        try {
+          if (file.size > 2 * 1024 * 1024)
+            throw new Error('JSON file must be no larger than 2 MiB.');
+          const tasks = JSON.parse(await file.text());
+          const title =
+            file.name
+              .replace(/\.json$/i, '')
+              .trim()
+              .slice(0, 160) || 'Guest session';
+          const response = await fetch('/api/teacher/imports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Teacher-Key': lastKey },
+            body: JSON.stringify({ title, tasks }),
+          });
+          const data = await response.json();
+          if (!response.ok)
+            throw new Error(typeof data.detail === 'string' ? data.detail : 'Import failed.');
+          sessionImport = data;
+          $('importTitle').value = data.title;
+          $('importSummary').textContent =
+            data.count +
+            ' valid questions · used for one session. Results are saved when Practice is off.';
+          $('importPreview').innerHTML = data.questions
+            .slice(0, 10)
+            .map((q) => '<p>' + esc(q.title) + ' · ' + esc(q.type) + '</p>')
+            .join('');
+          $('uploadBankPanel').classList.remove('hidden');
+          $('catalogControls').classList.add('hidden');
+        } catch (error) {
+          $('importError').textContent = error.message;
+        } finally {
+          $('startBtn').disabled = false;
+          $('uploadBankFile').value = '';
+        }
+      };
+      $('clearImport').onclick = () => {
+        sessionImport = null;
+        $('uploadBankPanel').classList.add('hidden');
+        $('catalogControls').classList.remove('hidden');
+      };
       $('startBtn').onclick = () => {
-        const ids = [...SELECTED];
+        if (sessionImport) {
+          ws.send(
+            JSON.stringify({
+              type: 'start',
+              importId: sessionImport.import_id,
+              title: $('importTitle').value,
+              test: testMode,
+            })
+          );
+          return;
+        }
+        let ids = [...SELECTED];
+        if (!ids.length && (catF.section !== 'all' || catF.block !== 'all'))
+          ids = visibleCat().map((it) => it.id);
+        if (!ids.length && catF.section !== 'all') {
+          alert('Choose a populated subject or upload a JSON bank.');
+          return;
+        }
         if (ids.length) ws.send(JSON.stringify({ type: 'start', taskIds: ids, test: testMode }));
         else if (confirm('No questions selected. Start a session using the settings in config?'))
           ws.send(JSON.stringify({ type: 'start', test: testMode }));
@@ -1641,16 +1738,16 @@
       /* ---------- конструктор сессии ---------- */
       let CATALOG = [],
         SELECTED = new Set(),
-        catF = { topic: 'all', type: 'all', level: 'all', block: 'all' },
+        catF = { section: 'all', topic: 'all', type: 'all', level: 'all', block: 'all' },
         catQ = '';
       // Темы и наборы определяются самим банком задач. Для демо-банка оставляем
       // красивые подписи, для любого другого предмета подпись = значение из банка.
       const TOPIC_LABELS = { asd: 'DSA', graphs: 'Graphs', py: 'Python' };
       const BLOCK_LABELS = {
-        comb1: 'Combinatorics: Set 1',
-        comb2: 'Combinatorics: Set 2',
-        comb3: 'Combinatorics: Set 3',
-        comb4: 'Combinatorics: Set 4',
+        comb1: 'Graphs: Set 1',
+        comb2: 'Graphs: Set 2',
+        comb3: 'Graphs: Set 3',
+        comb4: 'Graphs: Set 4',
         oop1: 'OOP fundamentals: Set 1',
         oop2: 'OOP fundamentals: Set 2',
         oop3: 'OOP fundamentals: Set 3',
@@ -1662,9 +1759,13 @@
       }
       // Собирает чипы тем/наборов из тех значений, что реально есть в банке.
       function buildCatalogChips() {
-        const topics = uniqSorted(CATALOG.map((it) => it.topic));
+        const subjectTasks = CATALOG.filter(
+          (it) => catF.section === 'all' || it.section === catF.section
+        );
+        const topics = uniqSorted(subjectTasks.map((it) => it.topic));
         const tAnchor = document.querySelector('.builder .chip[data-f="topic"][data-v="all"]');
         if (tAnchor) {
+          tAnchor.classList.toggle('on', catF.topic === 'all');
           tAnchor.parentNode
             .querySelectorAll('.chip[data-f="topic"]:not([data-v="all"])')
             .forEach((c) => c.remove());
@@ -1678,9 +1779,10 @@
               .join('')
           );
         }
-        const blocks = uniqSorted(CATALOG.map((it) => it.block));
+        const blocks = uniqSorted(subjectTasks.map((it) => it.block));
         const bAnchor = document.querySelector('.builder .chip[data-f="block"][data-v="all"]');
         if (bAnchor) {
+          bAnchor.classList.toggle('on', catF.block === 'all');
           bAnchor.parentNode
             .querySelectorAll('.chip[data-f="block"]:not([data-v="all"])')
             .forEach((c) => c.remove());
@@ -1689,7 +1791,7 @@
             blocks
               .map(
                 (b) =>
-                  `<button class="chip" data-f="block" data-v="${esc(b)}">${esc(blockLabel(b))}</button>`
+                  `<button class="chip" data-f="block" data-v="${esc(b)}">${esc(subjectTasks.find((it) => it.block === b)?.setLabel || blockLabel(b))}</button>`
               )
               .join('')
           );
@@ -1700,6 +1802,7 @@
         if (dl) dl.innerHTML = topics.map((t) => `<option value="${esc(t)}"></option>`).join('');
       }
       function catMatch(it) {
+        if (catF.section !== 'all' && it.section !== catF.section) return false;
         if (catF.topic !== 'all' && it.topic !== catF.topic) return false;
         if (catF.type !== 'all' && it.type !== catF.type) return false;
         if (catF.level !== 'all' && String(it.level) !== catF.level) return false;
@@ -1756,7 +1859,8 @@
                 '</span></label>'
               );
             })
-            .join('') || '<div class="muted" style="padding:14px">No results found.</div>';
+            .join('') ||
+          '<div class="muted" style="padding:14px">No question sets here yet. Upload a JSON bank for this session or choose another subject.</div>';
         mathify($('catList'));
         $('selCount').textContent = SELECTED.size;
       }
@@ -1778,6 +1882,14 @@
         let v = c.dataset.v;
         if (c.classList.contains('on') && v !== 'all') v = 'all';
         catF[c.dataset.f] = v;
+        if (c.dataset.f === 'section') {
+          SELECTED.clear();
+          if (c.dataset.f === 'section') {
+            catF.block = 'all';
+            catF.topic = 'all';
+            buildCatalogChips();
+          }
+        }
         document
           .querySelectorAll('.builder .chip[data-f="' + c.dataset.f + '"]')
           .forEach((x) => x.classList.toggle('on', x.dataset.v === v));
@@ -2227,6 +2339,10 @@
       }
 
       function render(m) {
+        if (m.type === 'startRejected') {
+          $('importError').textContent = m.error;
+          return;
+        }
         if (m.type === 'catalog') {
           CATALOG = m.items || [];
           buildCatalogChips();
@@ -2266,6 +2382,7 @@
         TOTAL = m.session.total || TOTAL;
         if (m.session.stream != null) setStreamUI(m.session.stream);
         const st = m.session.status;
+        if (st !== 'lobby' && sessionImport) $('clearImport').click();
         document.querySelector('.wrap').classList.toggle('competition', st === 'running');
         $('startBtn').classList.toggle('hidden', st !== 'lobby');
         $('testBtn').classList.toggle('hidden', st !== 'lobby');

@@ -177,6 +177,166 @@ class SessionTests(unittest.IsolatedAsyncioTestCase):
             return {"array": source["expected"]}
         return {"blanks": ["LIFO"]}
 
+    async def http(self, path, method="GET", payload=None, headers=None):
+        def request():
+            body = json.dumps(payload).encode() if payload is not None else None
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{self.port}" + path,
+                data=body,
+                method=method,
+                headers={"Content-Type": "application/json", **(headers or {})},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    return response.status, json.loads(response.read())
+            except urllib.error.HTTPError as error:
+                return error.code, json.loads(error.read())
+
+        return await asyncio.to_thread(request)
+
+    async def issue_api_key(self):
+        status, data = await self.http(
+            "/api/v1/auth/token", "POST", {"name": "E2E integration"}, {"X-Teacher-Key": KEY}
+        )
+        self.assertEqual(status, 200)
+        return data
+
+    async def test_z_developer_keys_permissions_expiry_and_revocation(self):
+        self.assertEqual((await self.http("/api/v1/sessions"))[0], 401)
+        self.assertEqual((await self.http("/api/v1/auth/token", "POST", {}))[0], 401)
+        key = await self.issue_api_key()
+        auth = {"Authorization": "Bearer " + key["access_token"]}
+        status, listing = await self.http("/api/v1/sessions?limit=1", headers=auth)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(listing["items"]), 1)
+        self.assertEqual(listing["items"][0]["provenance"], "recorded")
+        self.assertEqual(key["expires_in"], 86400)
+        # Developer credentials do not authorize teacher operations.
+        self.assertEqual((await self.http("/api/teacher/imports", "POST", {}, auth))[0], 401)
+        self.assertEqual((await self.http("/api/v1/auth/token", "POST", {}, auth))[0], 401)
+        with sqlite3.connect(self.root / "runtime/algoclimb.db") as conn:
+            stored = conn.execute(
+                "SELECT token_hash,expires_at-created_at FROM developer_keys WHERE id=?",
+                (key["id"],),
+            ).fetchone()
+            self.assertNotEqual(stored[0], key["access_token"])
+            self.assertEqual(stored[1], 86400)
+            conn.execute("UPDATE developer_keys SET expires_at=0 WHERE id=?", (key["id"],))
+        self.assertEqual((await self.http("/api/v1/sessions", headers=auth))[0], 401)
+        key = await self.issue_api_key()
+        self.assertEqual(
+            (
+                await self.http(
+                    "/api/v1/auth/token/" + key["id"] + "/revoke",
+                    "POST",
+                    headers={"X-Teacher-Key": KEY},
+                )
+            )[0],
+            200,
+        )
+        self.assertEqual(
+            (
+                await self.http(
+                    "/api/v1/sessions", headers={"Authorization": "Bearer " + key["access_token"]}
+                )
+            )[0],
+            401,
+        )
+
+    async def test_z_import_is_one_session_and_records_its_metadata(self):
+        question = {
+            **self.tasks[0],
+            "id": "guest-question",
+            "title": "Guest question",
+            "section": "db",
+        }
+        teacher = {"X-Teacher-Key": KEY}
+        status, bad = await self.http(
+            "/api/teacher/imports",
+            "POST",
+            {"title": "Guest", "tasks": [{**question, "answer": 999}]},
+            teacher,
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("Question 1", bad["detail"])
+        status, imported = await self.http(
+            "/api/teacher/imports",
+            "POST",
+            {"title": "Guest workshop", "tasks": [question]},
+            teacher,
+        )
+        self.assertEqual(status, 200)
+        student = await self.join("Guest")
+        await send(
+            self.teacher,
+            "start",
+            importId=imported["import_id"],
+            title="Named guest workshop",
+            test=False,
+        )
+        task = (await receive(student, "task"))["task"]
+        self.assertEqual(task["id"], "guest-question")
+        # Changing the bank while a class is running is rejected.
+        self.assertEqual(
+            (
+                await self.http(
+                    "/api/teacher/imports",
+                    "POST",
+                    {"title": "Second", "tasks": [question]},
+                    teacher,
+                )
+            )[0],
+            409,
+        )
+        await send(
+            student,
+            "answer",
+            taskId=task["id"],
+            payload={"choice": task["options"].index(question["options"][question["answer"]])},
+        )
+        await receive(student, "sessionend")
+        key = await self.issue_api_key()
+        auth = {"Authorization": "Bearer " + key["access_token"]}
+        _, listing = await self.http("/api/v1/sessions?limit=1", headers=auth)
+        saved = listing["items"][0]
+        self.assertEqual(saved["title"], "Named guest workshop")
+        self.assertEqual(saved["sections"], ["db"])
+        self.assertEqual(saved["source"], "upload")
+        self.assertEqual(saved["winner"]["nick"], "Guest")
+        _, answers = await self.http(f"/api/v1/sessions/{saved['id']}/answers", headers=auth)
+        self.assertEqual(answers["items"][0]["task_id"], "guest-question")
+        await send(self.teacher, "reset")
+        await receive(self.teacher, "state", lambda m: m["session"]["status"] == "lobby")
+        await send(self.teacher, "start", importId=imported["import_id"])
+        self.assertIn("already used", (await receive(self.teacher, "startRejected"))["error"])
+        # Reconnecting the teacher still sees only the permanent library.
+        other = await self.connect("/teacher?key=" + KEY)
+        catalog = await receive(other, "catalog")
+        self.assertNotIn("guest-question", [q["id"] for q in catalog["items"]])
+
+    async def test_z_legacy_history_marks_inference_and_missing_data(self):
+        with sqlite3.connect(self.root / "runtime/algoclimb.db") as conn:
+            sid = conn.execute(
+                "INSERT INTO sessions(date,stream,status) VALUES('2020-01-01',1,'finished')"
+            ).lastrowid
+            conn.executemany(
+                "INSERT INTO answers(session_id,nick,task_id) VALUES(?,?,?)",
+                [(sid, "Legacy", "demo_stack"), (sid, "Legacy", "deleted-question")],
+            )
+            empty = conn.execute(
+                "INSERT INTO sessions(date,stream,status) VALUES('2020-01-02',1,'finished')"
+            ).lastrowid
+        key = await self.issue_api_key()
+        auth = {"Authorization": "Bearer " + key["access_token"]}
+        _, result = await self.http(f"/api/v1/sessions/{sid}", headers=auth)
+        self.assertEqual(result["provenance"], "inferred_from_answered_questions")
+        self.assertEqual(result["question_count"], 2)
+        self.assertEqual(result["unresolved_question_ids"], ["deleted-question"])
+        self.assertIsNone(result["winner"])
+        _, result = await self.http(f"/api/v1/sessions/{empty}", headers=auth)
+        self.assertEqual(result["provenance"], "unavailable")
+        self.assertIsNone(result["title"])
+
     async def test_lifecycle_reconnect_and_persistence(self):
         student = await self.join()
         ids = ["demo_stack", "demo_triangle", "demo_bfs", "demo_bubble", "test_blank"]

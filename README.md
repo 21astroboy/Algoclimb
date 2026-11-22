@@ -295,6 +295,23 @@ Use **one application worker**. Multiple independent replicas do not share live 
 Updating recreates the container, so deploy between classes and reload browser pages afterward.
 See the [deployment guide](docs/deployment.md) for configuration, backups and recovery.
 
+## Subjects, guest workshops and developer access
+
+The teacher library groups sets under **Algorithms**, **OOP**, **Graphs**, **DB** and
+**NN**. DB and NN show an empty state until their questions are added. Existing
+`comb*` sets appear under Graphs, `oop*` under OOP, and the original ungrouped bank
+under Algorithms. An explicit `section` field can assign future questions.
+
+Colleagues can sign in with the teacher key and **Upload JSON for one session**.
+The app validates and previews the bank before starting. It is consumed once and
+kept separate from the permanent library. Saved results retain the session name
+and selected question metadata.
+
+Open `/developers` to exchange a teacher key for a **24-hour read-only API key**.
+Use it to read saved sessions, rankings, answers, attendance and activity events.
+The page includes a history viewer and a revocation action.
+[API reference and guest-bank workflow](docs/developer-api.md).
+
 ## Documentation
 
 | Guide | What it covers |

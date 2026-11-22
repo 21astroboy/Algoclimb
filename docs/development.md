@@ -47,7 +47,7 @@ ruff format --check .
 mypy
 npm run lint
 (cd backend && python -m smoke_test)
-(cd backend && python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery)
+(cd backend && python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery test_import_bank)
 (cd backend && python -m e2e_test)
 python -m unittest tools.test_reliability
 python tools/reliability_test.py --students 12 --rounds 10 --disconnects --qr --idle 1
@@ -119,6 +119,9 @@ The large-class image is an explicitly labeled deterministic display fixture:
 overlap, checks all participants are listed and long names wrap, then saves
 `teacher-large-class.png` in the selected language directory. CI runs this layout
 check in Chromium. Nicknames support up to 96 characters; longer values are rejected.
+Run `node tools/check_workspace.cjs` against the same demo to verify subjects,
+JSON import validation, a guest class, key issuance/revocation and history in the browser.
+
 Stop the demo server after capture; its temporary runtime is deleted.
 
 ## Optional API docs

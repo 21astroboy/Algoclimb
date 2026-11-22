@@ -24,6 +24,7 @@ An existing malformed file is an error, not a reason to rely on the next fallbac
 | --- | --- |
 | `id` | Unique stable string; used to match answers and explanations. |
 | `type` | `choice`, `graph`, `order`, `sort` or `blank`. |
+| `section` | Optional subject: `algorithms`, `oop`, `graphs`, `db`, `nn`. |
 | `title` | Short title shown in the session builder. |
 | `prompt` | Instructions: state exactly what the student must submit. |
 | `topic` | Arbitrary topic string; creates a filter in the builder. |

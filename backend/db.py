@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import threading
@@ -54,6 +55,14 @@ _conn.executescript(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id INTEGER, nick TEXT, kind TEXT, at TEXT
     );
+    CREATE TABLE IF NOT EXISTS session_metadata (
+      session_id INTEGER PRIMARY KEY, metadata_json TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS developer_keys (
+      id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+      created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+      revoked INTEGER NOT NULL DEFAULT 0
+    );
     -- Аналитика (list_sessions) считает подзапросы по session_id для каждой
     -- сессии; без индексов это полный перебор всей истории ответов.
     CREATE INDEX IF NOT EXISTS idx_answers_session ON answers(session_id);
@@ -90,7 +99,7 @@ def _all(sql, args=()):
 
 def wipe_all():
     with _lock:
-        for t in ("answers", "results", "events", "attendance", "sessions"):
+        for t in ("answers", "results", "events", "attendance", "session_metadata", "sessions"):
             _conn.execute("DELETE FROM " + t + ";")
         try:
             _conn.execute("DELETE FROM sqlite_sequence;")
@@ -105,13 +114,20 @@ def wipe_all():
     return True
 
 
-def create_session(stream):
+def create_session(stream, metadata=None):
     date = _now()[:10]
-    cur = _exec(
-        "INSERT INTO sessions(date,stream,status,started_at) VALUES(?,?,?,?)",
-        (date, stream, "lobby", None),
-    )
-    return cur.lastrowid
+    with _lock, _conn:
+        cur = _conn.execute(
+            "INSERT INTO sessions(date,stream,status,started_at) VALUES(?,?,?,?)",
+            (date, stream, "lobby", None),
+        )
+        sid = cur.lastrowid
+        if metadata is not None:
+            _conn.execute(
+                "INSERT INTO session_metadata VALUES (?,?)",
+                (sid, json.dumps(metadata, ensure_ascii=False)),
+            )
+        return sid
 
 
 def set_session_status(sid, status):
@@ -375,3 +391,76 @@ def attendance_map(stream):
     res = [{"nick": c["nick"], "icon": c["icon"], "sessionIds": list(c["set"])} for c in m.values()]
     res.sort(key=lambda a: a["nick"])
     return res
+
+
+def get_session_metadata(sid):
+    rows = _all("SELECT metadata_json FROM session_metadata WHERE session_id=?", (sid,))
+    return json.loads(rows[0]["metadata_json"]) if rows else None
+
+
+def create_developer_key(key_id, digest, name, created_at, expires_at):
+    _exec(
+        "INSERT INTO developer_keys(id,token_hash,name,created_at,expires_at) VALUES(?,?,?,?,?)",
+        (key_id, digest, name, created_at, expires_at),
+    )
+
+
+def developer_key_valid(digest, now):
+    return bool(
+        _all(
+            "SELECT id FROM developer_keys WHERE token_hash=? AND revoked=0 AND expires_at>?",
+            (digest, now),
+        )
+    )
+
+
+def revoke_developer_key(key_id):
+    return _exec("UPDATE developer_keys SET revoked=1 WHERE id=?", (key_id,)).rowcount > 0
+
+
+def history_sessions(limit=50, offset=0):
+    return _all("SELECT * FROM sessions ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
+
+
+def history_session(sid):
+    rows = _all("SELECT * FROM sessions WHERE id=?", (sid,))
+    return rows[0] if rows else None
+
+
+def history_records(sid, kind, limit=100, offset=0):
+    columns = {
+        "results": "nick,total,place,base_points,multiplier",
+        "answers": "nick,task_id,correct,duration_ms,submitted_at",
+        "attendance": "nick,icon,joined_at",
+        "events": "nick,kind,at",
+    }
+    if kind not in columns:
+        raise ValueError("Unknown history record type")
+    order = "place,id" if kind == "results" else "id"
+    return _all(
+        f"SELECT {columns[kind]} FROM {kind} WHERE session_id=? ORDER BY {order} LIMIT ? OFFSET ?",
+        (sid, limit, offset),
+    )
+
+
+def history_task_ids(sid):
+    return [
+        r["task_id"]
+        for r in _all("SELECT DISTINCT task_id FROM answers WHERE session_id=? ORDER BY id", (sid,))
+    ]
+
+
+def finish_session(sid, ranking):
+    """Publish final status and the whole ranking together for concurrent readers."""
+    with _lock, _conn:
+        _conn.execute("DELETE FROM results WHERE session_id=?", (sid,))
+        _conn.executemany(
+            "INSERT INTO results(session_id,nick,base_points,multiplier,total,place) VALUES(?,?,?,?,?,?)",
+            [
+                (sid, row["nick"], 0, 1, row["score"], index + 1)
+                for index, row in enumerate(ranking)
+            ],
+        )
+        _conn.execute(
+            "UPDATE sessions SET status='finished',finished_at=? WHERE id=?", (_now(), sid)
+        )
