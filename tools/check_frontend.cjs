@@ -8,4 +8,5 @@ for (const file of ['teacher.html', 'student.html', 'answers.html', 'developers.
     new vm.Script(match[1], { filename: file });
   }
 }
-console.log('Inline JavaScript syntax OK');
+for (const file of ['workspace.js', 'attendance.js']) new vm.Script(fs.readFileSync(path.join(__dirname, '..', 'frontend', file), 'utf8'), { filename: file });
+console.log('Inline and workspace JavaScript syntax OK');

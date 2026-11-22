@@ -16,14 +16,14 @@ function setup() {
     static CONNECTING = 0;
     static OPEN = 1;
     static CLOSED = 3;
-    constructor() { this.readyState = 0; this.sent = []; sockets.push(this); }
+    constructor(url) { this.url = url; this.readyState = 0; this.sent = []; sockets.push(this); }
     send(raw) { this.sent.push(JSON.parse(raw)); }
     close() { this.readyState = 3; if (this.onclose) this.onclose(); }
     open() { this.readyState = 1; this.onopen(); }
     message(m) { this.onmessage({ data: JSON.stringify(m) }); }
   }
   const context = vm.createContext({
-    WebSocket: Socket, location: { protocol: 'https:', host: 'example.test' },
+    URLSearchParams, WebSocket: Socket, location: { protocol: 'https:', host: 'example.test', search: '?room=classroom-1' },
     Date: { now: () => now }, me: { nick: 'Student' },
     $: () => ({}), handle: (m) => messages.push(m),
     window: { addEventListener: (name, fn) => { events[name] = fn; } },
@@ -124,3 +124,5 @@ test('answering while offline queues the answer without throwing', () => {
   assert.equal(vm.runInContext('pendingAnswer.taskId', x.context), 't2');
   assert.equal(x.sockets[0].sent.filter((m) => m.type === 'answer').length, 0);
 });
+
+test('room identity is preserved when reconnecting', () => { const s=setup(); assert.ok(s.sockets[0].url.includes('room=classroom-1')); s.sockets[0].close(); s.run(1000); assert.ok(s.sockets[1].url.includes('room=classroom-1')); });

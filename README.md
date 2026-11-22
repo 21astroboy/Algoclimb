@@ -16,7 +16,7 @@ Students answer on their phones. You lead the session, follow progress live, and
 
 </div>
 
-![Live teacher dashboard: shared progress mountain and leaderboard](docs/images/en/teacher-live.png)
+![Personal teacher workspace](docs/images/en/workspace.png)
 
 A self-hosted app for live classroom quizzes in algorithms, graph theory, combinatorics,
 or any other subject. Everyone answers the same question at the same time. Students join
@@ -28,13 +28,16 @@ an English demonstration bank; the [Russian page](README.ru.md) shows Russian ta
 
 ## What you can do
 
-- **Build a session:** filter your bank by topic, type and difficulty, or create questions in the UI.
-- **Teach at your pace:** start, pause, resume, add time, or skip a question.
-- **Use five question types:** multiple choice, graph construction, traversal, sorting and fill-in-the-blank.
-- **Follow the class:** a full-width progress map and a leaderboard of all participants,
-  with large, wrapping names, answer counts and tab-switch indicators.
-- **Review the results:** per-student answers, response times, attendance, CSV and Excel exports.
-- **Keep your own data:** SQLite history and private question banks on your server; optional Google Sheets export.
+- **Personal teacher accounts:** one-use invitations and administrator-issued recovery links; no SMTP or shared everyday password.
+- **Independent classrooms:** teachers run separate sessions concurrently in one server process.
+- **Subject library:** Algorithms, OOP, Graphs (including combinatorics), DB and NN; subjects contain question sets. No Topics filter.
+- **JSON import:** a separate bank for one session, or a permanent personal set. Shared publication requires administrator approval.
+- **Live teaching:** QR lobby, full participant names, progress lanes, pause/resume, extra time and reconnect recovery.
+- **Detailed reports:** Overview, Leaderboard, Students, Questions and Connections; compare every student's submitted answer with the saved correct answer.
+- **Attendance:** optional one-shot location check around the teacher's position, with uncertainty handling and manual confirmation. Quiz scores and presence are separate.
+- **Scoped developer keys:** read-only access to your sessions/results for 24 hours; administrator revocation and current subject permissions apply.
+
+[Account, attendance and API guide](docs/workspace.md) · [Русская инструкция](docs/workspace.ru.md)
 
 ## Quick start
 
@@ -49,8 +52,7 @@ cp .env.example .env
 ./algoclimb up
 ```
 
-Open **[localhost:3000/teacher](http://localhost:3000/teacher)** and sign in with the teacher
-key printed in the terminal. Find it again with `./algoclimb key`.
+Open **[localhost:3000/workspace](http://localhost:3000/workspace)**. Use the initial teacher key once to create the owner account, then sign in with your email login and password. Find the bootstrap key with `./algoclimb key`. Once the owner exists, legacy teacher-key access is disabled. On an already provisioned server, use the owner credentials issued by its administrator.
 
 The app works immediately with the public demo bank. To let phones join, set `PUBLIC_URL`
 in `.env` to an address reachable from those phones, then run `./algoclimb up` again.
@@ -68,23 +70,20 @@ pip install -r requirements.txt
 python -m uvicorn main:app --app-dir backend --host 0.0.0.0 --port 3000 --ws wsproto
 ```
 
-Run **one worker**: the live session is shared in that process's memory. The direct Python
+Run **one worker**: isolated live rooms are held in that process's memory. The direct Python
 command reads environment variables; it does not automatically load `.env`.
 
 ## Run a class
 
-1. Open `/teacher` and enter your private teacher key.
-2. Choose the class group and questions. Use **Practice** for a rehearsal without saving results.
-3. Students scan the QR, enter their assigned nickname, and choose an avatar.
-4. Select **Start**. Each question ends when everyone has answered or its timer expires.
-5. Pause, resume or add time as needed. The server accepts one valid submission per question;
-   answers during a pause or after the deadline are rejected. Invalid formats leave the attempt available.
-6. Review the final leaderboard and question breakdown. Students receive their own answer review.
+1. Sign in at `/workspace` (or `/teacher` after owner setup).
+2. Browse a subject and select a question set, or upload a JSON bank. Choose **one session** or **permanent personal library**.
+3. Choose a session title, group and answer feedback policy: after the session (default), immediately, or teacher only.
+4. Optionally enable attendance by location. On HTTPS, the teacher supplies a center and radius; 200 m is a starting point to test on site.
+5. Open the lobby. Students scan that room's QR, enter their assigned nickname and select an avatar. Project only the student join screen, not your private controls.
+6. Start, pause, resume, extend or skip rounds. A valid submission consumes the attempt; an invalid format does not. Recently disconnected students have a short reconnect grace period.
+7. Open **My sessions → Report**. Inspect the leaderboard, individual answers and question statistics; export CSV for everyone or only confirmed/in-zone participants.
 
-Keep `/answers` and its teacher key private. Select **Show answer** only when you intend
-to reveal the answer on the projected screen.
-
-![Teacher lobby with session builder and six demo participants](docs/images/en/teacher-lobby.png)
+Room links and reconnect secrets are separate. A room QR admits a participant but does not prove identity or physical presence.
 
 ## Question types, with examples
 
@@ -295,22 +294,15 @@ Use **one application worker**. Multiple independent replicas do not share live 
 Updating recreates the container, so deploy between classes and reload browser pages afterward.
 See the [deployment guide](docs/deployment.md) for configuration, backups and recovery.
 
-## Subjects, guest workshops and developer access
+## Access, attendance and developer API
 
-The teacher library groups sets under **Algorithms**, **OOP**, **Graphs**, **DB** and
-**NN**. DB and NN show an empty state until their questions are added. Existing
-`comb*` sets appear under Graphs, `oop*` under OOP, and the original ungrouped bank
-under Algorithms. An explicit `section` field can assign future questions.
+Use `/workspace` for invitations, API keys, personal sets and history. The owner chooses each teacher's allowed sections, reviews requests and can suspend access immediately or after current classes. Removing access preserves historical attribution and transfers personal sets to the owner.
 
-Colleagues can sign in with the teacher key and **Upload JSON for one session**.
-The app validates and previews the bank before starting. It is consumed once and
-kept separate from the permanent library. Saved results retain the session name
-and selected question metadata.
+API keys are issued under **API keys**, expire after 24 hours and use `Authorization: Bearer <key>`. Endpoints: `/api/v1/sessions`, `/api/v1/sessions/{id}`, and the `results`, `answers`, `attendance`, `events` subresources. Teachers only access owned sessions in currently permitted subjects; the owner can access historical sessions. Legacy master-key issuance at `/developers` is disabled after owner setup.
 
-Open `/developers` to exchange a teacher key for a **24-hour read-only API key**.
-Use it to read saved sessions, rankings, answers, attendance and activity events.
-The page includes a history viewer and a revocation action.
-[API reference and guest-bank workflow](docs/developer-api.md).
+Geolocation uses the browser's location permission, **HTTPS**, coordinates and reported accuracy, not IP geolocation. Ordinary VPN use need not change device GPS, but IP fallback or spoofing extensions can affect results. Imprecise/unavailable readings need manual review; attendance never blocks answering or reconnection. This is a supporting presence signal, not an anti-spoofing guarantee.
+
+See [the full guide](docs/workspace.md) for manual invitations/recovery, administrator operations, privacy and limitations. Email addresses are login names; without SMTP the app does **not** claim email verification or send password reset mail.
 
 ## Documentation
 

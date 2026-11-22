@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff==0.16.8 mypy==1.18.2
+          pip install ruff==0.16.8 mypy==1.18.2 httpx==0.28.1
 
       - name: Ruff (линтер)
         run: ruff check .
@@ -45,7 +45,7 @@ jobs:
 
       - name: Backend regression tests
         working-directory: backend
-        run: python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery test_import_bank
+        run: python -m unittest test_timers test_answers test_teacher_updates test_connection_recovery test_import_bank test_workspace
 
       - name: Isolated HTTP and WebSocket E2E
         working-directory: backend
@@ -101,6 +101,15 @@ jobs:
           trap 'kill "$demo_pid"' EXIT
           npm run test:layout
           node tools/check_workspace.cjs
+
+      - name: Personal accounts and workspace browser E2E
+        run: |
+          runtime=$(mktemp -d)
+          RUNTIME_DIR="$runtime" TEACHER_KEY=LOCAL-TEST-ONLY QR_ROTATION=0 PUBLIC_URL=http://127.0.0.1:8099 TASK_BANK_PATH=tools/fixtures/screenshot-bank.en.json python -m uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8099 --ws wsproto > /tmp/algoclimb-accounts.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for i in $(seq 1 40); do curl -fsS http://127.0.0.1:8099/healthz && break || sleep 0.5; done
+          node tools/check_accounts.cjs
 
   # ─────────────────────────────── Docker (сборка образа) ────────────────
   docker:
