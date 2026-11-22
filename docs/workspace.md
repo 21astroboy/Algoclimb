@@ -56,3 +56,5 @@ Other subresources: `answers`, `attendance`, `events`. Pagination uses `limit` a
 Back up SQLite with its backup API and copy runtime snapshots before migration; do not simply copy a live WAL database file. Build and test a candidate image using a separate runtime volume before replacing production. Use HTTPS reverse proxying with WebSocket support. Set PUBLIC_URL to the public HTTPS host. Keep a rollback image and backup: the schema additions are additive, but a rollback will not expose new account features.
 
 Validation includes backend authorization tests, real-browser invitation/session/report flows and an isolated synthetic-client reconnect benchmark. These checks do not guarantee classroom Wi-Fi, mobile OS background behavior or location accuracy; test the attendance radius on site before using it for grading.
+
+When using Docker behind a host-side proxy, set `BIND_IP=127.0.0.1` and set `FORWARDED_ALLOW_IPS` to the actual local proxy/Docker gateway IP plus `127.0.0.1`. This lets Uvicorn recognize the original HTTPS scheme and issue Secure cookies. Do not trust arbitrary forwarded headers on a publicly exposed application port.

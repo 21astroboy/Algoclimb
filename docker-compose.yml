@@ -8,6 +8,8 @@ services:
       # Публичный адрес сервера — попадёт в QR-код и ссылку для студентов.
       # Напр. PUBLIC_URL=https://algoclimb.example.ru  или  http://203.0.113.10:3000
       - PUBLIC_URL=${PUBLIC_URL:-}
+      # Trust only the local reverse proxy / Docker gateway in production.
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
       # Альтернатива: только IP/хост (если PUBLIC_URL не задан).
       - HOST_IP=${HOST_IP:-}
       # Фиксированный ключ преподавателя (иначе генерируется случайный при старте).
