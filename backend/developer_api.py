@@ -139,8 +139,8 @@ def register(app, game, teacher_key):
         if u and u["role"] != "admin":
             rows = await asyncio.to_thread(
                 db._all,
-                "SELECT s.* FROM sessions s JOIN session_owners o ON s.id=o.session_id WHERE o.owner_id=? ORDER BY s.id DESC",
-                (u["id"],),
+                "SELECT s.* FROM sessions s WHERE EXISTS (SELECT 1 FROM session_owners o WHERE o.session_id=s.id AND o.owner_id=?) OR EXISTS (SELECT 1 FROM session_readers r WHERE r.session_id=s.id AND r.email=?) ORDER BY s.id DESC",
+                (u["id"], u["email"]),
             )
             allowed = []
             for row in rows:

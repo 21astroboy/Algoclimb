@@ -417,13 +417,7 @@ def register(app, rooms, new_room, teacher_key):
         u = ac.current(request)
 
         def read():
-            if u["role"] == "admin":
-                rows = db.history_sessions(200)
-            else:
-                rows = db._all(
-                    "SELECT s.* FROM sessions s JOIN session_owners o ON o.session_id=s.id WHERE o.owner_id=? ORDER BY s.id DESC LIMIT 200",
-                    (u["id"],),
-                )
+            rows = ac.visible_sessions(u)
             items = []
             for row in rows:
                 try:
@@ -544,6 +538,44 @@ def register(app, rooms, new_room, teacher_key):
                 "SELECT id,name,owner_id,expires_at,revoked FROM developer_keys ORDER BY created_at DESC LIMIT 100"
             ),
         }
+
+    @app.post("/api/workspace/admin/sessions/{sid}/access")
+    async def share_session(sid: int, request: Request):
+        u = ac.current(request, True)
+        body = await read_json(request)
+        address = email(body)
+        if not db.history_session(sid):
+            raise HTTPException(404, "Session not found.")
+        if body.get("action") == "revoke":
+            db._exec("DELETE FROM session_readers WHERE session_id=? AND email=?", (sid, address))
+        else:
+            permitted = allowed_sections(body)
+            if not permitted:
+                raise HTTPException(400, "Specify the report's subject sections.")
+            meta = db.get_session_metadata(sid) or {}
+            required = meta.get("sections", [])
+            if required and not set(required).issubset(permitted):
+                raise HTTPException(400, "The session contains additional subject sections.")
+            targets = db._all(
+                "SELECT sections FROM users WHERE email=? AND active=1 UNION ALL SELECT sections FROM account_tokens WHERE email=? AND kind='invite' AND used=0 AND expires>?",
+                (address, address, int(time.time())),
+            )
+            if not targets or not any(
+                set(permitted).issubset(json.loads(t["sections"])) for t in targets
+            ):
+                raise HTTPException(
+                    400, "Invite the teacher with the required subject access first."
+                )
+            db._exec(
+                "INSERT INTO session_readers VALUES(?,?,?,?) ON CONFLICT(session_id,email) DO UPDATE SET sections=excluded.sections,granted_by=excluded.granted_by",
+                (sid, address, json.dumps(permitted), u["id"]),
+            )
+        ac.audit(
+            u["id"],
+            "session_read_access_" + ("revoked" if body.get("action") == "revoke" else "granted"),
+            f"{sid}:{address}",
+        )
+        return {"ok": True}
 
     @app.post("/api/workspace/admin/invite")
     async def invite(request: Request):

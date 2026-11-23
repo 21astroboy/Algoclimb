@@ -35,6 +35,11 @@ def init():
         CREATE TABLE IF NOT EXISTS session_owners (
           session_id INTEGER PRIMARY KEY, owner_id TEXT NOT NULL, room TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS session_readers (
+          session_id INTEGER NOT NULL, email TEXT NOT NULL, sections TEXT NOT NULL,
+          granted_by TEXT NOT NULL, PRIMARY KEY(session_id,email)
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_readers_email ON session_readers(email,session_id);
         CREATE TABLE IF NOT EXISTS teacher_sets (
           id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, section TEXT NOT NULL,
           title TEXT NOT NULL, tasks TEXT NOT NULL, visibility TEXT NOT NULL DEFAULT 'personal'
@@ -133,12 +138,28 @@ def sections(u):
     return list(catalog.SECTIONS) if u["role"] == "admin" else u["sections"]
 
 
+def visible_sessions(u, limit=200, offset=0):
+    if u["role"] == "admin":
+        return db.history_sessions(limit, offset)
+    return db._all(
+        "SELECT s.* FROM sessions s WHERE EXISTS (SELECT 1 FROM session_owners o WHERE o.session_id=s.id AND o.owner_id=?) OR EXISTS (SELECT 1 FROM session_readers r WHERE r.session_id=s.id AND r.email=?) ORDER BY s.id DESC LIMIT ? OFFSET ?",
+        (u["id"], u["email"], limit, offset),
+    )
+
+
 def own_session(u, sid):
-    rows = db._all("SELECT owner_id FROM session_owners WHERE session_id=?", (sid,))
-    if u["role"] != "admin" and (not rows or rows[0]["owner_id"] != u["id"]):
+    owners = db._all("SELECT owner_id FROM session_owners WHERE session_id=?", (sid,))
+    grants = db._all(
+        "SELECT sections FROM session_readers WHERE session_id=? AND email=?", (sid, u["email"])
+    )
+    owned = bool(owners and owners[0]["owner_id"] == u["id"])
+    if u["role"] != "admin" and not owned and not grants:
         raise HTTPException(404, "Session not found.")
     meta = db.get_session_metadata(sid) or {}
-    if u["role"] != "admin" and not set(meta.get("sections", [])).issubset(sections(u)):
+    required = meta.get("sections", [])
+    if grants and not required:
+        required = json.loads(grants[0]["sections"])
+    if u["role"] != "admin" and not set(required).issubset(sections(u)):
         raise HTTPException(403, "Subject access has been revoked.")
 
 

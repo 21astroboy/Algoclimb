@@ -42,7 +42,7 @@ Browser geolocation requires HTTPS (localhost is a development exception). A nor
 
 ## Read-only developer access
 
-Create a named key under API keys. Copy it once, keep it server-side and send `Authorization: Bearer <key>`. It expires after exactly 24 hours and can be revoked earlier. Authentication is checked against the current owner account, session ownership and subject permissions on each request. A teacher cannot access another teacher's report by guessing a session ID.
+Create a named key under API keys. Copy it once, keep it server-side and send `Authorization: Bearer <key>`. It expires after exactly 24 hours and can be revoked earlier. Authentication is checked against the current owner account, session ownership and subject permissions on each request. A teacher cannot access another teacher's report by guessing a session ID. The owner may explicitly grant read-only access to selected reports with **Share report**; grants also work for pending invitations and never transfer room controls. Current subject permissions still apply.
 
 ```sh
 curl -H "Authorization: Bearer $ALGOCLIMB_API_KEY" https://your-host/api/v1/sessions

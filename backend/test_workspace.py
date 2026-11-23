@@ -91,6 +91,58 @@ class WorkspaceTests(unittest.TestCase):
         finally:
             db._exec("UPDATE users SET email=? WHERE id=?", (self.uid + "@example.org", self.uid))
 
+    def test_read_only_report_grant_can_precede_invitation_activation(self):
+        address = secrets.token_hex(8) + "@example.org"
+        token = self.client.post(
+            "/api/workspace/admin/invite", json={"email": address, "sections": ["oop"]}
+        ).json()["token"]
+        sid = db.create_session(1, {"title": "Shared OOP", "sections": ["oop"], "questions": []})
+        self.addCleanup(db._exec, "DELETE FROM sessions WHERE id=?", (sid,))
+        self.addCleanup(db._exec, "DELETE FROM session_readers WHERE session_id=?", (sid,))
+        granted = self.client.post(
+            f"/api/workspace/admin/sessions/{sid}/access",
+            json={"email": address, "sections": ["oop"]},
+        )
+        self.assertEqual(granted.status_code, 200, granted.text)
+        c = TestClient(main.app)
+        self.addCleanup(c.close)
+        activated = c.post(
+            "/api/workspace/activate",
+            json={"token": token, "name": "Reader", "subject": "OOP", "password": self.password},
+        )
+        self.assertEqual(activated.status_code, 200)
+        uid = activated.json()["id"]
+        self.teachers.append(uid)
+        self.assertEqual(c.get(f"/api/workspace/sessions/{sid}").status_code, 200)
+        self.assertIn(sid, [r["id"] for r in c.get("/api/workspace/sessions").json()])
+        other, _, _ = self.teacher(["oop"])
+        self.assertEqual(other.get(f"/api/workspace/sessions/{sid}").status_code, 404)
+        self.assertEqual(
+            c.post(
+                f"/api/workspace/admin/sessions/{sid}/access",
+                json={"email": address, "sections": ["oop"]},
+            ).status_code,
+            403,
+        )
+        key = c.post("/api/workspace/keys", json={"name": "Shared report"}).json()["token"]
+        headers = {"Authorization": "Bearer " + key}
+        self.assertEqual(c.get(f"/api/v1/sessions/{sid}", headers=headers).status_code, 200)
+        self.assertIn(
+            sid, [r["id"] for r in c.get("/api/v1/sessions", headers=headers).json()["items"]]
+        )
+        self.client.post(
+            "/api/workspace/admin/users/" + uid, json={"sections": []}
+        ).raise_for_status()
+        self.assertEqual(c.get(f"/api/workspace/sessions/{sid}").status_code, 403)
+        self.client.post(
+            "/api/workspace/admin/users/" + uid, json={"sections": ["oop"]}
+        ).raise_for_status()
+        self.client.post(
+            f"/api/workspace/admin/sessions/{sid}/access",
+            json={"email": address, "action": "revoke"},
+        ).raise_for_status()
+        self.assertEqual(c.get(f"/api/workspace/sessions/{sid}").status_code, 404)
+
     def test_invitation_one_use_and_teacher_cannot_invite(self):
         c, _, token = self.teacher()
         self.assertEqual(

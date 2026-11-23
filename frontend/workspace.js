@@ -683,7 +683,8 @@ function analyticsView() {
     heading(
       report.session.title || 'Session #' + report.session.id,
       `${report.session.date} · ${report.questions.length || report.session.question_count || 0} questions · ${reportStudents().length} participants`,
-      button('Export CSV', exportReport)
+      button('Export CSV', exportReport) +
+        (me.role === 'admin' ? button('Share report', shareReport) : '')
     ) +
     tabs(
       [
@@ -871,6 +872,33 @@ function reportConnections() {
       ])
     )
   )}</div>`;
+}
+function shareReport() {
+  modal(
+    'Read-only report access',
+    `${input('shareEmail', 'Teacher email')}<label>Subject sections in this report</label>${sectionChecks(report.session.sections || [])}<p>For a legacy report, select the sections after checking its question sets. The teacher must already have subject access, or an unused invitation. Session ownership and room controls stay unchanged.</p>${formError()}${button(
+      'Grant view access',
+      () =>
+        formTask(async () => {
+          await api('/admin/sessions/' + report.session.id + '/access', {
+            email: $('shareEmail').value,
+            sections: readSections(),
+          });
+          closeModal();
+          toast('Read-only report access granted.');
+        }),
+      true
+    )}${button('Revoke view access', () =>
+      formTask(async () => {
+        await api('/admin/sessions/' + report.session.id + '/access', {
+          email: $('shareEmail').value,
+          action: 'revoke',
+        });
+        closeModal();
+        toast('Report access revoked.');
+      })
+    )}`
+  );
 }
 function exportReport() {
   const checks = new Map(report.checks.map((x) => [x.nick, x.status]));
