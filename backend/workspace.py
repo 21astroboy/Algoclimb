@@ -329,7 +329,7 @@ def register(app, rooms, new_room, teacher_key):
                 "owner_id": g.owner_id,
             }
             for k, g in rooms.items()
-            if g.owner_id == u["id"] or u["role"] == "admin"
+            if k and (g.owner_id == u["id"] or u["role"] == "admin")
         ]
 
     @app.post("/api/workspace/rooms")

@@ -274,6 +274,20 @@ class WorkspaceTests(unittest.TestCase):
             401,
         )
 
+    def test_legacy_room_is_hidden_and_prepared_room_can_close(self):
+        listed = self.client.get("/api/workspace/rooms").json()
+        self.assertNotIn("", [room["id"] for room in listed])
+        c, _u, _ = self.teacher()
+        rid = c.post("/api/workspace/rooms", json={}).json()["id"]
+        self.assertIn(rid, [r["id"] for r in c.get("/api/workspace/rooms").json()])
+        g = main.rooms[rid]
+        g.save_snapshot()
+        self.assertTrue(g.snapshot_file.exists())
+        self.assertEqual(c.post(f"/api/workspace/rooms/{rid}/close", json={}).status_code, 200)
+        self.assertNotIn(rid, main.rooms)
+        self.assertFalse(g.snapshot_file.exists())
+        self.assertNotIn(rid, [r["id"] for r in c.get("/api/workspace/rooms").json()])
+
     def test_session_time_limits_are_validated_and_isolated(self):
         c, _u, _ = self.teacher()
         rid = c.post("/api/workspace/rooms", json={}).json()["id"]
