@@ -14,7 +14,7 @@
         <strong>Contact / Связаться</strong>
         <a href="mailto:leyurus21@gmail.com">leyurus21@gmail.com</a>
         <a href="mailto:konshin.kp@misis.ru">konshin.kp@misis.ru</a>
-        <a href="https://t.me/twentyoneastro" target="_blank" rel="noopener noreferrer">Telegram · @twentyoneastro</a>
+        <a href="https://t.me/twentyoneastroboy" target="_blank" rel="noopener noreferrer">Telegram · @twentyoneastroboy</a>
       </div>
     </div>`;
   const style = document.createElement('style');
