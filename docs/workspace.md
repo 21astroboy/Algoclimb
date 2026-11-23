@@ -32,6 +32,12 @@ The teacher workspace has Overview, Question library, My sessions, Analytics, AP
 
 Reports have real navigation: Overview, Leaderboard, Students, Questions and Connections. A student's page compares their answer with the correct answer for every recorded question. A question page lists all participants' answers. Connection events identify reconnects/disconnects, not their root cause. New sessions save detailed text, timing and points; old sessions cannot reconstruct answers or question versions that were never saved. Legacy sessions remain visible to the owner.
 
+### Classroom climb display
+
+The Class climb board combines a mountain route with a readable ranked list. Correct answers determine checkpoint progress; points remain a separate ranking value. Students at the same checkpoint share a numbered marker rather than overlapping name labels. Click a marker to filter that group, search by full name, focus a student, show the top ten, or switch to the leaderboard alone. Large view expands the board; Escape exits it. Search focus and scroll position are retained during live updates. Longer sessions group nearby checkpoints to keep the map readable.
+
+![Class climb with 120 synthetic participants](images/en/workspace-climb.png)
+
 ## Optional attendance by location
 
 Enable attendance while preparing the room, request the teacher's position and choose a 50–5000 m radius. Start with a site-tested radius, for example 200 m. A center whose reported uncertainty exceeds that radius is rejected; retry with a better reading. No maps, paid geocoding service or continuous tracking are used.

@@ -509,29 +509,336 @@ label {
   padding: 8px 24px;
   font-size: 13px;
 }
-.mountain-live {
-  height: 430px;
-  overflow: auto;
-  border: 1px solid #dae3ee;
-  background: linear-gradient(150deg, #edf4fc, #f8fbff);
-}
-.lane {
-  height: 42px;
-  border-bottom: 1px solid #e1e8f0;
-  position: relative;
-  min-width: 650px;
-}
-.climber {
-  position: absolute;
-  background: #ffdc68;
-  border-radius: 8px;
-  padding: 7px 12px;
-  font-size: 12px;
-  white-space: nowrap;
-  max-width: 300px;
+.competition-board {
+  padding: 24px;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
+.board-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.board-heading h2 {
+  font-size: 28px;
+  letter-spacing: -0.6px;
+  margin: 6px 0;
+}
+.board-heading p {
+  margin: 0;
+  font-size: 14px;
+}
+.board-eyebrow {
+  color: #6a8095;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+}
+.board-spotlight {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  border: 1px solid #ecda9c;
+  border-radius: 12px;
+  background: #fff9e7;
+}
+.board-rank {
+  min-width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #ffd343;
+  font-size: 21px;
+  font-weight: 800;
+}
+.board-spotlight-name {
+  min-width: 0;
+  flex: 1;
+}
+.board-spotlight-name small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.board-spotlight-name strong {
+  display: block;
+  font-size: 21px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.board-spotlight-stat {
+  min-width: 86px;
+}
+.board-spotlight-stat strong {
+  font-size: 25px;
+  display: block;
+}
+.board-spotlight-stat strong span {
+  font-size: 16px;
+  color: #738598;
+}
+.board-spotlight-stat small {
+  font-size: 11px;
+}
+.climb-scene-scroll {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid #dbe6ed;
+}
+.climb-scene {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+  max-height: 370px;
+  font-family: inherit;
+}
+.climb-tick {
+  fill: #536b7d;
+  font-size: 12px;
+  font-weight: 600;
+}
+.climb-marker {
+  cursor: pointer;
+  outline: none;
+}
+.climb-marker > circle:not(.climb-halo) {
+  fill: #203b52;
+  stroke: #fff;
+  stroke-width: 3;
+}
+.climb-marker text {
+  fill: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.climb-marker .climb-halo {
+  fill: #f7d05b;
+  opacity: 0.6;
+}
+.climb-marker.selected > circle:not(.climb-halo),
+.climb-marker:hover > circle:not(.climb-halo),
+.climb-marker:focus > circle:not(.climb-halo) {
+  fill: #bc8610;
+  stroke: #172a3b;
+}
+.board-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b8091;
+  margin: 12px 0 22px;
+}
+.board-legend i {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #203b52;
+  margin-right: 5px;
+}
+.board-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.board-toolbar input {
+  flex: 1;
+  min-width: 200px;
+}
+.board-toolbar button {
+  padding: 10px 14px;
+}
+.climb-leaderboard {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid #dce4ed;
+  border-radius: 12px;
+}
+.climb-table-head,
+.climb-student-row {
+  display: grid;
+  grid-template-columns: 54px minmax(190px, 1.3fr) minmax(230px, 1.6fr) 90px;
+  gap: 18px;
+  align-items: center;
+  min-width: 720px;
+  padding: 14px 18px;
+}
+.climb-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f7fa;
+  color: #6e8194;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #dde5ed;
+}
+.climb-student-row {
+  min-height: 78px;
+  border-bottom: 1px solid #e9eef3;
+}
+.climb-student-row:last-child {
+  border-bottom: 0;
+}
+.climb-student-row.is-focused {
+  background: #fffbed;
+}
+.climb-rank {
+  font-size: 18px;
+  font-weight: 800;
+  color: #5f738a;
+}
+.climb-rank.podium {
+  color: #926e09;
+}
+.climb-student-name {
+  border: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+  min-width: 0;
+  border-radius: 0;
+}
+.climb-student-name strong {
+  display: block;
+  font-size: 17px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.climb-student-name small {
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+  font-weight: 400;
+}
+.climb-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.climb-track {
+  position: relative;
+  height: 10px;
+  border-radius: 12px;
+  background: #e7edf2;
+  flex: 1;
+  margin: 0 7px;
+}
+.climb-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f4cf4e, #d4a519);
+}
+.climb-track i {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  background: #243f54;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px #1c344348;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.climb-progress-label {
+  white-space: nowrap;
+  font-size: 15px;
+  color: #607589;
+}
+.climb-progress-label b {
+  font-size: 19px;
+  color: #20384c;
+}
+.climb-progress-label small {
+  display: block;
+  font-size: 10px;
+}
+.climb-score {
+  font-size: 20px;
+  text-align: right;
+}
+.climb-score small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+.competition-expanded {
+  overflow: hidden;
+}
+.board-expanded {
+  position: fixed;
+  inset: 14px;
+  z-index: 30;
+  overflow: auto;
+  background: #fff;
+  box-shadow: 0 0 0 30px #17293de6;
+}
+.board-expanded .climb-scene {
+  max-height: 410px;
+}
+.board-expanded .climb-leaderboard {
+  max-height: none;
+  overflow: visible;
+}
+.board-expanded .climb-student-name strong {
+  font-size: 21px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .climb-track > span,
+  .climb-track i {
+    transition:
+      width 0.3s ease,
+      left 0.3s ease;
+  }
+}
+@media (max-width: 1000px) {
+  .board-heading {
+    flex-wrap: wrap;
+  }
+  .board-spotlight {
+    flex-wrap: wrap;
+  }
+  .board-spotlight-name {
+    flex-basis: 50%;
+  }
+  .competition-board {
+    padding: 18px;
+  }
+}
+@media (max-width: 700px) {
+  .board-heading h2 {
+    font-size: 24px;
+  }
+  .board-spotlight-name strong {
+    font-size: 18px;
+  }
+  .board-spotlight-stat strong {
+    font-size: 21px;
+  }
+  .board-expanded {
+    inset: 7px;
+  }
+  .climb-scene {
+    min-width: 760px;
+  }
+}
+
 .main {
   max-width: 1600px;
 }

@@ -170,8 +170,29 @@ function editAccount() {
 }
 function render() {
   if (!me) return;
+  const scrolls = new Map(
+    [...document.querySelectorAll('[data-preserve-scroll]')].map((el) => [
+      el.dataset.preserveScroll,
+      { top: el.scrollTop, left: el.scrollLeft },
+    ])
+  );
+  const searchFocused = document.activeElement?.id === 'boardSearch';
+  const searchPosition = searchFocused ? document.activeElement.selectionStart : null;
+  document.body.classList.toggle('competition-expanded', boardExpanded && page === 'lobby');
   $('app').innerHTML =
     `<div class="shell">${nav()}<main class="main">${({ home: homeView, library: libraryView, sessions: sessionsView, lobby: lobbyView, analytics: analyticsView, keys: keysView, requests: requestsView, admin: adminView }[page] || homeView)()}</main></div>`;
+  for (const el of document.querySelectorAll('[data-preserve-scroll]')) {
+    const saved = scrolls.get(el.dataset.preserveScroll);
+    if (saved) {
+      el.scrollTop = saved.top;
+      el.scrollLeft = saved.left;
+    }
+  }
+  if (searchFocused && $('boardSearch')) {
+    const input = $('boardSearch');
+    input.focus({ preventScroll: true });
+    if (searchPosition !== null) input.setSelectionRange(searchPosition, searchPosition);
+  }
   pruneActions();
 }
 async function navigate(p) {
@@ -483,6 +504,13 @@ async function upload() {
   );
 }
 async function openRoom(id) {
+  if (room !== id) {
+    boardQuery = '';
+    boardCheckpoint = null;
+    boardTopOnly = false;
+    boardFocus = null;
+    boardExpanded = false;
+  }
   room = id;
   state = null;
   pendingImport = null;
@@ -529,6 +557,147 @@ function send(command) {
     throw new Error('Reconnecting. Wait for the connection to restore.');
   socket.send(JSON.stringify(command));
 }
+let boardQuery = '',
+  boardCheckpoint = null,
+  boardTopOnly = false,
+  boardExpanded = false,
+  boardFocus = null,
+  boardMode = 'mountain';
+function boardAction(fn) {
+  return registerAction(fn);
+}
+function boardProgress(s, total) {
+  return Math.max(0, Math.min(total, Number(s.correct) || 0));
+}
+function boardPoint(progress) {
+  return {
+    x: 64 + progress * 860,
+    y: 312 - progress * 248 + 18 * Math.sin(progress * Math.PI * 2),
+  };
+}
+function competitionBoard() {
+  const all = state.leaderboard || [],
+    total = Math.max(1, Number(state.roundTotal) || Number(state.session.total) || 1);
+  const bucketWidth = Math.max(1, Math.ceil(total / 30));
+  const checkpointFor = (s) => Math.floor(boardProgress(s, total) / bucketWidth) * bucketWidth;
+  const checkpointLabel = (step) =>
+    bucketWidth === 1 ? String(step) : `${step}–${Math.min(total, step + bucketWidth - 1)}`;
+  const filtered = all.filter(
+    (s) =>
+      (!boardTopOnly || s.rank <= 10) &&
+      (boardCheckpoint === null || checkpointFor(s) === boardCheckpoint) &&
+      String(s.nick).toLocaleLowerCase().includes(boardQuery.toLocaleLowerCase())
+  );
+  const focused = all.find((s) => s.nick === boardFocus) || all[0];
+  const groups = new Map();
+  for (const s of all) {
+    const step = checkpointFor(s);
+    if (!groups.has(step)) groups.set(step, []);
+    groups.get(step).push(s);
+  }
+  const route = Array.from({ length: 101 }, (_, i) => {
+    const p = boardPoint(i / 100);
+    return `${p.x},${p.y}`;
+  }).join(' ');
+  const spacing = Math.max(1, Math.ceil(total / 10));
+  const markers = [...groups]
+    .map(([step, people]) => {
+      const p = boardPoint((step + Math.min(total, step + bucketWidth - 1)) / 2 / total),
+        selected = step === boardCheckpoint,
+        active = focused && people.some((s) => s.nick === focused.nick);
+      return `<g class="climb-marker ${selected ? 'selected' : ''} ${active ? 'focused' : ''}" role="button" tabindex="0" data-action="${boardAction(
+        () => {
+          boardCheckpoint = boardCheckpoint === step ? null : step;
+          render();
+        }
+      )}" data-checkpoint="${step}" aria-label="${checkpointLabel(step)} correct answers: ${people.length} participants. Filter leaderboard"><title>${checkpointLabel(step)}/${total} correct · ${people.length} participants</title>${active ? `<circle cx="${p.x}" cy="${p.y}" r="23" class="climb-halo"/>` : ''}<circle cx="${p.x}" cy="${p.y}" r="16"/><text x="${p.x}" y="${p.y + 5}" text-anchor="middle">${people.length}</text></g>`;
+    })
+    .join('');
+  const ticks = Array.from({ length: total + 1 }, (_, step) => {
+    if (step % spacing !== 0 && step !== total) return '';
+    const p = boardPoint(step / total);
+    return `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#849caf"/><text class="climb-tick" x="${p.x}" y="${p.y + 42}" text-anchor="middle">${step === total ? 'Finish · ' + total : step === 0 ? 'Start · 0' : step}</text>`;
+  }).join('');
+  return `<section class="card competition-board ${boardExpanded ? 'board-expanded' : ''}" aria-label="Class climb"><header class="board-heading"><div><span class="board-eyebrow">${state.session.status === 'finished' ? 'FINAL RESULTS' : state.paused ? 'PAUSED CLASSROOM' : 'LIVE CLASSROOM'} · ${all.length} ${all.length === 1 ? 'CLIMBER' : 'CLIMBERS'}</span><h2>Class climb</h2><p>Correct answers move you toward the summit. ${all.length ? `${Math.max(...all.map((s) => boardProgress(s, total)))}/${total} is the furthest checkpoint.` : 'Waiting for the first participant.'}</p></div><div class="row">${button(
+    boardMode === 'mountain' ? 'Leaderboard only' : 'Show mountain',
+    () => {
+      boardMode = boardMode === 'mountain' ? 'leaderboard' : 'mountain';
+      render();
+    }
+  )}${button(
+    boardExpanded ? 'Exit large view' : 'Large view',
+    () => {
+      boardExpanded = !boardExpanded;
+      render();
+    },
+    true
+  )}</div></header>${focused ? `<div class="board-spotlight"><span class="board-rank">#${focused.rank}</span><div class="board-spotlight-name"><small>${boardFocus ? 'SELECTED CLIMBER' : 'LEADING THE CLIMB'}</small><strong>${esc(focused.nick)}</strong></div><div class="board-spotlight-stat"><strong>${boardProgress(focused, total)}<span> / ${total}</span></strong><small>correct answers</small></div><div class="board-spotlight-stat"><strong>${Number(focused.score) || 0}</strong><small>points</small></div>${badge(focused.connected ? 'connected' : 'offline')}</div>` : ''}${boardMode === 'mountain' ? `<div class="climb-scene-scroll" data-preserve-scroll="climb-scene"><svg class="climb-scene" viewBox="0 0 1000 400" role="group" aria-label="Mountain from zero to ${total} correct answers. Numbered circles show participant counts at each checkpoint."><defs><linearGradient id="climb-sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#edf6fb"/><stop offset="1" stop-color="#f9fbfc"/></linearGradient><linearGradient id="climb-rock" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#bad1df"/><stop offset="1" stop-color="#e4eef2"/></linearGradient></defs><rect width="1000" height="400" rx="16" fill="url(#climb-sky)"/><circle cx="100" cy="64" r="27" fill="#ffe6a2"/><path d="M0 260 150 130 280 260 465 105 650 280 840 145 1000 280V400H0Z" fill="#e5eef3"/><path d="M0 370 240 265 420 290 620 150 744 191 919 52 1000 174V400H0Z" fill="url(#climb-rock)"/><path d="m859 100 60-48 49 74-39-16-20 9-17-24Z" fill="#fff"/><path d="M919 52V12m0 0 38 10-38 10" fill="#edbd27" stroke="#394e67" stroke-width="3" stroke-linejoin="round"/><polyline points="${route}" fill="none" stroke="#a6bac7" stroke-width="15" stroke-linecap="round" opacity=".35"/><polyline points="${route}" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/><polyline points="${route}" fill="none" stroke="#d3a521" stroke-width="3" stroke-dasharray="5 7"/>${ticks}${markers}<text x="970" y="382" text-anchor="end" class="climb-tick">${total} questions · climb at your own pace</text></svg></div><div class="board-legend"><span><i></i> Circle number = students at this checkpoint</span><span>Click a circle to inspect that group</span></div>` : ''}<div class="board-toolbar"><input id="boardSearch" type="search" aria-label="Find a climber" placeholder="Find a student by full name…" value="${esc(boardQuery)}">${button(
+    boardTopOnly ? 'Show everyone' : 'Top 10',
+    () => {
+      boardTopOnly = !boardTopOnly;
+      render();
+    },
+    boardTopOnly
+  )}${
+    boardCheckpoint !== null
+      ? button(
+          `${checkpointLabel(boardCheckpoint)}/${total} correct · clear filter`,
+          () => {
+            boardCheckpoint = null;
+            render();
+          },
+          true
+        )
+      : ''
+  }${
+    boardQuery
+      ? button('Clear search', () => {
+          boardQuery = '';
+          render();
+        })
+      : ''
+  }<span class="muted">${filtered.length} of ${all.length}</span></div><div class="climb-leaderboard" data-preserve-scroll="climb-ranking"><div class="climb-table-head"><span>Rank</span><span>Student</span><span>Ascent · correct answers</span><span>Points</span></div>${
+    filtered
+      .map((s) => {
+        const progress = boardProgress(s, total),
+          chosen = focused?.nick === s.nick;
+        return `<div class="climb-student-row ${chosen ? 'is-focused' : ''}" data-climber-name="${esc(s.nick)}"><span class="climb-rank ${s.rank <= 3 ? 'podium' : ''}">${s.rank}</span><button class="climb-student-name" data-action="${boardAction(
+          () => {
+            boardFocus = s.nick;
+            render();
+          }
+        )}" title="Focus ${esc(s.nick)}"><strong>${esc(s.nick)}</strong><small>${s.connected ? 'Connected' : 'Offline · progress saved'}${s.answeredThisRound ? ' · Answer submitted' : ''}</small></button><div class="climb-progress"><div class="climb-track"><span style="width:${(progress / total) * 100}%"></span><i style="left:${(progress / total) * 100}%" aria-hidden="true"></i></div><span class="climb-progress-label"><b>${progress}</b> / ${total} <small>correct</small></span></div><strong class="climb-score">${Number(s.score) || 0}<small>points</small></strong></div>`;
+      })
+      .join('') || '<div class="empty">No climbers match these filters.</div>'
+  }</div></section>`;
+}
+document.addEventListener('input', (event) => {
+  if (event.target.id !== 'boardSearch') return;
+  const at = event.target.selectionStart;
+  boardQuery = event.target.value;
+  render();
+  const input = $('boardSearch');
+  if (input) {
+    input.focus({ preventScroll: true });
+    if (at !== null) input.setSelectionRange(at, at);
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && boardExpanded) {
+    boardExpanded = false;
+    render();
+  }
+  if (
+    (event.key === 'Enter' || event.key === ' ') &&
+    event.target.matches('g.climb-marker[data-action]')
+  ) {
+    event.preventDefault();
+    Promise.resolve()
+      .then(() => events.get(Number(event.target.dataset.action))?.())
+      .catch(fail);
+  }
+});
+
 function lobbyView() {
   if (!state) return heading('Opening session…', 'Connecting to your classroom.');
   const running = state.session.status === 'running',
@@ -560,7 +729,7 @@ function lobbyView() {
             : button('Open saved report', async () => {
                 await navigate('sessions');
               })
-        }<b>Question ${state.round + 1} / ${state.roundTotal} · ${state.answeredCount} answered</b></div><div class="space"></div><div class="card"><h2>Competition map</h2><div class="mountain-live">${state.leaderboard.map((s) => `<div class="lane"><span class="climber" style="left:${Math.min(67, (s.correct / Math.max(1, state.roundTotal)) * 67)}%" title="${esc(s.nick)}">${s.rank}. ${esc(s.nick)} · ${s.correct}/${state.roundTotal} · ${s.score} pts</span></div>`).join('')}</div></div><div class="space"></div>`
+        }<b>Question ${state.round + 1} / ${state.roundTotal} · ${state.answeredCount} answered</b></div><div class="space"></div>${competitionBoard()}<div class="space"></div>`
       : '') +
     `<div class="two"><div class="card"><h2>Participants · ${state.roster.length}</h2><p>${state.roster.filter((x) => x.connected).length} connected · ${state.roster.filter((x) => !x.connected).length} offline. Rejoining preserves answers.</p><div class="roster">${state.roster.map((s) => `<div class="roster-item"><b>${esc(s.nick)}</b><br>${badge(s.connected ? 'connected' : 'offline')}<br>${badge(checks.get(s.nick)?.status)}<div class="space"></div>${button('Confirm presence', () => markAttendance(s.nick, 'confirmed'))}${button('Not present', () => markAttendance(s.nick, 'rejected'))}</div>`).join('')}</div></div><aside class="stack"><div class="card empty"><h2>Student access</h2><div class="qr">${state.qrSvg || ''}</div><p><a href="${esc(state.joinUrl)}" target="_blank" rel="noopener">${esc(state.joinUrl)}</a></p>${button(
       'Copy join link',
