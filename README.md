@@ -37,7 +37,7 @@ an English demonstration bank; the [Russian page](README.ru.md) shows Russian ta
 - **Attendance:** optional one-shot location check around the teacher's position, with uncertainty handling and manual confirmation. Quiz scores and presence are separate.
 - **Scoped developer keys:** read-only access to your sessions/results for 24 hours; administrator revocation and current subject permissions apply.
 
-[Account, attendance and API guide](docs/workspace.md) · [Русская инструкция](docs/workspace.ru.md)
+[Teacher workspace: step-by-step guide](docs/teacher-guide.md) · [Русский](docs/teacher-guide.ru.md) · [Accounts and API](docs/workspace.md)
 
 ## Quick start
 
@@ -74,6 +74,8 @@ Run **one worker**: isolated live rooms are held in that process's memory. The d
 command reads environment variables; it does not automatically load `.env`.
 
 ## Run a class
+
+[Read the teacher walkthrough](docs/teacher-guide.md) for question selection, lobby, climb board, attendance and reports.
 
 1. Sign in at `/workspace` (or `/teacher` after owner setup).
 2. Browse a subject and select a question set, or upload a JSON bank. Choose **one session** or **permanent personal library**.
@@ -308,6 +310,8 @@ See [the full guide](docs/workspace.md) for manual invitations/recovery, adminis
 
 | Guide | What it covers |
 | --- | --- |
+| [Teacher workspace](docs/teacher-guide.md) · [Русский](docs/teacher-guide.ru.md) | First class, JSON, controls, climb board, attendance, reports and common questions |
+| [Accounts and API](docs/workspace.md) · [Русский](docs/workspace.ru.md) | Invitations, permissions, shared reports and technical limits |
 | [Question banks](docs/task-bank.md) · [Русский](docs/task-bank.ru.md) | All five types, JSON examples, graph checks, formulas and explanations |
 | [Deployment](docs/deployment.md) | VPS setup, HTTPS, configuration, updates, backup and recovery |
 | [Development](docs/development.md) | Architecture, checks, isolated E2E tests and screenshot capture |

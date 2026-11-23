@@ -2,6 +2,8 @@
 
 [Русский](workspace.ru.md) · [README](../README.md)
 
+For everyday teaching, start with the [step-by-step teacher guide](teacher-guide.md). This page covers permissions, API access and operations.
+
 ## Accounts without SMTP
 
 1. The owner creates an invitation under **Administration → Invite teacher**, assigns subjects and sends the link privately through an existing communication channel.
