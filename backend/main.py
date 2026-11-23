@@ -230,6 +230,10 @@ class Game:
         self.custom_specs = []
         self.load_custom_tasks()
 
+    def time_limit_for(self, task):
+        seconds = self.session.get("timeLimits", {}).get(task["type"]) if task else None
+        return seconds * 1000 if seconds is not None else time_limit_for(task)
+
     @property
     def snapshot_file(self):
         return self._snapshot_file if self.room_id else SNAPSHOT_FILE
@@ -661,7 +665,7 @@ class Game:
             "deadline": self.round_deadline
             if (running and not self.intermission and not self.paused)
             else 0,
-            "limit": time_limit_for(task) if task else 0,
+            "limit": self.time_limit_for(task) if task else 0,
             "serverTime": int(time.time() * 1000),
             "answeredCount": len(self.round_answered),
             "activeCount": len(self.connected_nicks()),
@@ -722,7 +726,7 @@ class Game:
                 "task": pub,
                 "deadline": self.round_deadline,
                 "serverTime": int(time.time() * 1000),
-                "limit": time_limit_for(task),
+                "limit": self.time_limit_for(task),
             },
         )
         a = s["answers"].get(self.round)
@@ -780,7 +784,7 @@ class Game:
         self.round_perm = (
             shuffle(list(range(len(task["options"])))) if task["type"] == "choice" else None
         )
-        self.round_deadline = int(time.time() * 1000) + time_limit_for(task)
+        self.round_deadline = int(time.time() * 1000) + self.time_limit_for(task)
         self.paused = False
         self.pause_remain = 0
         await asyncio.gather(
@@ -792,7 +796,7 @@ class Game:
         )
         if self._timer:
             self._timer.cancel()
-        self._schedule("_timer", time_limit_for(task) + 400, lambda: self.end_round("timeout"))
+        self._schedule("_timer", self.time_limit_for(task) + 400, lambda: self.end_round("timeout"))
         await self.broadcast_teacher()
 
     async def end_round(self, reason):
@@ -920,7 +924,7 @@ class Game:
                 "type": "resumed",
                 "deadline": self.round_deadline,
                 "serverTime": int(time.time() * 1000),
-                "limit": time_limit_for(self.order[self.round]),
+                "limit": self.time_limit_for(self.order[self.round]),
             }
         )
         await self.broadcast_teacher()
@@ -1218,7 +1222,7 @@ class Game:
                 payload = {"choice": self.round_perm[picked]}
             correct = bool(bank.run_check(task, payload))
             self.round_answered.add(s["nick"])
-            limit = time_limit_for(task)
+            limit = self.time_limit_for(task)
             frac = max(0, min(1, (self.round_deadline - now) / limit))
             points = base_points = speed_bonus = streak_bonus = 0
             if correct:
@@ -1508,6 +1512,7 @@ class Game:
                 title = title.strip()
             session_meta = catalog.metadata(self.order, title, "upload" if imported else "library")
             session_meta["attendance_required"] = bool(self.session.get("geo"))
+            session_meta["timeLimits"] = self.session.get("timeLimits", {})
             session_meta["feedback_policy"] = self.session.get("reveal", "immediate")
             session_meta["snapshot"] = [
                 {

@@ -9,6 +9,32 @@ import main
 
 
 class TimerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_session_time_limit_drives_deadline_and_restoration(self):
+        import tempfile
+        from pathlib import Path
+
+        game = main.Game()
+        task = {**bank.TASKS[0], "timeLimit": 17}
+        game.session.update(status="running", test=True, timeLimits={task["type"]: 60})
+        game.order = [task]
+        game.broadcast_students = AsyncMock()
+        game.broadcast_teacher = AsyncMock()
+        try:
+            before = main.now_ms()
+            await game.begin_round(0)
+            self.assertAlmostEqual(game.round_deadline - before, 60000, delta=1000)
+            with tempfile.TemporaryDirectory() as directory:
+                restored = main.Game()
+                restored.room_id = game.room_id = "timing-test"
+                restored._snapshot_file = game._snapshot_file = Path(directory) / "state.json"
+                game.save_snapshot()
+                restored.load_snapshot()
+                self.assertEqual(restored.time_limit_for(restored.order[0]), 60000)
+                self.assertEqual(restored.round_deadline, game.round_deadline)
+                restored._cancel_timers()
+        finally:
+            game._cancel_timers()
+
     async def test_timeout_reaches_next_round_without_watchdog(self):
         game = main.Game()
         game.session.update(status="running", test=True)

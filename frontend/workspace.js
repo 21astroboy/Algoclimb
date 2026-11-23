@@ -409,6 +409,14 @@ async function createRoom() {
   return r.id;
 }
 async function configure() {
+  const timeTypes = [
+    ['choice', 'Multiple choice'],
+    ['graph', 'Build graph'],
+    ['order', 'Traversal / ordering'],
+    ['sort', 'Sorting'],
+    ['blank', 'Fill blanks'],
+  ];
+  const savedLimits = state?.session?.preparation?.timeLimits || {};
   modal(
     'Prepare session',
     `${input('sessionTitle', 'Session title', 'Class · ' + new Date().toLocaleDateString())}${input('classGroup', 'Group / cohort number', '1', 'number')}${field(
@@ -420,10 +428,19 @@ async function configure() {
         ['teacher', 'Teacher only'],
       ],
       'after'
-    )}<p>${pendingImport ? 'One-session bank selected.' : picked.size + ' questions selected. With no selection, available questions are used.'}</p><label class="checkrow"><input type="checkbox" id="geoEnabled"> Check attendance by location (optional)</label>${input('geoRadius', 'Attendance radius (meters)', '200', 'number')}<p class="muted">Location is requested only when you enable this option. Uncertain results can be reviewed manually.</p>${formError()}${button(
+    )}<details><summary>Time per question type (optional)</summary><p class="muted">Seconds per question, from 5 to 3600. Leave blank to keep the question’s own time limit or the platform default. A value here overrides it for this session only.</p>${timeTypes.map(([type, label]) => input('time-' + type, label + ' · seconds', savedLimits[type] ?? '', 'number').replace(' required>', ' min="5" max="3600" step="1" placeholder="Default">')).join('')}</details><p>${pendingImport ? 'One-session bank selected.' : picked.size + ' questions selected. With no selection, available questions are used.'}</p><label class="checkrow"><input type="checkbox" id="geoEnabled"> Check attendance by location (optional)</label>${input('geoRadius', 'Attendance radius (meters)', '200', 'number')}<p class="muted">Location is requested only when you enable this option. Uncertain results can be reviewed manually.</p>${formError()}${button(
       'Open lobby',
       () =>
         formTask(async () => {
+          const timeLimits = {};
+          for (const [type, label] of timeTypes) {
+            const raw = $('time-' + type).value.trim();
+            if (!raw) continue;
+            const seconds = Number(raw);
+            if (!Number.isInteger(seconds) || seconds < 5 || seconds > 3600)
+              throw new Error(label + ': enter whole seconds from 5 to 3600 or leave blank.');
+            timeLimits[type] = seconds;
+          }
           if ($('geoEnabled').checked) {
             if (!isSecureContext || !navigator.geolocation)
               throw new Error('Location requires HTTPS and browser permission.');
@@ -452,8 +469,15 @@ async function configure() {
             taskIds: [...picked],
             importId: pendingImport,
             stream: group,
+            timeLimits,
           });
-          const prep = { title, taskIds: [...picked], stream: group, importId: pendingImport };
+          const prep = {
+            title,
+            taskIds: [...picked],
+            stream: group,
+            importId: pendingImport,
+            timeLimits,
+          };
           localStorage.setItem('ac.prep.' + room, JSON.stringify(prep));
           closeModal();
           await openRoom(room);

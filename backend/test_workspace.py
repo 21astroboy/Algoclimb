@@ -274,6 +274,43 @@ class WorkspaceTests(unittest.TestCase):
             401,
         )
 
+    def test_session_time_limits_are_validated_and_isolated(self):
+        c, _u, _ = self.teacher()
+        rid = c.post("/api/workspace/rooms", json={}).json()["id"]
+        url = f"/api/workspace/rooms/{rid}/settings"
+        g = main.rooms[rid]
+        for invalid in (
+            [],
+            None,
+            {"choice": True},
+            {"choice": 4},
+            {"sort": 3601},
+            {"blank": 10.5},
+            {"unknown": 30},
+            {"graph": "30"},
+        ):
+            response = c.post(url, json={"title": "Timing", "timeLimits": invalid})
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertNotIn("timeLimits", g.session)
+        limits = {"choice": 60, "graph": 120, "order": 90, "sort": 5, "blank": 3600}
+        response = c.post(url, json={"title": "Timing", "timeLimits": limits})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(g.session["preparation"]["timeLimits"], limits)
+        for kind, seconds in limits.items():
+            self.assertEqual(g.time_limit_for({"type": kind, "timeLimit": 17}), seconds * 1000)
+        other_id = c.post("/api/workspace/rooms", json={}).json()["id"]
+        other = main.rooms[other_id]
+        task = {"type": "choice", "timeLimit": 17}
+        self.assertEqual(other.time_limit_for(task), 17000)
+        snapshot = g.snapshot_dict()
+        self.assertEqual(snapshot["session"]["timeLimits"], limits)
+        g.session["status"] = "running"
+        self.assertEqual(c.post(url, json={"title": "Timing", "timeLimits": {}}).status_code, 409)
+        self.assertEqual(g.session["timeLimits"], limits)
+        g.session["status"] = "lobby"
+        self.assertEqual(c.post(url, json={"title": "Defaults"}).status_code, 200)
+        self.assertEqual(g.time_limit_for(task), 17000)
+
     def test_room_isolation_geo_accuracy_and_manual_override(self):
         c, _u, _ = self.teacher()
         other, _, _ = self.teacher()

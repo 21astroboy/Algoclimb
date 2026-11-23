@@ -363,6 +363,16 @@ def register(app, rooms, new_room, teacher_key):
         async with g.lock:
             if g.session["status"] != "lobby":
                 raise HTTPException(409, "Session has already started.")
+            limits = body.get("timeLimits", {})
+            if (
+                not isinstance(limits, dict)
+                or not set(limits) <= {"choice", "graph", "order", "sort", "blank"}
+                or any(type(v) is not int or not 5 <= v <= 3600 for v in limits.values())
+            ):
+                raise HTTPException(
+                    400,
+                    "Time limits must be whole seconds from 5 to 3600 for known question types.",
+                )
             g.session["title"] = text(body, "title")
             ids = body.get("taskIds", [])
             permitted = {t["id"] for t in ac.catalog_tasks(u)}
@@ -409,6 +419,8 @@ def register(app, rooms, new_room, teacher_key):
                 }
             else:
                 g.session.pop("geo", None)
+            g.session["timeLimits"] = limits.copy()
+            g.session["preparation"]["timeLimits"] = limits.copy()
             g.save_snapshot()
         return {"ok": True}
 

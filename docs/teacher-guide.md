@@ -231,3 +231,7 @@ The same section shows status and the owner's reply. Approving existing-subject 
 Under **Administration → Invite teacher**, the owner enters an email and subjects, creates a link and privately sends it to the colleague. No email is automatically sent. **Teachers → Manage** changes permissions, issues recovery, revokes credentials, suspends now/after class, or removes access and transfers personal sets to the owner.
 
 For a particular report, choose **Report → Share report**, enter the teacher email and report subjects, then **Grant view access**. This also works with an invitation awaiting activation. **Revoke view access** removes the grant. Room control stays with the owner. Administration is hidden from teachers and protected by server-side role checks.
+
+### Optional question timing
+
+In **Prepare session → Time per question type (optional)**, set whole seconds (5–3600) separately for multiple choice, graph building, traversal/ordering, sorting and fill blanks. Leave any field blank to use that question’s `timeLimit` or the platform default. A session override takes priority over the JSON value, affects both the countdown and speed bonus, survives reconnection/server recovery, and cannot be changed after starting. Other sessions and the question bank stay unchanged.

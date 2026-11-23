@@ -111,6 +111,9 @@ jobs:
           for i in $(seq 1 40); do curl -fsS http://127.0.0.1:8099/healthz && break || sleep 0.5; done
           node tools/check_accounts.cjs
 
+      - name: Optional session timing form
+        run: node tools/check_session_timing.cjs
+
       - name: Workspace climb board layout and interaction
         run: node tools/check_climb_board.cjs
 
