@@ -988,14 +988,17 @@ function analyticsView() {
 }
 function reportOverview() {
   const correct = report.answers.filter((x) => x.correct).length;
-  return `<div class="grid">${metric('Participants', reportStudents().length, 'Open student answer matrix', () => setReportTab('students'))}${metric('Accuracy', accuracy(correct, report.answers.length), 'Correct / submitted answers', () => setReportTab('questions'))}${metric('Reconnections', report.events.filter((x) => x.kind === 'reconnected').length, 'Open connection events', () => setReportTab('connections'))}</div><div class="space"></div><div class="two"><div class="card"><h2>Accuracy by question</h2><div class="metric">${report.questions
+  return `<div class="grid">${metric('Participants', reportStudents().length, 'Open student answer matrix', () => setReportTab('students'))}${metric('Accuracy', accuracy(correct, report.answers.length), 'Correct / submitted answers', () => setReportTab('questions'))}${metric('Reconnections', report.events.filter((x) => x.kind === 'reconnected').length, 'Open connection events', () => setReportTab('connections'))}</div><div class="space"></div><div class="two"><div class="card"><h2>Accuracy by question</h2><p class="muted">Correct / submitted answers · select a bar to inspect the question</p><div class="accuracy-chart"><div class="metric accuracy-bars" style="min-width:${Math.max(240, report.questions.length * 48)}px">${report.questions
     .map((q, i) => {
       const a = report.answers.filter((x) => x.task_id === q.id);
-      return `<button data-action="${registerAction(() => openQuestion(q.id))}" title="${esc(q.title)}" style="height:${a.length ? Math.max(3, (a.filter((x) => x.correct).length / a.length) * 100) : 3}%"><small>${i + 1}</small></button>`;
+      const correct = a.filter((x) => x.correct).length;
+      const label = a.length ? accuracy(correct, a.length) : '—';
+      const description = `Q${i + 1} · ${q.title} · ${a.length ? label + ' · ' + correct + '/' + a.length + ' correct' : 'No submissions'}`;
+      return `<button data-action="${registerAction(() => openQuestion(q.id))}" aria-label="${esc(description)}" title="${esc(description)}" style="height:${a.length ? Math.max(3, (correct / a.length) * 100) : 3}%"><span class="accuracy-value" aria-hidden="true">${label}</span><small>Q${i + 1}</small></button>`;
     })
     .join(
       ''
-    )}</div><div class="space"></div>${!report.questions.length ? '<p>Legacy session: question snapshots were not recorded.</p>' : button('Inspect questions', () => setReportTab('questions'))}</div><div class="card"><h2>Leaderboard</h2>${report.results
+    )}</div></div><div class="space"></div>${!report.questions.length ? '<p>Legacy session: question snapshots were not recorded.</p>' : button('Inspect questions', () => setReportTab('questions'))}</div><div class="card"><h2>Leaderboard</h2>${report.results
     .slice(0, 3)
     .map(
       (r) => `<p>${r.place}. ${button(r.nick, () => openStudent(r.nick))}<br>${r.total} points</p>`

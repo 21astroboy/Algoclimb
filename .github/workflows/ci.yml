@@ -114,6 +114,9 @@ jobs:
       - name: Workspace navigation and interaction
         run: node tools/check_workspace_ux.cjs
 
+      - name: Analytics chart labels
+        run: node tools/check_analytics_chart.cjs
+
       - name: Optional session timing form
         run: node tools/check_session_timing.cjs
 

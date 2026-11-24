@@ -1091,3 +1091,29 @@ button.active:not(:disabled):active {
     padding-bottom: 20px;
   }
 }
+
+/* Per-question values stay readable with 30+ questions and on phones. */
+.accuracy-chart {
+  overflow-x: auto;
+  padding: 30px 8px;
+}
+.accuracy-bars {
+  margin: 0;
+  height: 120px;
+  gap: 18px;
+}
+.accuracy-bars button {
+  min-width: 30px;
+}
+.accuracy-value {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.two > .card {
+  min-width: 0;
+}

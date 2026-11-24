@@ -339,3 +339,7 @@ Created by Kirill · [@21astroboy](https://github.com/21astroboy) · [AGPL-3.0](
 ## For contributors and coding agents
 
 Start with [AGENTS.md](AGENTS.md) and the [agent handbook](agents/README.md). The handbook documents architecture, persistence, permissions, classroom rules, frontend navigation/accessibility, test setup, deployment and incident recovery. See the [teacher guide](docs/teacher-guide.md) for the grouped session setup, back/logo navigation and tab-leave counters in live classes and reports.
+
+The session overview chart labels every question with its correct/submitted percentage; unanswered questions show an em dash.
+
+[Detailed engineering backlog and annotated context screenshots](docs/backlog/README.md).

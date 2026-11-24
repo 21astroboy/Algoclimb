@@ -247,3 +247,5 @@ Buttons have distinct backgrounds, hover and pressed states, a keyboard focus ou
 The live participant cards show **tab leaves**. Saved **Leaderboard**, **Students**, individual student reports and **Connections** show the counts/events. A tab leave is recorded when a joined student hides the page while a question is displayed and their WebSocket is open. It also includes switching apps or minimizing the browser. It is not proof of cheating, does not measure absence duration and cannot reliably report an exit while offline. Practice sessions do not create ordinary saved history; legacy reports may have no events.
 
 ![Session setup with optional timing](images/en/workspace-session-setup.png)
+
+The **Accuracy by question** chart shows the percentage above each bar and the question number below. Hover/focus for the full title and correct/submitted count; select the bar to inspect answers. An em dash means no submissions. Long charts scroll horizontally.
