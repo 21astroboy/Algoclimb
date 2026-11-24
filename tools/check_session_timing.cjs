@@ -32,7 +32,15 @@ const root = path.resolve(__dirname, '..');
         return route.fulfill({ json: data });
       }
       const file = pathname === '/workspace' ? 'workspace.html' : pathname.slice(1);
-      if (!['workspace.html', 'workspace.js', 'workspace.css'].includes(file))
+      if (
+        ![
+          'workspace.html',
+          'workspace.js',
+          'workspace.css',
+          'interactions.css',
+          'site-footer.js',
+        ].includes(file)
+      )
         return route.fulfill({ status: 404, body: '' });
       return route.fulfill({
         contentType: file.endsWith('.js')
@@ -48,7 +56,18 @@ const root = path.resolve(__dirname, '..');
 
     await p.evaluate(() => {
       room = 'fixture';
-      state = { session: { status: 'lobby', preparation: { timeLimits: { choice: 45 } } } };
+      state = {
+        session: {
+          status: 'lobby',
+          reveal: 'teacher',
+          preparation: {
+            title: 'Prepared fixture',
+            stream: 7,
+            taskIds: ['fixture-question'],
+            timeLimits: { choice: 45 },
+          },
+        },
+      };
       api = async (_url, data) => {
         window.savedTiming = data;
         return {};
@@ -57,6 +76,9 @@ const root = path.resolve(__dirname, '..');
       configure();
     });
     await p.locator('summary').click();
+    assert.equal(await p.locator('#sessionTitle').inputValue(), 'Prepared fixture');
+    assert.equal(await p.locator('#classGroup').inputValue(), '7');
+    assert.equal(await p.locator('#revealMode').inputValue(), 'teacher');
     assert.equal(await p.locator('#time-choice').inputValue(), '45');
     assert.equal(await p.locator('#time-sort').getAttribute('required'), null);
     await p.locator('#time-graph').fill('4');
@@ -70,6 +92,7 @@ const root = path.resolve(__dirname, '..');
       choice: 45,
       graph: 120,
     });
+    assert.deepEqual(await p.evaluate(() => window.savedTiming.taskIds), ['fixture-question']);
     await p.setViewportSize({ width: 390, height: 844 });
     await p.evaluate(() => configure());
     await p.locator('summary').click();

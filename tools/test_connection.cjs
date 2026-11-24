@@ -126,3 +126,30 @@ test('answering while offline queues the answer without throwing', () => {
 });
 
 test('room identity is preserved when reconnecting', () => { const s=setup(); assert.ok(s.sockets[0].url.includes('room=classroom-1')); s.sockets[0].close(); s.run(1000); assert.ok(s.sockets[1].url.includes('room=classroom-1')); });
+
+test('tab leave is emitted only while a joined student hides a visible question on an open socket', () => {
+  const start = html.indexOf('      /* анти-ИИ: уход со вкладки */');
+  const telemetry = html.slice(start, html.indexOf('    </script>', start));
+  let listener;
+  let taskHidden = false;
+  const sent = [];
+  const ctx = vm.createContext({
+    document: { hidden: false, addEventListener: (_name, fn) => { listener = fn; } },
+    me: { done: false },
+    ws: { readyState: 1, send: raw => sent.push(JSON.parse(raw)) },
+    WebSocket: { OPEN: 1 },
+    $: () => ({ classList: { contains: () => taskHidden } }),
+  });
+  assert(start >= 0);
+  vm.runInContext(telemetry, ctx);
+  listener();
+  assert.equal(sent.length, 0);
+  ctx.document.hidden = true;
+  listener();
+  assert.deepEqual(sent, [{ type: 'tableave' }]);
+  taskHidden = true; listener();
+  taskHidden = false; ctx.me.done = true; listener();
+  ctx.me.done = false; ctx.ws.readyState = 3; listener();
+  ctx.ws.readyState = 1; ctx.me = null; listener();
+  assert.equal(sent.length, 1);
+});

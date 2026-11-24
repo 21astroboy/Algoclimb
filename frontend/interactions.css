@@ -1,0 +1,49 @@
+/* Shared affordances, including touch and keyboard users. */
+button,
+.btn,
+[role='button'] {
+  touch-action: manipulation;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
+}
+button:not(:disabled):hover,
+.btn:not(:disabled):hover {
+  box-shadow:
+    0 0 0 2px #5d8bb54d,
+    0 4px 10px #07172b26;
+  filter: brightness(1.06);
+}
+button:not(:disabled):active,
+.btn:not(:disabled):active {
+  box-shadow: inset 0 3px 7px #07172b55;
+  filter: brightness(0.87);
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible {
+  outline: 3px solid #2979c7;
+  outline-offset: 3px;
+}
+button:disabled,
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+button[aria-busy='true'] {
+  cursor: progress;
+  box-shadow: inset 0 0 0 2px #2979c7;
+}
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .btn,
+  [role='button'] {
+    transition: none;
+  }
+}

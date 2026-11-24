@@ -33,6 +33,29 @@ let room,
   reconnectTimer,
   retry = 0;
 let operation = 0;
+const navigationTrail = [];
+function rememberPage() {
+  const last = navigationTrail.at(-1);
+  if (!last || last.page !== page || last.room !== room) navigationTrail.push({ page, room });
+  if (navigationTrail.length > 40) navigationTrail.shift();
+}
+async function goBack() {
+  if ($('overlay').children.length) return closeModal();
+  if (page === 'analytics' && report) {
+    if (reportTab === 'student') return setReportTab('students');
+    if (reportTab === 'question') return setReportTab('questions');
+    if (reportTab !== 'overview') return setReportTab('overview');
+    report = null;
+    return navigate('analytics', false);
+  }
+  const target = navigationTrail.pop();
+  if (target?.page === 'lobby' && target.room) {
+    if (target.room === room || rooms.some((r) => r.id === target.room))
+      return openRoom(target.room, false);
+    return navigate('sessions', false);
+  }
+  return navigate(target?.page || 'home', false);
+}
 const events = new Map();
 let eventId = 0;
 function button(label, callback, primary = false) {
@@ -41,10 +64,26 @@ function button(label, callback, primary = false) {
   return `<button data-action="${id}" class="${primary ? 'primary' : ''}">${esc(label)}</button>`;
 }
 document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-home]')) {
+    e.preventDefault();
+    closeModal();
+    navigate('home').catch(fail);
+    return;
+  }
   const b = e.target.closest('[data-action]');
   if (b)
     Promise.resolve()
-      .then(() => events.get(Number(b.dataset.action))?.())
+      .then(async () => {
+        if (b.dataset.busy) return;
+        b.dataset.busy = 'true';
+        b.setAttribute('aria-busy', 'true');
+        try {
+          await events.get(Number(b.dataset.action))?.();
+        } finally {
+          delete b.dataset.busy;
+          b.removeAttribute('aria-busy');
+        }
+      })
       .catch(fail);
 });
 function fail(e) {
@@ -77,12 +116,18 @@ async function api(path, body, method) {
 function heading(title, sub = '', actions = '') {
   return `<div class="heading"><div><h1>${esc(title)}</h1><span class="muted">${esc(sub)}</span></div><div class="row">${actions}</div></div>`;
 }
-function modal(title, html) {
+let dialogTrigger;
+function modal(title, html, className = '') {
+  dialogTrigger = document.activeElement;
+  $('app').inert = true;
   $('overlay').innerHTML =
-    `<div class="modalback"><div class="modal">${button('Close', closeModal)}<div class="space"></div><h2>${esc(title)}</h2>${html}</div></div>`;
+    `<div class="modalback"><section role="dialog" aria-modal="true" aria-label="${esc(title)}" class="modal ${className}">${button('← Back / Close', closeModal)}<div class="space"></div><h2>${esc(title)}</h2>${html}</section></div>`;
+  $('overlay').querySelector('button')?.focus({ preventScroll: true });
 }
 function closeModal() {
   $('overlay').innerHTML = '';
+  $('app').inert = false;
+  if (dialogTrigger?.isConnected) dialogTrigger.focus({ preventScroll: true });
   pruneActions();
 }
 function input(id, label, value = '', type = 'text') {
@@ -134,7 +179,7 @@ function nav() {
   ];
   if (room) items.splice(2, 0, ['lobby', 'Current session']);
   if (me.role === 'admin') items.push(['admin', 'Administration']);
-  return `<aside class="rail"><div class="brand">Algo<em>Climb</em></div>${items.map(([p, t]) => button(t, () => navigate(p), p === page)).join('')}<div class="profile">${esc(me.name)}<br>${esc(me.subject)}<br>${esc(me.role)} · ${Object.keys(catalog.sections).join(', ')}<br>${button('Account & password', editAccount)}${button(
+  return `<aside class="rail"><a class="brand" href="/workspace" data-home aria-label="AlgoClimb · Overview">Algo<em>Climb</em></a>${items.map(([p, t]) => button(t, () => navigate(p), p === page)).join('')}<div class="profile">${esc(me.name)}<br>${esc(me.subject)}<br>${esc(me.role)} · ${Object.keys(catalog.sections).join(', ')}<br>${button('Account & password', editAccount)}${button(
     'Sign out',
     async () => {
       await api('/logout', {});
@@ -180,7 +225,7 @@ function render() {
   const searchPosition = searchFocused ? document.activeElement.selectionStart : null;
   document.body.classList.toggle('competition-expanded', boardExpanded && page === 'lobby');
   $('app').innerHTML =
-    `<div class="shell">${nav()}<main class="main">${({ home: homeView, library: libraryView, sessions: sessionsView, lobby: lobbyView, analytics: analyticsView, keys: keysView, requests: requestsView, admin: adminView }[page] || homeView)()}</main></div>`;
+    `<div class="shell">${nav()}<main class="main">${page !== 'home' ? '<div class="page-back">' + button('← Back', goBack) + '</div>' : ''}${({ home: homeView, library: libraryView, sessions: sessionsView, lobby: lobbyView, analytics: analyticsView, keys: keysView, requests: requestsView, admin: adminView }[page] || homeView)()}</main></div>`;
   for (const el of document.querySelectorAll('[data-preserve-scroll]')) {
     const saved = scrolls.get(el.dataset.preserveScroll);
     if (saved) {
@@ -195,7 +240,7 @@ function render() {
   }
   pruneActions();
 }
-async function navigate(p) {
+async function navigate(p, remember = true) {
   const id = ++operation;
   if (p === 'sessions' || p === 'home' || p === 'analytics') {
     [history, rooms] = await Promise.all([api('/sessions'), api('/rooms')]);
@@ -206,6 +251,7 @@ async function navigate(p) {
     [adminData, requests] = await Promise.all([api('/admin'), api('/requests')]);
   }
   if (id !== operation) return;
+  if (remember && page !== p) rememberPage();
   page = p;
   render();
   window.scrollTo(0, 0);
@@ -416,10 +462,17 @@ async function configure() {
     ['sort', 'Sorting'],
     ['blank', 'Fill blanks'],
   ];
-  const savedLimits = state?.session?.preparation?.timeLimits || {};
+  const prep = state?.session?.status === 'lobby' ? state.session.preparation || {} : {};
+  const savedLimits = prep.timeLimits || {};
+  const taskIds = picked.size ? [...picked] : prep.taskIds || [];
+  const importId = pendingImport || prep.importId || null;
+  const configuredGeo =
+    state?.session?.status === 'lobby' && state.session.attendanceSettings?.enabled
+      ? state.session.attendanceSettings
+      : null;
   modal(
     'Prepare session',
-    `${input('sessionTitle', 'Session title', 'Class · ' + new Date().toLocaleDateString())}${input('classGroup', 'Group / cohort number', '1', 'number')}${field(
+    `<p class="muted">Prepare your classroom, then invite students. The quiz starts only when you press Start in the lobby.</p><div class="session-summary"><strong>${importId ? 'One-session JSON bank' : taskIds.length ? taskIds.length + ' selected questions' : 'Available question bank'}</strong><span>${importId ? 'Separate bank · used for this session only' : 'Your library stays unchanged'}</span></div><section class="setup-section"><h3>1 · Class details</h3><div class="setup-grid"><div>${input('sessionTitle', 'Session title', prep.title || 'Class · ' + new Date().toLocaleDateString())}</div><div>${input('classGroup', 'Group / cohort number', prep.stream || '1', 'number')}</div></div>${field(
       'revealMode',
       'Show answer correctness',
       [
@@ -427,8 +480,8 @@ async function configure() {
         ['immediate', 'After each answer'],
         ['teacher', 'Teacher only'],
       ],
-      'after'
-    )}<details><summary>Time per question type (optional)</summary><p class="muted">Seconds per question, from 5 to 3600. Leave blank to keep the question’s own time limit or the platform default. A value here overrides it for this session only.</p>${timeTypes.map(([type, label]) => input('time-' + type, label + ' · seconds', savedLimits[type] ?? '', 'number').replace(' required>', ' min="5" max="3600" step="1" placeholder="Default">')).join('')}</details><p>${pendingImport ? 'One-session bank selected.' : picked.size + ' questions selected. With no selection, available questions are used.'}</p><label class="checkrow"><input type="checkbox" id="geoEnabled"> Check attendance by location (optional)</label>${input('geoRadius', 'Attendance radius (meters)', '200', 'number')}<p class="muted">Location is requested only when you enable this option. Uncertain results can be reviewed manually.</p>${formError()}${button(
+      state?.session?.status === 'lobby' ? state.session.reveal || 'after' : 'after'
+    )}</section><details class="setup-section"><summary>2 · Time per question type (optional)</summary><p class="muted">Seconds per question, from 5 to 3600. Leave blank to keep the question’s own time limit or the platform default. A value here overrides it for this session only.</p><div class="setup-grid">${timeTypes.map(([type, label]) => '<div>' + input('time-' + type, label + ' · seconds', savedLimits[type] ?? '', 'number').replace(' required>', ' min="5" max="3600" step="1" placeholder="Default">') + '</div>').join('')}</div></details><section class="setup-section"><h3>3 · Attendance (optional)</h3><label class="checkrow"><input type="checkbox" id="geoEnabled"> Check attendance by location</label><div id="geoOptions" hidden>${input('geoRadius', 'Attendance radius (meters)', configuredGeo?.radius || '200', 'number')}<p class="muted">Requires location permission. Uncertain results can be reviewed manually; quiz scores are preserved separately.</p></div></section><div class="setup-actions">${formError()}<p class="muted">You can review these settings before starting.</p>${button(
       'Open lobby',
       () =>
         formTask(async () => {
@@ -466,16 +519,16 @@ async function configure() {
             title,
             reveal,
             geo,
-            taskIds: [...picked],
-            importId: pendingImport,
+            taskIds,
+            importId,
             stream: group,
             timeLimits,
           });
           const prep = {
             title,
-            taskIds: [...picked],
+            taskIds,
             stream: group,
-            importId: pendingImport,
+            importId,
             timeLimits,
           };
           localStorage.setItem('ac.prep.' + room, JSON.stringify(prep));
@@ -483,8 +536,14 @@ async function configure() {
           await openRoom(room);
         }),
       true
-    )}`
+    )}</div>`,
+    'session-setup'
   );
+  $('geoEnabled').checked = Boolean(configuredGeo);
+  $('geoOptions').hidden = !configuredGeo;
+  $('geoEnabled').addEventListener('change', () => {
+    $('geoOptions').hidden = !$('geoEnabled').checked;
+  });
 }
 async function upload() {
   modal(
@@ -527,7 +586,8 @@ async function upload() {
     )}`
   );
 }
-async function openRoom(id) {
+async function openRoom(id, remember = true) {
+  if (remember && (page !== 'lobby' || room !== id)) rememberPage();
   if (room !== id) {
     boardQuery = '';
     boardCheckpoint = null;
@@ -707,6 +767,24 @@ document.addEventListener('input', (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Tab' && $('overlay').children.length) {
+    const items = [
+      ...$('overlay').querySelectorAll('button, input, select, textarea, summary, a[href]'),
+    ].filter((el) => !el.disabled && el.getClientRects().length);
+    const first = items[0],
+      last = items.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+  if (event.key === 'Escape' && $('overlay').children.length) {
+    closeModal();
+    return;
+  }
   if (event.key === 'Escape' && boardExpanded) {
     boardExpanded = false;
     render();
@@ -753,9 +831,9 @@ function lobbyView() {
             : button('Open saved report', async () => {
                 await navigate('sessions');
               })
-        }<b>Question ${state.round + 1} / ${state.roundTotal} · ${state.answeredCount} answered</b></div><div class="space"></div>${competitionBoard()}<div class="space"></div>`
+        }<b>Question ${state.round + 1} / ${state.roundTotal} · ${state.answeredCount} answered</b><span class="tab-leaves">↗ ${(state.leaderboard || []).reduce((n, s) => n + (Number(s.tabLeaves) || 0), 0)} tab leaves</span></div><div class="space"></div>${competitionBoard()}<div class="space"></div>`
       : '') +
-    `<div class="two"><div class="card"><h2>Participants · ${state.roster.length}</h2><p>${state.roster.filter((x) => x.connected).length} connected · ${state.roster.filter((x) => !x.connected).length} offline. Rejoining preserves answers.</p><div class="roster">${state.roster.map((s) => `<div class="roster-item"><b>${esc(s.nick)}</b><br>${badge(s.connected ? 'connected' : 'offline')}<br>${badge(checks.get(s.nick)?.status)}<div class="space"></div>${button('Confirm presence', () => markAttendance(s.nick, 'confirmed'))}${button('Not present', () => markAttendance(s.nick, 'rejected'))}</div>`).join('')}</div></div><aside class="stack"><div class="card empty"><h2>Student access</h2><div class="qr">${state.qrSvg || ''}</div><p><a href="${esc(state.joinUrl)}" target="_blank" rel="noopener">${esc(state.joinUrl)}</a></p>${button(
+    `<div class="two"><div class="card"><h2>Participants · ${state.roster.length}</h2><p>${state.roster.filter((x) => x.connected).length} connected · ${state.roster.filter((x) => !x.connected).length} offline. Rejoining preserves answers.</p><div class="roster">${state.roster.map((s) => `<div class="roster-item"><b>${esc(s.nick)}</b><br>${badge(s.connected ? 'connected' : 'offline')}<br>${badge(checks.get(s.nick)?.status)}<br><span class="tab-leaves">↗ ${Number(state.leaderboard?.find((r) => r.nick === s.nick)?.tabLeaves) || 0} tab leaves</span><div class="space"></div>${button('Confirm presence', () => markAttendance(s.nick, 'confirmed'))}${button('Not present', () => markAttendance(s.nick, 'rejected'))}</div>`).join('')}</div></div><aside class="stack"><div class="card empty"><h2>Student access</h2><div class="qr">${state.qrSvg || ''}</div><p><a href="${esc(state.joinUrl)}" target="_blank" rel="noopener">${esc(state.joinUrl)}</a></p>${button(
       'Copy join link',
       async () => {
         await navigator.clipboard.writeText(state.joinUrl);
@@ -820,7 +898,9 @@ async function repeatSession(id) {
   await configure();
 }
 async function openReport(id) {
-  report = await api('/sessions/' + id);
+  const nextReport = await api('/sessions/' + id);
+  if (page !== 'analytics') rememberPage();
+  report = nextReport;
   reportTab = 'overview';
   answerFilter = 'all';
   page = 'analytics';
@@ -838,6 +918,9 @@ function reportStudents() {
 }
 function studentAnswers(nick) {
   return report.answers.filter((a) => a.nick === nick);
+}
+function tabLeaveCount(nick) {
+  return report.events.filter((e) => e.kind === 'tableave' && (!nick || e.nick === nick)).length;
 }
 function studentStats(nick) {
   const a = studentAnswers(nick);
@@ -927,13 +1010,14 @@ function registerAction(fn) {
 function reportLeaderboard() {
   const checks = new Map(report.checks.map((x) => [x.nick, x.status]));
   return `<div class="card"><h2>Leaderboard</h2><p>Quiz results are preserved separately from attendance. Review the top 10 before awarding grades.</p>${table(
-    ['Rank', 'Student', 'Score', 'Correct', 'Attendance', ''],
+    ['Rank', 'Student', 'Score', 'Correct', 'Tab leaves', 'Attendance', ''],
     report.results.map((r) =>
       tr([
         r.place,
         esc(r.nick),
         r.total,
         studentStats(r.nick).correct,
+        tabLeaveCount(r.nick),
         badge(checks.get(r.nick)),
         button('View all answers', () => openStudent(r.nick)),
       ])
@@ -954,7 +1038,14 @@ function reportStudentTable() {
       render();
     }
   )}</div><div class="card"><h2>Student × question results</h2><p>Click a name for the full answer report. Scroll horizontally for all questions.</p>${table(
-    ['Student', 'Score', 'Submitted', 'Correct', ...report.questions.map((q, i) => 'Q' + (i + 1))],
+    [
+      'Student',
+      'Score',
+      'Submitted',
+      'Correct',
+      'Tab leaves',
+      ...report.questions.map((q, i) => 'Q' + (i + 1)),
+    ],
     names.map((n) => {
       const s = studentStats(n);
       return tr([
@@ -962,6 +1053,7 @@ function reportStudentTable() {
         s.score,
         s.submitted,
         s.correct,
+        tabLeaveCount(n),
         ...report.questions.map((q) => {
           const a = report.answers.find((x) => x.nick === n && x.task_id === q.id);
           return button(a ? (a.correct ? '✓' : '✕') : '—', () => {
@@ -996,7 +1088,7 @@ function answerFilters() {
 }
 function reportStudent() {
   const s = studentStats(selectedStudent);
-  return `<p>${button('← All students', () => setReportTab('students'))}</p>${heading(selectedStudent, 'Full answers for this session')}<div class="grid">${metric('Score', s.score, 'Rank ' + s.rank)}${metric('Correct', s.correct, accuracy(s.correct, s.submitted))}${metric('Submitted', s.submitted, 'of ' + report.questions.length)}</div><div class="space"></div>${answerFilters()}<div class="stack">${
+  return `<p>${button('← All students', () => setReportTab('students'))}</p>${heading(selectedStudent, 'Full answers for this session')}<div class="grid">${metric('Score', s.score, 'Rank ' + s.rank)}${metric('Correct', s.correct, accuracy(s.correct, s.submitted))}${metric('Submitted', s.submitted, 'of ' + report.questions.length)}${metric('Tab leaves', tabLeaveCount(selectedStudent), 'Recorded while a question was visible')}</div><div class="space"></div>${answerFilters()}<div class="stack">${
     report.questions
       .filter(
         (q) =>
@@ -1054,13 +1146,13 @@ function reportQuestion() {
   )}</div>`;
 }
 function reportConnections() {
-  return `<div class="card"><h2>Connection & classroom events</h2><p>A disconnect event records an observation; it does not establish the cause. Older sessions may not contain connection events.</p>${table(
+  return `<div class="card"><h2>Connection & classroom events</h2><p><strong>${tabLeaveCount()} tab leaves recorded</strong></p><p>Tab leaves are recorded when a student hides the page while a question is displayed and connected. They do not prove cheating. Offline exits, lobby and finished screens are not counted.</p><p>A disconnect event records an observation; it does not establish the cause. Older sessions may not contain connection events.</p>${table(
     ['Time', 'Student', 'Event', ''],
     report.events.map((e) =>
       tr([
         esc(e.at),
         esc(e.nick),
-        badge(e.kind),
+        badge(e.kind === 'tableave' ? 'Tab left' : e.kind),
         button('Student report', () => openStudent(e.nick)),
       ])
     )

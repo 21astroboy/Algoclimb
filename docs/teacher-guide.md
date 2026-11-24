@@ -235,3 +235,15 @@ For a particular report, choose **Report → Share report**, enter the teacher e
 ### Optional question timing
 
 In **Prepare session → Time per question type (optional)**, set whole seconds (5–3600) separately for multiple choice, graph building, traversal/ordering, sorting and fill blanks. Leave any field blank to use that question’s `timeLimit` or the platform default. A session override takes priority over the JSON value, affects both the countdown and speed bonus, survives reconnection/server recovery, and cannot be changed after starting. Other sessions and the question bank stay unchanged.
+
+### Navigation and controls
+
+Click **AlgoClimb** to return to Overview. Each section has **← Back**; report detail returns to its student/question list, and the report overview returns to the report list. Going back does not stop the class. Dialogs close with **← Back / Close** or Escape. Keyboard focus stays inside the dialog and returns to its trigger when possible.
+
+Buttons have distinct backgrounds, hover and pressed states, a keyboard focus outline and busy feedback. Session preparation groups class details, optional timing and optional attendance; location fields appear only when enabled. A summary shows the selected bank. **Open lobby** prepares the room; **Start** begins the quiz.
+
+### Where to see tab leaves
+
+The live participant cards show **tab leaves**. Saved **Leaderboard**, **Students**, individual student reports and **Connections** show the counts/events. A tab leave is recorded when a joined student hides the page while a question is displayed and their WebSocket is open. It also includes switching apps or minimizing the browser. It is not proof of cheating, does not measure absence duration and cannot reliably report an exit while offline. Practice sessions do not create ordinary saved history; legacy reports may have no events.
+
+![Session setup with optional timing](images/en/workspace-session-setup.png)

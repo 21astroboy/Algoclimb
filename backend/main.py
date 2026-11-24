@@ -653,6 +653,11 @@ class Game:
                 "total": len(self.order),
                 "metadata": self.session.get("metadata"),
                 "preparation": self.session.get("preparation"),
+                "reveal": self.session.get("reveal", "after"),
+                "attendanceSettings": {
+                    "enabled": bool(self.session.get("geo")),
+                    "radius": (self.session.get("geo") or {}).get("radius", 200),
+                },
             },
             "test": bool(self.session["test"]),
             "gradesExportEnabled": bool(config["gsheets"].get("enabled")),

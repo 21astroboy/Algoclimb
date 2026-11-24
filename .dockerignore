@@ -40,3 +40,7 @@ pyproject.toml
 AB-test
 *.ipynb
 design
+
+# Agent-only handoff material
+AGENTS.md
+agents

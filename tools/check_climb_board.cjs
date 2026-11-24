@@ -32,7 +32,15 @@ const root = path.resolve(__dirname, '..');
         return route.fulfill({ json: data });
       }
       const file = pathname === '/workspace' ? 'workspace.html' : pathname.slice(1);
-      if (!['workspace.html', 'workspace.js', 'workspace.css'].includes(file))
+      if (
+        ![
+          'workspace.html',
+          'workspace.js',
+          'workspace.css',
+          'interactions.css',
+          'site-footer.js',
+        ].includes(file)
+      )
         return route.fulfill({ status: 404, body: '' });
       return route.fulfill({
         contentType: file.endsWith('.js')

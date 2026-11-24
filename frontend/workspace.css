@@ -948,3 +948,146 @@ pre {
     font-size: 26px;
   }
 }
+
+/* Teacher workspace: clear actions and a structured session setup. */
+button {
+  border-color: #aabbd0;
+  background: #eaf0f8;
+  box-shadow: 0 1px 2px #13243b14;
+}
+button:not(:disabled):hover {
+  background: #d6e5f7;
+  border-color: #5c82b0;
+  filter: none;
+}
+button:not(:disabled):active {
+  background: #bcd3ef;
+}
+button.primary,
+button.active {
+  background: #ffd343;
+  border-color: #b48b14;
+}
+button.primary:not(:disabled):hover,
+button.active:not(:disabled):hover {
+  background: #f3bf20;
+  border-color: #8c6900;
+}
+button.primary:not(:disabled):active,
+button.active:not(:disabled):active {
+  background: #dba713;
+}
+.rail button {
+  border: 1px solid #dce5ef;
+  background: #f2f5fa;
+  min-height: 44px;
+}
+.rail button.primary {
+  border-color: #cba52e;
+  background: #fff0b0;
+}
+.brand {
+  display: block;
+  text-decoration: none;
+  border-radius: 8px;
+}
+.brand:hover {
+  color: #315f91;
+}
+.page-back {
+  margin-bottom: 18px;
+}
+.modal {
+  width: min(720px, 100%);
+}
+.modal.session-setup {
+  width: min(820px, 100%);
+  padding: 28px;
+}
+.session-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  background: #fff4c9;
+  border: 1px solid #e4cd7a;
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+.session-summary span {
+  color: #655526;
+  font-size: 13px;
+}
+.setup-section {
+  border: 1px solid #d5dfeb;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  background: #f8fafd;
+}
+.setup-section summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 4px;
+  border-radius: 6px;
+}
+.setup-section summary:hover {
+  color: #24558e;
+  background: #e4edf9;
+}
+.setup-section[open] summary {
+  margin-bottom: 16px;
+}
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 20px;
+}
+.setup-grid > div {
+  min-width: 0;
+}
+.setup-actions {
+  border-top: 1px solid #d5dfeb;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.setup-actions button {
+  width: 100%;
+  min-height: 48px;
+}
+.tab-leaves {
+  display: inline-block;
+  background: #fff1cf;
+  border: 1px solid #d8ae4e;
+  border-radius: 6px;
+  padding: 3px 7px;
+  margin-top: 6px;
+  color: #76500a;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal.session-setup {
+    padding: 20px;
+  }
+  .setup-section {
+    padding: 14px;
+  }
+}
+
+.session-setup .setup-actions {
+  position: sticky;
+  bottom: -28px;
+  background: #fff;
+  padding: 16px 0 28px;
+  box-shadow: 0 -10px 18px #ffffffed;
+  z-index: 1;
+}
+@media (max-width: 600px) {
+  .session-setup .setup-actions {
+    bottom: -20px;
+    padding-bottom: 20px;
+  }
+}

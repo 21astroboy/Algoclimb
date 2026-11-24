@@ -258,7 +258,11 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             await self.join(ws)
         self.start_round()
         self.game._teacher_dirty = False
-        await self.game.handle_student(ws, {"type": "tableave"}, "10.0.0.5")
+        self.game.session.update(id=123, test=False)
+        with patch.object(main.db, "record_event") as record:
+            await self.game.handle_student(ws, {"type": "tableave"}, "10.0.0.5")
+            record.assert_called_once_with(123, "Student", "tableave")
+        self.assertEqual(self.game.leaderboard()[0]["tabLeaves"], 1)
         self.game.broadcast_teacher.assert_not_awaited()
         self.assertTrue(self.game._teacher_dirty)
 

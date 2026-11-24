@@ -129,3 +129,7 @@ Stop the demo server after capture; its temporary runtime is deleted.
 For a direct Python launch, set `DOCS=1`; with Compose, put `DOCS=1` in `.env` and run
 `./algoclimb up`. HTTP docs are at `/docs`, `/redoc` and `/openapi.json`. WebSocket events are
 described in the API introduction. Never share the teacher key or its authenticated URLs.
+
+## Coding agent handoff
+
+Read [AGENTS.md](../AGENTS.md) and the [agent handbook](../agents/README.md) before changing classroom behavior or deploying. UI regression fixtures include `tools/check_workspace_ux.cjs`, `tools/check_session_timing.cjs` and `tools/check_climb_board.cjs`. All use synthetic data.
