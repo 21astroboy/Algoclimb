@@ -39,6 +39,8 @@ const root = path.resolve(__dirname, '..');
           'workspace.css',
           'interactions.css',
           'site-footer.js',
+          'i18n.js',
+          'locales/ru.json',
         ].includes(file)
       )
         return route.fulfill({ status: 404, body: '' });

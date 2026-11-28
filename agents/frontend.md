@@ -9,7 +9,7 @@
 - Legacy teacher, answer-key and developer pages are still served; keep shared assets compatible.
 - `site-footer.js` renders the copyright, source/license link and public contacts on all main pages.
 
-The public interface is English. Bank content is escaped/preserved in its own language. Use `esc()`
+The teacher workspace supports EN/RU, with English as the default. Bank content is escaped/preserved in its own language. Use `esc()`
 for untrusted strings in generated HTML, and use text content for errors. Never interpolate an uploaded
 prompt, student name or URL into executable JavaScript/HTML without the correct boundary handling.
 Do not use internal implementation details in ordinary teaching flow labels.
@@ -77,3 +77,21 @@ names, large rosters (60–120), many questions (30+) and keyboard navigation. N
 screenshots from a real class or an administrator page containing invitation/API tokens.
 `CHROME_PATH` can select installed Chrome locally; CI installs Playwright Chromium.
 Version workspace asset URLs when updating the script/style pair. Test static paths after deployment.
+
+## Localization and library selection
+
+`frontend/i18n.js` loads `frontend/locales/ru.json` before the workspace bootstraps. `tx()` translates explicit
+interface literals; the `ui` tagged-template helper translates static template segments before interpolation.
+Dynamic values (question text, names, session titles, HTML-escaped user data) must not be passed through a
+bulk DOM translator. `uh()` is for static HTML strings only, not arbitrary user HTML. Translation is not sanitization.
+The chosen language is stored in `ac.language`; switching retains the current in-memory selection and form values.
+A failed language-pack request falls back to English. New controls need message keys in the same change.
+
+Individual question checkboxes update `selectionCount` in place so focus and the open filters remain intact.
+`libraryItems()` is the shared filtered catalog for the table and random sampling. Source distinguishes the
+built-in bank from saved JSON sets, including authorized shared imports; it does not infer private ownership.
+Sample preview does not change selection. Add/Replace rechecks current catalog membership and the 500-question
+bound before applying, with no partial mutation on error. Server-side permitted-ID validation remains mandatory.
+
+`reportFilename()` includes the session title, stream/group, date, session ID and export scope; it removes path
+separators/control characters while retaining Cyrillic. Never translate or discard the user's session title.

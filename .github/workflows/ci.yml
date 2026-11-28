@@ -117,6 +117,12 @@ jobs:
       - name: Analytics chart labels
         run: node tools/check_analytics_chart.cjs
 
+      - name: Interface translation boundaries
+        run: node --test tools/test_i18n.cjs
+
+      - name: Library selection, filters, export filenames and languages
+        run: node tools/check_library_workflow.cjs
+
       - name: Optional session timing form
         run: node tools/check_session_timing.cjs
 

@@ -2,7 +2,7 @@
 
 Read [agents/README.md](agents/README.md) first. It indexes the architecture, product rules,
 frontend conventions, tests and operations runbooks. This file applies to the whole repository.
-The detailed guides describe the implementation as of 2026-11-24; inspect current code before changes.
+The detailed guides describe the implementation as of 2026-11-28; inspect current code before changes.
 
 ## Required working rules
 
@@ -12,7 +12,7 @@ The detailed guides describe the implementation as of 2026-11-24; inspect curren
 - Use a temporary `RUNTIME_DIR` for tests. Keep private banks, runtime state, invitations, passwords,
   resume secrets and API tokens out of Git, screenshots, logs and agent reports.
 - Do not modify unrelated research files, notebooks, archives or untracked design prototypes.
-- Keep the public interface English. Question text and explanations can remain Russian.
+- Keep English as the default interface language and preserve the teacher workspace EN/RU switch. Never translate user-authored question content or answers automatically.
 - Maintain both `README.md` / `README.ru.md` and the relevant bilingual teacher guide when behavior changes.
 - Keep ownership and subject checks on the server; hiding a UI control does not grant or revoke permission.
 - Validate and authorize before mutating game state. Preserve question timing, scoring and reconnect semantics.

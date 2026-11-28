@@ -22,7 +22,7 @@ A self-hosted app for live classroom quizzes in algorithms, graph theory, combin
 or any other subject. Everyone answers the same question at the same time. Students join
 by QR code, and each correct answer moves them up the mountain.
 
-The interface is **English**. Your questions, answer options and explanations can stay
+The teacher workspace supports **English / Russian** with a saved language switch; English is the default. Your questions, answer options and explanations can stay
 **Russian** or use any other language. The default public demo bank includes Russian questions. The screenshots below use
 an English demonstration bank; the [Russian page](README.ru.md) shows Russian tasks.
 
@@ -343,3 +343,5 @@ Start with [AGENTS.md](AGENTS.md) and the [agent handbook](agents/README.md). Th
 The session overview chart labels every question with its correct/submitted percentage; unanswered questions show an em dash.
 
 [Detailed engineering backlog and annotated context screenshots](docs/backlog/README.md).
+
+The library supports collapsible type/difficulty/source filters and a previewed random sample from the current filtered area. Individual selection counts update immediately. CSV filenames retain the session title and group/stream. See the [teacher guide](docs/teacher-guide.md) and [repository layout audit](docs/repository-layout.md).

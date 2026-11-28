@@ -42,6 +42,8 @@ Install Chromium for browser fixtures:
 
 ```bash
 npx playwright install chromium
+node tools/check_library_workflow.cjs
+node --test tools/test_i18n.cjs
 node tools/check_session_timing.cjs
 node tools/check_workspace_ux.cjs
 node tools/check_climb_board.cjs

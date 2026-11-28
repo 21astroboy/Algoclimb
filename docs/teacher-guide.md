@@ -249,3 +249,18 @@ The live participant cards show **tab leaves**. Saved **Leaderboard**, **Student
 ![Session setup with optional timing](images/en/workspace-session-setup.png)
 
 The **Accuracy by question** chart shows the percentage above each bar and the question number below. Hover/focus for the full title and correct/submitted count; select the bar to inspect answers. An em dash means no submissions. Long charts scroll horizontally.
+
+### Language, selection and random samples
+
+Use **Русский / English** in the teacher sidebar (also on the sign-in screen). The preference survives reloads.
+Question text, names and session titles stay in their original language; switching retains the current question selection.
+The **selected** counter updates immediately when individual question checkboxes change.
+
+In **Question library → Advanced filters**, optionally narrow by type, difficulty and source, then apply.
+Topics remain removed. Choose a **Random sample size** and **Preview random sample**: sampling uses only the
+current subject, set, search and filters. You can **Add to selection** or **Replace selection**, or close without changes.
+The preview never silently takes questions from another area; reduce N if fewer questions match. The session maximum is 500.
+
+CSV filenames include the session title (including your own “поток 1/2” text), explicit group/stream, date,
+session ID and export scope. Example: `algoclimb_Графы поток 2_group-2_2026-11-28_44_all.csv`.
+[Repository layout audit](repository-layout.md).
